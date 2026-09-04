@@ -15,6 +15,7 @@ pub mod WebViewManager;
 pub mod DialogCommon;
 mod PartsSingleModeSkillLearningListItem;
 mod TrainingParamChangeA2U;
+mod SingleModeMainTrainingCuttController;
 pub mod WebViewDefine;
 pub mod TextFrame;
 pub mod PartsSingleModeSkillListItem;
@@ -183,6 +184,7 @@ pub fn init() {
     DialogCommon::init(image);
     PartsSingleModeSkillLearningListItem::init(image);
     TrainingParamChangeA2U::init(image);
+    SingleModeMainTrainingCuttController::init(image);
     TextFrame::init(image);
     PartsSingleModeSkillListItem::init(image);
     FlashActionPlayer::init(image);

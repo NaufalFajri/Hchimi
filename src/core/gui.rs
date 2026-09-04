@@ -127,6 +127,8 @@ pub struct Gui {
     menu_visible: bool,
     menu_anim_time: Option<Instant>,
     menu_fps_value: i32,
+    trainer_preview_visible: bool,
+    trainer_preview_selected: usize,
 
     #[cfg(target_os = "windows")]
     menu_vsync_value: i32,
@@ -651,6 +653,8 @@ impl Gui {
             menu_visible: false,
             menu_anim_time: None,
             menu_fps_value: fps_value,
+            trainer_preview_visible: false,
+            trainer_preview_selected: 0,
 
             #[cfg(target_os = "windows")]
             menu_vsync_value: hachimi.vsync_count.load(atomic::Ordering::Relaxed),
@@ -935,6 +939,7 @@ impl Gui {
         self.context.begin_pass(input);
 
         if self.menu_visible { self.run_menu(); }
+        if self.trainer_preview_visible { self.run_trainer_preview(); }
         if self.update_progress_visible { self.run_update_progress(); }
 
         self.process_plugin_windows();
@@ -1157,6 +1162,9 @@ impl Gui {
                         if ui.button(t!("menu.close_menu")).clicked() {
                             self.show_menu = false;
                             self.menu_anim_time = None;
+                        }
+                        if ui.button("Trainer menu preview").clicked() {
+                            self.trainer_preview_visible = !self.trainer_preview_visible;
                         }
                     }
                     // did this because android phones have a notch
@@ -1650,6 +1658,92 @@ impl Gui {
             visuals.fg_stroke.color,
             visuals.fg_stroke
         ));
+    }
+
+    fn run_trainer_preview(&mut self) {
+        const ITEMS: [&str; 11] = [
+            "Player Options >",
+            "Vehicle Options >",
+            "Weapon Options >",
+            "People Options >",
+            "Teleport Options >",
+            "Mission Options >",
+            "Time Options >",
+            "Weather Options >",
+            "Object Options >",
+            "Misc Options >",
+            "Settings >",
+        ];
+
+        let ctx = &self.context;
+        let scale = get_scale(ctx);
+        let mut selected = self.trainer_preview_selected;
+        ctx.input(|input| {
+            if input.key_pressed(egui::Key::ArrowUp) {
+                selected = selected.saturating_sub(1);
+            }
+            if input.key_pressed(egui::Key::ArrowDown) {
+                selected = (selected + 1).min(ITEMS.len() - 1);
+            }
+            if input.key_pressed(egui::Key::Escape) {
+                self.trainer_preview_visible = false;
+            }
+        });
+        self.trainer_preview_selected = selected;
+
+        egui::Area::new("trainer_preview".into())
+            .fixed_pos(egui::pos2(10.0 * scale, 40.0 * scale))
+            .show(ctx, |ui| {
+                let frame = egui::Frame::NONE
+                    .fill(egui::Color32::from_rgb(91, 105, 102))
+                    .inner_margin(egui::Margin::ZERO);
+                frame.show(ui, |ui| {
+                    ui.set_width(272.0 * scale);
+                    ui.vertical(|ui| {
+                        ui.add_sized(
+                            [ui.available_width(), 58.0 * scale],
+                            egui::Label::new(
+                                egui::RichText::new("RZL-TRAINER")
+                                    .size(25.0 * scale)
+                                    .strong()
+                                    .color(egui::Color32::WHITE),
+                            )
+                            .wrap_mode(egui::TextWrapMode::Extend),
+                        );
+                        for (index, label) in ITEMS.iter().enumerate() {
+                            let response = ui.add_sized(
+                                [ui.available_width(), 29.0 * scale],
+                                egui::Button::new(
+                                    egui::RichText::new(*label)
+                                        .size(16.0 * scale)
+                                        .color(if index == selected {
+                                            egui::Color32::BLACK
+                                        } else {
+                                            egui::Color32::WHITE
+                                        }),
+                                )
+                                .fill(if index == selected {
+                                    egui::Color32::from_rgb(194, 195, 186)
+                                } else {
+                                    egui::Color32::TRANSPARENT
+                                })
+                                .corner_radius(0.0),
+                            );
+                            if response.clicked() {
+                                self.trainer_preview_selected = index;
+                            }
+                        }
+                        ui.horizontal(|ui| {
+                            ui.add_space(ui.available_width() - 42.0 * scale);
+                            ui.label(
+                                egui::RichText::new(format!("{}/{}", selected + 1, ITEMS.len()))
+                                    .size(15.0 * scale)
+                                    .color(egui::Color32::WHITE),
+                            );
+                        });
+                    });
+                });
+            });
     }
 
     fn run_update_progress(&mut self) {
