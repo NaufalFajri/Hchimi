@@ -29,6 +29,8 @@ mod StoryViewTextControllerSingleMode;
 mod JikkyoDisplay;
 pub mod Screen;
 #[cfg(target_os = "windows")]
+pub mod LandscapeUIManager;
+#[cfg(target_os = "windows")]
 pub mod StandaloneWindowResize;
 #[cfg(target_os = "windows")]
 mod GallopInput;
@@ -57,7 +59,8 @@ mod ButtonCommon;
 mod NowLoading;
 pub mod StoryTimelineController;
 mod DialogRaceOrientation;
-mod RaceInfo;
+pub mod RaceDefine;
+pub mod RaceInfo;
 mod RaceUtil;
 mod SaveDataManager;
 mod ApplicationSettingSaveLoader;
@@ -109,12 +112,27 @@ mod RaceModelController;
 mod RaceViewBase;
 #[cfg(target_os = "windows")]
 mod RaceEffectManager;
-#[cfg(target_os = "windows")]
-mod HorseData;
-#[cfg(target_os = "windows")]
+pub mod HorseData;
 pub mod HorseRaceInfo;
-#[cfg(target_os = "windows")]
-mod HorseRaceInfoReplay;
+pub mod RaceManager;
+pub mod RaceHorseManagerBase;
+pub mod RaceSimulateData;
+pub mod RaceSimulateEventData;
+pub mod RaceSimulateReader;
+pub mod RaceHorseManagerReplay;
+pub mod RaceSimulateFrameData;
+pub mod RaceSimulateHorseFrameData;
+
+#[path = "SimulateEventType.rs"]
+mod simulate_event_type;
+pub use simulate_event_type::SimulateEventType;
+#[path = "TemptationMode.rs"]
+mod temptation_mode;
+pub use temptation_mode::TemptationMode;
+
+pub mod SkillManager;
+pub mod SkillBase;
+pub mod HorseRaceInfoReplay;
 #[cfg(target_os = "windows")]
 mod PartsScheduleBookAutoPlayScreen;
 pub mod TweenAnimationTimelineComponent;
@@ -237,6 +255,7 @@ pub fn init() {
 
     #[cfg(target_os = "windows")]
     {
+        LandscapeUIManager::init(image);
         StandaloneWindowResize::init(image);
         GallopInput::init(image);
         InputSystemManager::init(image);
@@ -262,12 +281,22 @@ pub fn init() {
         RaceModelController::init(image);
         RaceViewBase::init(image);
         RaceEffectManager::init(image);
-        HorseData::init(image);
-        HorseRaceInfo::init(image);
-        HorseRaceInfoReplay::init(image);
         TitleViewController::init(image);
         PartsScheduleBookAutoPlayScreen::init(image);
     }
+    HorseData::init(image);
+    HorseRaceInfo::init(image);
+    RaceManager::init(image);
+    RaceHorseManagerBase::init(image);
+    RaceSimulateData::init(image);
+    RaceSimulateEventData::init(image);
+    RaceSimulateReader::init(image);
+    RaceHorseManagerReplay::init(image);
+    RaceSimulateFrameData::init(image);
+    RaceSimulateHorseFrameData::init(image);
+    HorseRaceInfoReplay::init(image);
+    SkillManager::init(image);
+    SkillBase::init(image);
     CameraData::init(image);
     TweenAnimationTimelineComponent::init(image);
     TweenAnimationTimelineData::init(image);
@@ -298,8 +327,6 @@ pub fn init() {
     HubViewControllerBase::init(image);
     LiveTheaterInfo::init(image);
     DownloadPathRegister::init(image);
-    SceneDefine::init(image);
-    GameDefine::init(image);
     MasterDataManager::init(image);
     MasterItemExchangeTop::init(image);
 }
