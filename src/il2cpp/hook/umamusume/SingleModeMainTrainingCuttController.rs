@@ -28,20 +28,6 @@ extern "C" fn OnSuccessSendCommand(
     )
 }
 
-// type PlayInResultFlashNormalFn = extern "C" fn(
-//     this: *mut Il2CppObject,
-//     result_type: i32,
-// );
-//
-// extern "C" fn PlayInResultFlashNormal(
-//     this: *mut Il2CppObject,
-//     _result_type: i32,
-// ) {
-//     get_orig_fn!(PlayInResultFlashNormal, PlayInResultFlashNormalFn)(
-//         this, TRAINING_RESULT_FAILURE
-//     )
-// }
-
 pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, SingleModeMainTrainingCuttController);
 
@@ -51,12 +37,4 @@ pub fn init(umamusume: *const Il2CppImage) {
         3,
     );
     new_hook!(on_success_send_command_addr, OnSuccessSendCommand);
-
-    // get_class_or_return!(umamusume, Gallop, AbstractTrainingCuttScenarioController);
-    // let play_in_result_flash_normal_addr = get_method_addr(
-    //     AbstractTrainingCuttScenarioController,
-    //     c"PlayInResultFlashNormal",
-    //     1,
-    // );
-    // new_hook!(play_in_result_flash_normal_addr, PlayInResultFlashNormal);
 }
