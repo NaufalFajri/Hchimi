@@ -103,6 +103,28 @@ pub struct Config {
     pub ingame_webview: bool,
     #[serde(default)]
     pub free_camera: super::free_camera::FreeCameraConfig,
+    #[serde(default)]
+    pub bouncy_uma: BouncyUmaConfig,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct BouncyUmaConfig {
+    pub enabled: bool,
+    pub bpm: f32,
+    pub amplitude: f32,
+    pub easing_type: i32,
+}
+
+impl Default for BouncyUmaConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            bpm: super::BouncyUma::default_bpm(),
+            amplitude: super::BouncyUma::default_amplitude(),
+            easing_type: 0,
+        }
+    }
 }
 
 impl Config {
