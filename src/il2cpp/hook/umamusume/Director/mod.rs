@@ -196,29 +196,6 @@ pub fn apply_live_character_options_to_character(chara_object: *mut Il2CppObject
 }
 
 #[cfg(target_os = "windows")]
-pub fn apply_live_character_scale_to_character(chara_object: *mut Il2CppObject, scale: Vector3_t) {
-    if chara_object.is_null() {
-        return;
-    }
-
-    let model_array = CharacterObject::get_LiveModelControllerArray(chara_object);
-    let model_controller = free_camera::first_enumerable_item(model_array);
-    if model_controller.is_null() {
-        return;
-    }
-
-    let owner = ModelController::get_OwnerObject(model_controller);
-    if owner.is_null() {
-        return;
-    }
-
-    let transform = GameObject::get_transform(owner);
-    if !transform.is_null() {
-        Transform::set_localScale(transform, scale);
-    }
-}
-
-#[cfg(target_os = "windows")]
 pub fn apply_live_bone_scale_to_character(
     chara_object: *mut Il2CppObject,
     bone_index: i32,
@@ -248,16 +225,6 @@ pub fn apply_live_bone_scale_to_character(
     if !bone.is_null() {
         Transform::set_localScale(bone, scale);
     }
-}
-
-#[cfg(target_os = "windows")]
-pub fn apply_live_character_scale_to_position(
-    director: *mut Il2CppObject,
-    position: i32,
-    scale: Vector3_t,
-) {
-    let chara_object = GetCharacterObjectFromPositionId(director, position);
-    apply_live_character_scale_to_character(chara_object, scale);
 }
 
 #[cfg(target_os = "windows")]
@@ -414,8 +381,6 @@ fn update_live_free_camera_target(this: *mut Il2CppObject) {
         restore_live_disabled_heads(index, true);
         return;
     }
-
-    apply_live_character_scale_to_character(chara_object, Vector3_t { x: 0.5, y: 1.0, z: 0.5 });
 
     let model_array = CharacterObject::get_LiveModelControllerArray(chara_object);
     let model_controller = free_camera::first_enumerable_item(model_array);
