@@ -211,6 +211,19 @@ pub fn apply_live_bone_scale_to_character(
         return;
     }
 
+    apply_bone_scale_to_model_controller(model_controller, bone_index, scale);
+}
+
+#[cfg(target_os = "windows")]
+pub fn apply_bone_scale_to_model_controller(
+    model_controller: *mut Il2CppObject,
+    bone_index: i32,
+    scale: Vector3_t,
+) {
+    if model_controller.is_null() || bone_index < 0 {
+        return;
+    }
+
     let owner = ModelController::get_OwnerObject(model_controller);
     if owner.is_null() {
         return;

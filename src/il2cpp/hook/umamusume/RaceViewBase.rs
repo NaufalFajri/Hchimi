@@ -1,4 +1,5 @@
 use crate::{
+        windows::BouncyUma,
     windows::free_camera::{self, CameraScene},
     il2cpp::{
         ext::StringExt,
@@ -18,6 +19,24 @@ impl_addr_wrapper_fn!(GetModelController, GET_MODEL_CONTROLLER_ADDR, *mut Il2Cpp
 
 pub fn restore_race_disabled_heads(current_index: i32, force_all: bool) {
     free_camera::restore_disabled_heads(&RACE_DISABLED_HEADS, current_index, force_all);
+}
+
+pub fn apply_bouncy_scale(view: *mut Il2CppObject, scale: Vector3_t) {
+    for index in 0..18 {
+        let model_controller = GetModelController(view, index);
+        if !model_controller.is_null() {
+            crate::il2cpp::hook::umamusume::Director::apply_bone_scale_to_model_controller(
+                model_controller,
+                1,
+                scale,
+            );
+            crate::il2cpp::hook::umamusume::Director::apply_bone_scale_to_model_controller(
+                model_controller,
+                2,
+                scale,
+            );
+        }
+    }
 }
 
 type LateUpdateViewFn = extern "C" fn(this: *mut Il2CppObject);
@@ -65,6 +84,7 @@ extern "C" fn LateUpdateView(this: *mut Il2CppObject) {
     }
 
     get_orig_fn!(LateUpdateView, LateUpdateViewFn)(this);
+    BouncyUma::update_race(this);
 }
 
 pub fn init(umamusume: *const Il2CppImage) {

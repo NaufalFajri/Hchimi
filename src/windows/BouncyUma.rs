@@ -23,6 +23,22 @@ static STATE: Lazy<Mutex<BouncyUmaState>> = Lazy::new(|| Mutex::new(BouncyUmaSta
     last_update: Instant::now(),
 }));
 
+fn current_scale() -> Option<Vector3_t> {
+    let config = Hachimi::instance().config.load();
+    let config = &config.windows.bouncy_uma;
+    if !config.enabled {
+        return None;
+    }
+
+    let state = STATE.lock().unwrap();
+    Some(next_scale(
+        state.elapsed,
+        config.bpm,
+        config.amplitude.clamp(0.0, MAX_AMPLITUDE),
+        config.easing_type,
+    ))
+}
+
 fn ease(value: f32, easing_type: i32) -> f32 {
     match easing_type {
         0 => value,
@@ -150,6 +166,22 @@ pub fn update(director: *mut Il2CppObject, delta_time: f32) {
         Director::apply_live_bone_scale_to_character(chara_object, 1, scale);
         Director::apply_live_bone_scale_to_character(chara_object, 2, scale);
     }
+}
+
+pub fn update_race(view: *mut Il2CppObject) {
+    let now = Instant::now();
+    let delta_time;
+    {
+        let mut state = STATE.lock().unwrap();
+        delta_time = now.duration_since(state.last_update).as_secs_f32();
+        state.elapsed += delta_time;
+        state.last_update = now;
+    }
+
+    let Some(scale) = current_scale() else {
+        return;
+    };
+    crate::il2cpp::hook::umamusume::RaceViewBase::apply_bouncy_scale(view, scale);
 }
 
 pub fn default_bpm() -> f32 { DEFAULT_BPM }

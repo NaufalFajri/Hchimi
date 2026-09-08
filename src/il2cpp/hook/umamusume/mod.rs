@@ -109,7 +109,7 @@ mod RaceCameraEventBase;
 #[cfg(target_os = "windows")]
 mod RaceModelController;
 #[cfg(target_os = "windows")]
-mod RaceViewBase;
+pub mod RaceViewBase;
 #[cfg(target_os = "windows")]
 mod RaceEffectManager;
 pub mod HorseData;
