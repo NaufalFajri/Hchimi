@@ -204,6 +204,11 @@ pub fn toggle_playback() {
     }
 }
 
+pub fn is_paused() -> bool {
+    let race_manager = RaceManager::instance();
+    !race_manager.is_null() && IsPaused(race_manager)
+}
+
 pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, RaceManagerReplayBase);
 

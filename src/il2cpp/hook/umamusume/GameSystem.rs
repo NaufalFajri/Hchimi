@@ -5,6 +5,8 @@ use crate::windows::free_camera::{self, CameraScene};
 use crate::core::live_utils;
 #[cfg(target_os = "windows")]
 use super::Director;
+#[cfg(target_os = "windows")]
+use super::{RaceCameraManager, RaceManagerReplayBase};
 // use std::sync::atomic::{AtomicBool, Ordering};
 // pub static GAME_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -56,6 +58,11 @@ type GameSystemLateUpdateFn = extern "C" fn(this: *mut Il2CppObject);
 extern "C" fn GameSystem_LateUpdate(this: *mut Il2CppObject) {
     get_orig_fn!(GameSystem_LateUpdate, GameSystemLateUpdateFn)(this);
     Director::apply_paused_free_camera();
+
+    #[cfg(target_os = "windows")]
+    if free_camera::scene() == CameraScene::Race && RaceManagerReplayBase::is_paused() {
+        RaceCameraManager::apply_paused_free_camera();
+    }
 }
 
 // good hook for initializing values i guess

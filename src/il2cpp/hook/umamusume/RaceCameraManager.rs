@@ -2,10 +2,25 @@ use crate::{
     windows::free_camera::{self, CameraScene},
     il2cpp::{
         hook::UnityEngine_CoreModule::Transform,
-        symbols::{get_method_addr, get_method_overload_addr},
+        symbols::{get_method_addr, get_method_overload_addr, SingletonLike},
         types::*,
     },
 };
+
+static mut CLASS: *mut Il2CppClass = 0 as _;
+static mut GET_MAIN_CAMERA_ADDR: usize = 0;
+impl_addr_wrapper_fn!(get_MainCamera, GET_MAIN_CAMERA_ADDR, *mut Il2CppObject, this: *mut Il2CppObject);
+
+pub fn class() -> *mut Il2CppClass {
+    unsafe { CLASS }
+}
+
+pub fn instance() -> *mut Il2CppObject {
+    let Some(singleton) = SingletonLike::new(class()) else {
+        return std::ptr::null_mut();
+    };
+    singleton.instance()
+}
 
 type NoArgsFn = extern "C" fn(this: *mut Il2CppObject);
 extern "C" fn RaceCameraManager_AlterLateUpdate(this: *mut Il2CppObject) {
@@ -16,6 +31,35 @@ extern "C" fn RaceCameraManager_AlterLateUpdate(this: *mut Il2CppObject) {
     Transform::set_update_race_camera(active);
     get_orig_fn!(RaceCameraManager_AlterLateUpdate, NoArgsFn)(this);
     Transform::set_update_race_camera(false);
+}
+
+pub fn apply_paused_free_camera() {
+    if !free_camera::is_scene_enabled(CameraScene::Race) {
+        return;
+    }
+
+    let camera_manager = instance();
+    if !camera_manager.is_null() {
+        RaceCameraManager_AlterLateUpdate(camera_manager);
+
+        let camera = get_MainCamera(camera_manager);
+        if !camera.is_null() {
+            let camera_transform = crate::il2cpp::hook::UnityEngine_CoreModule::Component::get_transform(camera);
+            if !camera_transform.is_null() {
+                Transform::set_update_race_camera(false);
+                let mut position = free_camera::race_camera_pos(Vector3_t::default());
+                Transform::set_position_Injected(camera_transform, &mut position);
+                if let Some(mut rotation) = free_camera::camera_rotation() {
+                    Transform::set_rotation_Injected(camera_transform, &mut rotation);
+                }
+                else {
+                    let mut look_at = free_camera::camera_look_at();
+                    let mut world_up = Vector3_t { x: 0.0, y: 1.0, z: 0.0 };
+                    Transform::Internal_LookAt_Injected(camera_transform, &mut look_at, &mut world_up);
+                }
+            }
+        }
+    }
 }
 
 type RaceChangeCameraModeFn = extern "C" fn(this: *mut Il2CppObject, mode: i32, is_skip: bool);
@@ -51,6 +95,11 @@ extern "C" fn RaceCameraManager_PlayEventCamera(
 
 pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, "Gallop", RaceCameraManager);
+
+    unsafe { CLASS = RaceCameraManager; }
+    unsafe {
+        GET_MAIN_CAMERA_ADDR = get_method_addr(RaceCameraManager, c"get_MainCamera", 0);
+    }
 
     let RaceCameraManager_AlterLateUpdate_addr = get_method_addr(RaceCameraManager, c"AlterLateUpdate", 0);
     new_hook!(RaceCameraManager_AlterLateUpdate_addr, RaceCameraManager_AlterLateUpdate);
