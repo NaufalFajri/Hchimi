@@ -533,6 +533,9 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
             }
 
             if !Gui::is_gui_input_active_atomic() {
+                if free_camera::toggle_from_windows_key(current_key, true, repeat) {
+                    return LRESULT(0);
+                }
                 free_camera::on_windows_key(current_key, true, repeat);
                 if free_camera::is_windows_key_bound(current_key) {
                     return LRESULT(0);
@@ -542,6 +545,9 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
         WM_KEYUP | WM_SYSKEYUP => {
             let current_key = wparam.0 as u16;
             if !Gui::is_gui_input_active_atomic() {
+                if free_camera::toggle_from_windows_key(current_key, false, false) {
+                    return LRESULT(0);
+                }
                 free_camera::on_windows_key(current_key, false, false);
                 if free_camera::is_windows_key_bound(current_key) {
                     return LRESULT(0);

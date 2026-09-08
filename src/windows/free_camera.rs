@@ -148,6 +148,7 @@ pub struct FreeCameraKeybinds {
     pub reset: u16,
     pub cycle_mode: u16,
     pub reverse: u16,
+    pub toggle_free_camera: u16,
 }
 
 impl Default for FreeCameraKeybinds {
@@ -176,7 +177,8 @@ impl Default for FreeCameraKeybinds {
             part_next: VK_OEM_7.0,         // '
             reset: VK_R.0,             // R
             cycle_mode: VK_F.0,        // F
-            reverse: VK_V.0,           // V
+            reverse: VK_B.0,           // B
+            toggle_free_camera: VK_V.0,// V
         }
     }
 }
@@ -752,6 +754,30 @@ pub fn is_live_secondary_camera_update() -> bool {
 
 pub fn reload_runtime_config() {
     RELOAD_CONFIG_REQUESTED.store(true, Ordering::Release);
+}
+
+pub fn toggle_from_windows_key(vk: u16, pressed: bool, repeat: bool) -> bool {
+    let config = Hachimi::instance().config.load();
+    if vk != config.windows.free_camera.keybinds.toggle_free_camera {
+        return false;
+    }
+    if !pressed || repeat {
+        return true;
+    }
+
+    let mut new_config = config.as_ref().clone();
+    new_config.windows.free_camera.enabled = !new_config.windows.free_camera.enabled;
+    if let Err(error) = Hachimi::instance().save_and_reload_config(new_config) {
+        error!("Failed to toggle free camera: {}", error);
+        return true;
+    }
+
+    let config = Hachimi::instance().config.load();
+    let mut state = STATE.lock().unwrap();
+    state.scene = CameraScene::None;
+    state.reset_with_config(&config.windows.free_camera);
+    RELOAD_CONFIG_REQUESTED.store(false, Ordering::Release);
+    true
 }
 
 pub fn is_enabled() -> bool {
@@ -1602,7 +1628,8 @@ pub fn is_windows_key_bound(vk: u16) -> bool {
         vk == kb.part_next ||
         vk == kb.reset ||
         vk == kb.cycle_mode ||
-        vk == kb.reverse
+        vk == kb.reverse ||
+        vk == kb.toggle_free_camera
 }
 
 fn set_key_flag(state: &mut KeyState, vk: u16, pressed: bool, kb: &FreeCameraKeybinds) {
