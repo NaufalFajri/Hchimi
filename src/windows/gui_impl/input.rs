@@ -6,25 +6,26 @@ use windows::Win32::{
     System::{
         DataExchange::{CloseClipboard, GetClipboardData, OpenClipboard},
         Ole::CF_TEXT,
-        SystemServices::{MK_CONTROL, MK_SHIFT}
+        SystemServices::{MK_CONTROL, MK_SHIFT},
     },
     UI::{
         Input::{
             Ime::{
-                ImmGetCompositionStringW, ImmGetContext, ImmReleaseContext, GCS_COMPSTR, GCS_RESULTSTR
+                ImmGetCompositionStringW, ImmGetContext, ImmReleaseContext, GCS_COMPSTR,
+                GCS_RESULTSTR,
             },
             KeyboardAndMouse::{
                 GetAsyncKeyState, VIRTUAL_KEY, VK_BACK, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END,
                 VK_ESCAPE, VK_HOME, VK_INSERT, VK_LEFT, VK_LSHIFT, VK_NEXT, VK_PRIOR, VK_RETURN,
                 VK_RIGHT, VK_SPACE, VK_TAB, VK_UP,
-            }
+            },
         },
         WindowsAndMessaging::{
-            WHEEL_DELTA, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
-            WM_LBUTTONDBLCLK, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDBLCLK, WM_MBUTTONDOWN,
-            WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDBLCLK,
-            WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_INPUT,
-            WM_IME_COMPOSITION, WM_IME_ENDCOMPOSITION, WM_IME_STARTCOMPOSITION
+            WHEEL_DELTA, WM_CHAR, WM_IME_COMPOSITION, WM_IME_ENDCOMPOSITION,
+            WM_IME_STARTCOMPOSITION, WM_INPUT, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDBLCLK,
+            WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDBLCLK, WM_MBUTTONDOWN, WM_MBUTTONUP,
+            WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDBLCLK, WM_RBUTTONDOWN,
+            WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
         },
     },
 };
@@ -43,10 +44,18 @@ pub enum InputResult {
     Key,
 }
 
-pub fn process(input: &mut RawInput, zoom_factor: f32, umsg: u32, wparam: usize, lparam: isize) -> InputResult {
+pub fn process(
+    input: &mut RawInput,
+    zoom_factor: f32,
+    umsg: u32,
+    wparam: usize,
+    lparam: isize,
+) -> InputResult {
     match umsg {
         WM_MOUSEMOVE => {
-            input.events.push(Event::PointerMoved(get_pos(lparam) / zoom_factor));
+            input
+                .events
+                .push(Event::PointerMoved(get_pos(lparam) / zoom_factor));
             InputResult::MouseMove
         }
         WM_LBUTTONDOWN | WM_LBUTTONDBLCLK => {
@@ -115,13 +124,15 @@ pub fn process(input: &mut RawInput, zoom_factor: f32, umsg: u32, wparam: usize,
             let delta = (wparam >> 16) as i16 as f32 * 10. / WHEEL_DELTA as f32;
 
             if wparam & MK_CONTROL.0 as usize != 0 {
-                input.events.push(Event::Zoom(if delta > 0. { 1.5 } else { 0.5 }));
+                input
+                    .events
+                    .push(Event::Zoom(if delta > 0. { 1.5 } else { 0.5 }));
                 InputResult::Zoom
             } else {
                 input.events.push(Event::MouseWheel {
                     unit: MouseWheelUnit::Line,
                     delta: Vec2::new(0., delta),
-                    modifiers: Modifiers::default()
+                    modifiers: Modifiers::default(),
                 });
                 InputResult::Scroll
             }
@@ -130,13 +141,15 @@ pub fn process(input: &mut RawInput, zoom_factor: f32, umsg: u32, wparam: usize,
             let delta = (wparam >> 16) as i16 as f32 * 10. / WHEEL_DELTA as f32;
 
             if wparam & MK_CONTROL.0 as usize != 0 {
-                input.events.push(Event::Zoom(if delta > 0. { 1.5 } else { 0.5 }));
+                input
+                    .events
+                    .push(Event::Zoom(if delta > 0. { 1.5 } else { 0.5 }));
                 InputResult::Zoom
             } else {
                 input.events.push(Event::MouseWheel {
                     unit: MouseWheelUnit::Line,
                     delta: Vec2::new(delta, 0.),
-                    modifiers: Modifiers::default()
+                    modifiers: Modifiers::default(),
                 });
                 InputResult::Scroll
             }
@@ -182,7 +195,11 @@ pub fn process(input: &mut RawInput, zoom_factor: f32, umsg: u32, wparam: usize,
     }
 }
 
-pub fn process_ime_sync(hwnd: HWND, umsg: u32, lparam: isize) -> (bool, Option<String>, Option<String>) {
+pub fn process_ime_sync(
+    hwnd: HWND,
+    umsg: u32,
+    lparam: isize,
+) -> (bool, Option<String>, Option<String>) {
     let mut is_ime = false;
     let mut commit = None;
     let mut preedit = None;
@@ -204,8 +221,16 @@ pub fn process_ime_sync(hwnd: HWND, umsg: u32, lparam: isize) -> (bool, Option<S
                         let size = ImmGetCompositionStringW(himc, GCS_RESULTSTR, None, 0);
                         if size > 0 {
                             let mut buf = vec![0u8; size as usize];
-                            ImmGetCompositionStringW(himc, GCS_RESULTSTR, Some(buf.as_mut_ptr() as _), size as u32);
-                            let utf16_slice = std::slice::from_raw_parts(buf.as_ptr() as *const u16, size as usize / 2);
+                            ImmGetCompositionStringW(
+                                himc,
+                                GCS_RESULTSTR,
+                                Some(buf.as_mut_ptr() as _),
+                                size as u32,
+                            );
+                            let utf16_slice = std::slice::from_raw_parts(
+                                buf.as_ptr() as *const u16,
+                                size as usize / 2,
+                            );
                             if let Ok(s) = String::from_utf16(utf16_slice) {
                                 commit = Some(s);
                             }
@@ -215,8 +240,16 @@ pub fn process_ime_sync(hwnd: HWND, umsg: u32, lparam: isize) -> (bool, Option<S
                         let size = ImmGetCompositionStringW(himc, GCS_COMPSTR, None, 0);
                         if size > 0 {
                             let mut buf = vec![0u8; size as usize];
-                            ImmGetCompositionStringW(himc, GCS_COMPSTR, Some(buf.as_mut_ptr() as _), size as u32);
-                            let utf16_slice = std::slice::from_raw_parts(buf.as_ptr() as *const u16, size as usize / 2);
+                            ImmGetCompositionStringW(
+                                himc,
+                                GCS_COMPSTR,
+                                Some(buf.as_mut_ptr() as _),
+                                size as u32,
+                            );
+                            let utf16_slice = std::slice::from_raw_parts(
+                                buf.as_ptr() as *const u16,
+                                size as usize / 2,
+                            );
                             if let Ok(s) = String::from_utf16(utf16_slice) {
                                 preedit = Some(s);
                             }
@@ -236,16 +269,14 @@ pub fn process_ime_sync(hwnd: HWND, umsg: u32, lparam: isize) -> (bool, Option<S
     (is_ime, commit, preedit)
 }
 
-
-
 pub fn is_handled_msg(umsg: u32) -> bool {
     match umsg {
-        WM_CHAR | WM_KEYDOWN | WM_KEYUP |
-        WM_LBUTTONDBLCLK | WM_LBUTTONDOWN | WM_LBUTTONUP | WM_MBUTTONDBLCLK | WM_MBUTTONDOWN |
-        WM_MBUTTONUP | WM_MOUSEHWHEEL | WM_MOUSEMOVE | WM_MOUSEWHEEL | WM_RBUTTONDBLCLK |
-        WM_RBUTTONDOWN | WM_RBUTTONUP | WM_SYSKEYDOWN | WM_SYSKEYUP => true,
+        WM_CHAR | WM_KEYDOWN | WM_KEYUP | WM_LBUTTONDBLCLK | WM_LBUTTONDOWN | WM_LBUTTONUP
+        | WM_MBUTTONDBLCLK | WM_MBUTTONDOWN | WM_MBUTTONUP | WM_MOUSEHWHEEL | WM_MOUSEMOVE
+        | WM_MOUSEWHEEL | WM_RBUTTONDBLCLK | WM_RBUTTONDOWN | WM_RBUTTONUP | WM_SYSKEYDOWN
+        | WM_SYSKEYUP => true,
         WM_INPUT => true,
-        _ => false
+        _ => false,
     }
 }
 
@@ -340,7 +371,7 @@ fn get_key(wparam: usize) -> Option<Key> {
         VIRTUAL_KEY(0x59) => Some(Key::Y),
         VIRTUAL_KEY(0x5A) => Some(Key::Z),
 
-        _ => None
+        _ => None,
     }
 }
 

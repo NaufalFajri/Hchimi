@@ -1,4 +1,4 @@
-use crate::il2cpp::{types::*};
+use crate::il2cpp::types::*;
 
 pub static mut UNITYACTION_CLASS: *mut Il2CppClass = std::ptr::null_mut();
 

@@ -1,10 +1,10 @@
 use crate::{
-    core::{Hachimi, game::Region},
+    core::{game::Region, Hachimi},
     il2cpp::{
         hook::UnityEngine_UI::Text,
         symbols::{get_field_from_name, get_field_object_value, get_method_addr},
-        types::*
-    }
+        types::*,
+    },
 };
 
 use super::TextFrame;
@@ -26,8 +26,10 @@ extern "C" fn SetFontSize(this: *mut Il2CppObject, font_size: i32) {
         let font_size = Text::get_fontSize(text_label);
         Text::set_fontSize(text_label, (font_size as f32 * mult).round() as i32);
     }
-    
-    if Hachimi::instance().game.region == Region::Global || Hachimi::instance().game.region == Region::Taiwan { 
+
+    if Hachimi::instance().game.region == Region::Global
+        || Hachimi::instance().game.region == Region::Taiwan
+    {
         if let Some(mult) = localized_data.config.text_frame_line_spacing_multiplier {
             let line_spacing = Text::get_lineSpacing(text_label);
             Text::set_lineSpacing(text_label, line_spacing * mult);
@@ -39,7 +41,12 @@ type SetLineSpacingFn = extern "C" fn(this: *mut Il2CppObject, fontSize: i32);
 extern "C" fn SetLineSpacing(this: *mut Il2CppObject, fontSize: i32) {
     get_orig_fn!(SetLineSpacing, SetLineSpacingFn)(this, fontSize);
 
-    if let Some(mult) = Hachimi::instance().localized_data.load().config.text_frame_line_spacing_multiplier {
+    if let Some(mult) = Hachimi::instance()
+        .localized_data
+        .load()
+        .config
+        .text_frame_line_spacing_multiplier
+    {
         let text_frame = get__textFrame(this);
         let text_label = TextFrame::get_TextLabel(text_frame);
         let line_spacing = Text::get_lineSpacing(text_label);
@@ -54,7 +61,8 @@ pub fn init(umamusume: *const Il2CppImage) {
     new_hook!(SetFontSize_addr, SetFontSize);
 
     if Hachimi::instance().game.region == Region::Japan {
-        let SetLineSpacing_addr = get_method_addr(StoryViewTextControllerLandscape, c"SetLineSpacing", 1);
+        let SetLineSpacing_addr =
+            get_method_addr(StoryViewTextControllerLandscape, c"SetLineSpacing", 1);
         new_hook!(SetLineSpacing_addr, SetLineSpacing);
     }
 

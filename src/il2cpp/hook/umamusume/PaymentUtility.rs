@@ -1,10 +1,25 @@
 use rust_i18n::t;
-use windows::Win32::{Foundation::{WPARAM, LPARAM}, UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE}};
+use windows::Win32::{
+    Foundation::{LPARAM, WPARAM},
+    UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE},
+};
 
-use crate::{core::{gui::SimpleYesNoDialog, Gui, Hachimi}, il2cpp::{symbols::get_method_addr, types::*}, windows::steamworks};
+use crate::{
+    core::{gui::SimpleYesNoDialog, Gui, Hachimi},
+    il2cpp::{symbols::get_method_addr, types::*},
+    windows::steamworks,
+};
 
-type StartPurchaseFn = extern "C" fn(this: *mut Il2CppObject, store_product_id: *mut Il2CppString, is_alert_agree: bool);
-extern "C" fn StartPurchase(this: *mut Il2CppObject, store_product_id: *mut Il2CppString, is_alert_agree: bool) {
+type StartPurchaseFn = extern "C" fn(
+    this: *mut Il2CppObject,
+    store_product_id: *mut Il2CppString,
+    is_alert_agree: bool,
+);
+extern "C" fn StartPurchase(
+    this: *mut Il2CppObject,
+    store_product_id: *mut Il2CppString,
+    is_alert_agree: bool,
+) {
     // check it again cuz it might change later
     if steamworks::is_overlay_conflicting(&Hachimi::instance()) {
         let mut gui = Gui::instance().unwrap().lock().unwrap();
@@ -21,7 +36,7 @@ extern "C" fn StartPurchase(this: *mut Il2CppObject, store_product_id: *mut Il2C
                         _ = PostMessageW(None, WM_CLOSE, WPARAM(0), LPARAM(0));
                     }
                 }
-            }
+            },
         )));
     }
     get_orig_fn!(StartPurchase, StartPurchaseFn)(this, store_product_id, is_alert_agree);

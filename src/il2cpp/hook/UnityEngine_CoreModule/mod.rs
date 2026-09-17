@@ -1,19 +1,19 @@
-pub mod Texture2D;
-pub mod Resources;
-pub mod Sprite;
-pub mod Object;
 pub mod Application;
-pub mod Material;
 mod AsyncOperation;
-pub mod GameObject;
-pub mod Texture;
-pub mod RenderTexture;
-pub mod Graphics;
 pub mod Behaviour;
 pub mod Component;
-pub mod UnityAction;
+pub mod GameObject;
+pub mod Graphics;
+pub mod Material;
+pub mod Object;
+pub mod RenderTexture;
+pub mod Resources;
+pub mod Sprite;
+pub mod Texture;
+pub mod Texture2D;
 #[cfg(target_os = "android")]
 pub mod TouchScreenKeyboard;
+pub mod UnityAction;
 
 #[cfg(target_os = "android")]
 #[path = "TouchScreenKeyboardType.rs"]
@@ -21,15 +21,15 @@ mod touch_screen_keyboard_type;
 #[cfg(target_os = "android")]
 pub use touch_screen_keyboard_type::TouchScreenKeyboardType;
 
-pub mod RectTransform;
-pub mod Transform;
-pub mod RectOffset;
 pub mod Camera;
 #[cfg(target_os = "windows")]
 pub mod QualitySettings;
-pub mod Screen;
-pub mod SceneManager;
+pub mod RectOffset;
+pub mod RectTransform;
 pub mod Scene;
+pub mod SceneManager;
+pub mod Screen;
+pub mod Transform;
 
 pub const HideFlags_DontUnloadUnusedAsset: i32 = 32;
 

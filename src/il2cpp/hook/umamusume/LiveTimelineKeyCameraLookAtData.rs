@@ -1,9 +1,6 @@
 use crate::{
+    il2cpp::{symbols::get_method_addr, types::*},
     windows::free_camera::{self, CameraScene, FreeCameraMode},
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*,
-    },
 };
 
 use super::LiveTimelineControl;
@@ -91,8 +88,13 @@ extern "C" fn GetCharacterWorldPos(
 }
 
 pub fn init(umamusume: *const Il2CppImage) {
-    get_class_or_return!(umamusume, "Gallop.Live.Cutt", LiveTimelineKeyCameraLookAtData);
+    get_class_or_return!(
+        umamusume,
+        "Gallop.Live.Cutt",
+        LiveTimelineKeyCameraLookAtData
+    );
 
-    let GetCharacterWorldPos_addr = get_method_addr(LiveTimelineKeyCameraLookAtData, c"GetCharacterWorldPos", 8);
+    let GetCharacterWorldPos_addr =
+        get_method_addr(LiveTimelineKeyCameraLookAtData, c"GetCharacterWorldPos", 8);
     new_hook!(GetCharacterWorldPos_addr, GetCharacterWorldPos);
 }

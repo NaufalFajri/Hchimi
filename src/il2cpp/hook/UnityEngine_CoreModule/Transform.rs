@@ -1,12 +1,10 @@
 #[cfg(target_os = "windows")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::{
-    il2cpp::{
-        api::{il2cpp_class_get_type, il2cpp_resolve_icall, il2cpp_type_get_object},
-        symbols::get_method_addr,
-        types::*
-    }
+use crate::il2cpp::{
+    api::{il2cpp_class_get_type, il2cpp_resolve_icall, il2cpp_type_get_object},
+    symbols::get_method_addr,
+    types::*,
 };
 
 #[cfg(target_os = "windows")]
@@ -100,22 +98,26 @@ type TransformSetQuaternionFn = extern "C" fn(this: *mut Il2CppObject, value: *m
 
 #[cfg(target_os = "windows")]
 extern "C" fn Transform_set_position_Injected(this: *mut Il2CppObject, value: *mut Vector3_t) {
-    if UPDATE_RACE_CAMERA.load(Ordering::Relaxed) &&
-        free_camera::is_scene_enabled(CameraScene::Race) &&
-        !value.is_null()
+    if UPDATE_RACE_CAMERA.load(Ordering::Relaxed)
+        && free_camera::is_scene_enabled(CameraScene::Race)
+        && !value.is_null()
     {
-        unsafe { *value = free_camera::race_camera_pos(*value); }
+        unsafe {
+            *value = free_camera::race_camera_pos(*value);
+        }
     }
     get_orig_fn!(Transform_set_position_Injected, TransformSetVectorFn)(this, value);
 }
 
 #[cfg(target_os = "windows")]
 extern "C" fn Transform_set_localPosition_Injected(this: *mut Il2CppObject, value: *mut Vector3_t) {
-    if UPDATE_RACE_CAMERA.load(Ordering::Relaxed) &&
-        free_camera::is_scene_enabled(CameraScene::Race) &&
-        !value.is_null()
+    if UPDATE_RACE_CAMERA.load(Ordering::Relaxed)
+        && free_camera::is_scene_enabled(CameraScene::Race)
+        && !value.is_null()
     {
-        unsafe { *value = free_camera::race_camera_pos(*value); }
+        unsafe {
+            *value = free_camera::race_camera_pos(*value);
+        }
     }
     get_orig_fn!(Transform_set_localPosition_Injected, TransformSetVectorFn)(this, value);
 }
@@ -126,17 +128,25 @@ extern "C" fn Transform_Internal_LookAt_Injected(
     world_position: *mut Vector3_t,
     world_up: *mut Vector3_t,
 ) {
-    if UPDATE_RACE_CAMERA.load(Ordering::Relaxed) && free_camera::is_scene_enabled(CameraScene::Race) {
+    if UPDATE_RACE_CAMERA.load(Ordering::Relaxed)
+        && free_camera::is_scene_enabled(CameraScene::Race)
+    {
         if let Some(mut rot) = free_camera::camera_rotation() {
             get_orig_fn!(Transform_set_rotation_Injected, TransformSetQuaternionFn)(this, &mut rot);
             return;
         }
 
         if !world_position.is_null() {
-            unsafe { *world_position = free_camera::camera_look_at(); }
+            unsafe {
+                *world_position = free_camera::camera_look_at();
+            }
         }
     }
-    get_orig_fn!(Transform_Internal_LookAt_Injected, TransformLookAtFn)(this, world_position, world_up);
+    get_orig_fn!(Transform_Internal_LookAt_Injected, TransformLookAtFn)(
+        this,
+        world_position,
+        world_up,
+    );
 }
 
 #[cfg(target_os = "windows")]
@@ -145,11 +155,19 @@ extern "C" fn Transform_set_rotation_Injected(this: *mut Il2CppObject, value: *m
 }
 
 #[cfg(target_os = "windows")]
-extern "C" fn Transform_set_localRotation_Injected(this: *mut Il2CppObject, value: *mut Quaternion_t) {
-    if UPDATE_RACE_CAMERA.load(Ordering::Relaxed) && free_camera::is_scene_enabled(CameraScene::Race) {
+extern "C" fn Transform_set_localRotation_Injected(
+    this: *mut Il2CppObject,
+    value: *mut Quaternion_t,
+) {
+    if UPDATE_RACE_CAMERA.load(Ordering::Relaxed)
+        && free_camera::is_scene_enabled(CameraScene::Race)
+    {
         return;
     }
-    get_orig_fn!(Transform_set_localRotation_Injected, TransformSetQuaternionFn)(this, value);
+    get_orig_fn!(
+        Transform_set_localRotation_Injected,
+        TransformSetQuaternionFn
+    )(this, value);
 }
 
 pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
@@ -167,14 +185,30 @@ pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
         GET_LOCALSCALE_ADDR = get_method_addr(Transform, c"get_localScale", 0);
         SET_LOCALSCALE_ADDR = get_method_addr(Transform, c"set_localScale", 1);
 
-        GET_POSITION_INJECTED_ADDR = il2cpp_resolve_icall(c"UnityEngine.Transform::get_position_Injected(UnityEngine.Vector3&)".as_ptr());
-        SET_POSITION_INJECTED_ADDR = il2cpp_resolve_icall(c"UnityEngine.Transform::set_position_Injected(UnityEngine.Vector3&)".as_ptr());
-        GET_LOCALPOSITION_INJECTED_ADDR = il2cpp_resolve_icall(c"UnityEngine.Transform::get_localPosition_Injected(UnityEngine.Vector3&)".as_ptr());
-        SET_LOCALPOSITION_INJECTED_ADDR = il2cpp_resolve_icall(c"UnityEngine.Transform::set_localPosition_Injected(UnityEngine.Vector3&)".as_ptr());
-        GET_ROTATION_INJECTED_ADDR = il2cpp_resolve_icall(c"UnityEngine.Transform::get_rotation_Injected(UnityEngine.Quaternion&)".as_ptr());
-        SET_ROTATION_INJECTED_ADDR = il2cpp_resolve_icall(c"UnityEngine.Transform::set_rotation_Injected(UnityEngine.Quaternion&)".as_ptr());
-        GET_LOCALROTATION_INJECTED_ADDR = il2cpp_resolve_icall(c"UnityEngine.Transform::get_localRotation_Injected(UnityEngine.Quaternion&)".as_ptr());
-        SET_LOCALROTATION_INJECTED_ADDR = il2cpp_resolve_icall(c"UnityEngine.Transform::set_localRotation_Injected(UnityEngine.Quaternion&)".as_ptr());
+        GET_POSITION_INJECTED_ADDR = il2cpp_resolve_icall(
+            c"UnityEngine.Transform::get_position_Injected(UnityEngine.Vector3&)".as_ptr(),
+        );
+        SET_POSITION_INJECTED_ADDR = il2cpp_resolve_icall(
+            c"UnityEngine.Transform::set_position_Injected(UnityEngine.Vector3&)".as_ptr(),
+        );
+        GET_LOCALPOSITION_INJECTED_ADDR = il2cpp_resolve_icall(
+            c"UnityEngine.Transform::get_localPosition_Injected(UnityEngine.Vector3&)".as_ptr(),
+        );
+        SET_LOCALPOSITION_INJECTED_ADDR = il2cpp_resolve_icall(
+            c"UnityEngine.Transform::set_localPosition_Injected(UnityEngine.Vector3&)".as_ptr(),
+        );
+        GET_ROTATION_INJECTED_ADDR = il2cpp_resolve_icall(
+            c"UnityEngine.Transform::get_rotation_Injected(UnityEngine.Quaternion&)".as_ptr(),
+        );
+        SET_ROTATION_INJECTED_ADDR = il2cpp_resolve_icall(
+            c"UnityEngine.Transform::set_rotation_Injected(UnityEngine.Quaternion&)".as_ptr(),
+        );
+        GET_LOCALROTATION_INJECTED_ADDR = il2cpp_resolve_icall(
+            c"UnityEngine.Transform::get_localRotation_Injected(UnityEngine.Quaternion&)".as_ptr(),
+        );
+        SET_LOCALROTATION_INJECTED_ADDR = il2cpp_resolve_icall(
+            c"UnityEngine.Transform::set_localRotation_Injected(UnityEngine.Quaternion&)".as_ptr(),
+        );
         INTERNAL_LOOKAT_INJECTED_ADDR = il2cpp_resolve_icall(c"UnityEngine.Transform::Internal_LookAt_Injected(UnityEngine.Vector3&,UnityEngine.Vector3&)".as_ptr());
     }
 
@@ -187,9 +221,18 @@ pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
         let set_localRotation_Injected_addr = unsafe { SET_LOCALROTATION_INJECTED_ADDR };
 
         new_hook!(set_position_Injected_addr, Transform_set_position_Injected);
-        new_hook!(set_localPosition_Injected_addr, Transform_set_localPosition_Injected);
-        new_hook!(Internal_LookAt_Injected_addr, Transform_Internal_LookAt_Injected);
+        new_hook!(
+            set_localPosition_Injected_addr,
+            Transform_set_localPosition_Injected
+        );
+        new_hook!(
+            Internal_LookAt_Injected_addr,
+            Transform_Internal_LookAt_Injected
+        );
         new_hook!(set_rotation_Injected_addr, Transform_set_rotation_Injected);
-        new_hook!(set_localRotation_Injected_addr, Transform_set_localRotation_Injected);
+        new_hook!(
+            set_localRotation_Injected_addr,
+            Transform_set_localRotation_Injected
+        );
     }
 }

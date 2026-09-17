@@ -1,6 +1,4 @@
-use crate::{
-    il2cpp::{symbols::get_method_addr, types::*}
-};
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 static mut GET_MOUSE_POSITION_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_mousePosition, GET_MOUSE_POSITION_ADDR, Vector3_t,);

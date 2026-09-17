@@ -1,21 +1,23 @@
-use std::sync::atomic::Ordering;
+use super::{RaceBGMController, RaceManager, RaceSoundReplay};
 use crate::{
-    core::{Hachimi, captions, game::Region, gui, utils::{race_seek_seh, race_seek_stage}},
+    core::{
+        captions,
+        game::Region,
+        gui,
+        utils::{race_seek_seh, race_seek_stage},
+        Hachimi,
+    },
     il2cpp::{
-        hook::Cute_Cri_Assembly::{
-            AudioPlayback::{self, AudioPlayback_t},
-            AtomSourceEx,
-        },
         ext::Il2CppStringExt,
-        symbols::{get_method_addr, get_field_from_name, Array, SingletonLike, Thread},
-        types::*
-    }
+        hook::Cute_Cri_Assembly::{
+            AtomSourceEx,
+            AudioPlayback::{self, AudioPlayback_t},
+        },
+        symbols::{get_field_from_name, get_method_addr, Array, SingletonLike, Thread},
+        types::*,
+    },
 };
-use super::{
-    RaceManager,
-    RaceBGMController,
-    RaceSoundReplay,
-};
+use std::sync::atomic::Ordering;
 
 #[repr(i32)]
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -24,7 +26,7 @@ pub enum Category {
     SE = 1,
     VOICE = 2,
     JIKKYO = 3,
-    LIVE = 4
+    LIVE = 4,
 }
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
@@ -40,32 +42,64 @@ pub fn instance() -> *mut Il2CppObject {
 }
 
 static mut GET_CRIAUDIOMANAGER_ADDR: usize = 0;
-impl_addr_wrapper_fn!(get_CriAudioManager, GET_CRIAUDIOMANAGER_ADDR, *mut Il2CppObject,);
+impl_addr_wrapper_fn!(
+    get_CriAudioManager,
+    GET_CRIAUDIOMANAGER_ADDR,
+    *mut Il2CppObject,
+);
 
-def_field_value_accessors!(get__songPlayback, set__songPlayback, _SONGPLAYBACK_FIELD, AudioPlayback_t);
-def_field_object_accessors!(get__songCharaPlaybacks, set__songCharaPlaybacks, _SONGCHARAPLAYBACKS_FIELD, Il2CppArray);
-def_field_value_accessors!(get__bgmPlayback, set__bgmPlayback, _BGMPLAYBACK_FIELD, AudioPlayback_t);
-def_field_object_accessors!(get__atomSourceArrayBGM, set__atomSourceArrayBGM, _ATOMSOURCEARRAYBGM_FIELD, Il2CppArray);
+def_field_value_accessors!(
+    get__songPlayback,
+    set__songPlayback,
+    _SONGPLAYBACK_FIELD,
+    AudioPlayback_t
+);
+def_field_object_accessors!(
+    get__songCharaPlaybacks,
+    set__songCharaPlaybacks,
+    _SONGCHARAPLAYBACKS_FIELD,
+    Il2CppArray
+);
+def_field_value_accessors!(
+    get__bgmPlayback,
+    set__bgmPlayback,
+    _BGMPLAYBACK_FIELD,
+    AudioPlayback_t
+);
+def_field_object_accessors!(
+    get__atomSourceArrayBGM,
+    set__atomSourceArrayBGM,
+    _ATOMSOURCEARRAYBGM_FIELD,
+    Il2CppArray
+);
 
 def_method_wrapper_fn!(GetCueLength, GET_CUE_LENGTH_ADDR, f32, this: *mut Il2CppObject, cue_sheet: *mut Il2CppString, cue_id: i32);
 def_method_wrapper_fn!(GetVolume, GET_VOLUME_ADDR, f32, category: Category);
 
 pub fn race_slider_music_base() -> bool {
     let audio_manager = instance();
-    if audio_manager.is_null() { return false; }
+    if audio_manager.is_null() {
+        return false;
+    }
 
     let mut bgm = get__bgmPlayback(audio_manager);
-    if bgm.criAtomExPlayback.id == 0 { return false; }
+    if bgm.criAtomExPlayback.id == 0 {
+        return false;
+    }
 
     let mut num_samples: i64 = 0;
     let mut sampling_rate: i32 = 0;
     if !AudioPlayback::GetNumPlayedSamples(&mut bgm, &mut num_samples, &mut sampling_rate) {
         return false;
     }
-    if sampling_rate <= 0 { return false; }
+    if sampling_rate <= 0 {
+        return false;
+    }
 
     let secs = num_samples as f32 / sampling_rate as f32;
-    if !secs.is_finite() || secs < 0.0 { return false; }
+    if !secs.is_finite() || secs < 0.0 {
+        return false;
+    }
 
     gui::RACE_SLIDER_MUSIC_TIME.store(secs.to_bits(), Ordering::Release);
     true
@@ -80,24 +114,48 @@ def_method_wrapper_fn!(
 
 pub fn play_race_bgm_cue(cue_name: *mut Il2CppString, position_secs: f32, bgm_volume: f32) -> bool {
     let audio_manager = instance();
-    if audio_manager.is_null() { return false; }
-    if cue_name.is_null() { return false; }
+    if audio_manager.is_null() {
+        return false;
+    }
+    if cue_name.is_null() {
+        return false;
+    }
 
-    let position = if position_secs.is_finite() && position_secs > 0.0 { position_secs } else { 0.0 };
-    let volume = if bgm_volume.is_finite() && bgm_volume >= 0.0 { bgm_volume } else { 1.0 };
+    let position = if position_secs.is_finite() && position_secs > 0.0 {
+        position_secs
+    } else {
+        0.0
+    };
+    let volume = if bgm_volume.is_finite() && bgm_volume >= 0.0 {
+        bgm_volume
+    } else {
+        1.0
+    };
     let mut cue_name = cue_name;
     PlayBgmFromName(
-        audio_manager, &mut cue_name, true, volume, 0.1, 0.1, position, false, 0
+        audio_manager,
+        &mut cue_name,
+        true,
+        volume,
+        0.1,
+        0.1,
+        position,
+        false,
+        0,
     );
     true
 }
 
 pub fn resync_race_music(race_manager: *mut Il2CppObject, target_time: f32) -> bool {
     let race_sound = RaceManager::get_RaceSound(race_manager);
-    if !RaceSoundReplay::is_replay_sound(race_sound) { return true; }
+    if !RaceSoundReplay::is_replay_sound(race_sound) {
+        return true;
+    }
 
     let bgm_controller = RaceSoundReplay::get_BGMController(race_sound);
-    if !RaceBGMController::is_bgm_controller(bgm_controller) { return true; }
+    if !RaceBGMController::is_bgm_controller(bgm_controller) {
+        return true;
+    }
 
     race_seek_seh(|| {
         race_seek_stage(12); // music_volume
@@ -108,16 +166,24 @@ pub fn resync_race_music(race_manager: *mut Il2CppObject, target_time: f32) -> b
         let music_base = f32::from_bits(gui::RACE_SLIDER_MUSIC_TIME.load(Ordering::Acquire));
 
         let audio_manager = instance();
-        if audio_manager.is_null() { return; }
+        if audio_manager.is_null() {
+            return;
+        }
 
         let sources_ptr = get__atomSourceArrayBGM(audio_manager);
-        if sources_ptr.is_null() { return; }
+        if sources_ptr.is_null() {
+            return;
+        }
         let sources: Array<*mut Il2CppObject> = Array::from(sources_ptr);
 
         race_seek_stage(13); // music_sweep
         for source in unsafe { sources.as_slice() }.iter() {
-            if source.is_null() { continue; }
-            if !AtomSourceEx::get_IsInUse(*source) { continue; }
+            if source.is_null() {
+                continue;
+            }
+            if !AtomSourceEx::get_IsInUse(*source) {
+                continue;
+            }
             AtomSourceEx::Stop(*source, 0.0, 0);
         }
 
@@ -128,21 +194,29 @@ pub fn resync_race_music(race_manager: *mut Il2CppObject, target_time: f32) -> b
             } else {
                 target_time - second_start
             };
-            play_race_bgm_cue(RaceBGMController::get_secondBgmCueName(bgm_controller), position, bgm_volume);
+            play_race_bgm_cue(
+                RaceBGMController::get_secondBgmCueName(bgm_controller),
+                position,
+                bgm_volume,
+            );
             RaceBGMController::set_isRequestFirstBGM(bgm_controller, true);
             RaceBGMController::set_isStoppedFirstBGM(bgm_controller, true);
             RaceBGMController::set_isPlayedSecondBGM(bgm_controller, true);
         } else {
             let delay = RaceBGMController::get_firstBGMDelayTime(bgm_controller);
             let first_stop = RaceBGMController::get_firstBgmStopTime(bgm_controller);
-    
+
             if target_time >= delay {
                 let position = if race_base < first_stop && music_valid {
                     music_base + (target_time - race_base)
                 } else {
                     target_time - delay
                 };
-                play_race_bgm_cue(RaceBGMController::get_firstBgmCueName(bgm_controller), position, bgm_volume);
+                play_race_bgm_cue(
+                    RaceBGMController::get_firstBgmCueName(bgm_controller),
+                    position,
+                    bgm_volume,
+                );
                 RaceBGMController::set_isRequestFirstBGM(bgm_controller, true);
                 RaceBGMController::set_isStoppedFirstBGM(bgm_controller, false);
             } else {
@@ -152,9 +226,14 @@ pub fn resync_race_music(race_manager: *mut Il2CppObject, target_time: f32) -> b
             RaceBGMController::set_isPlayedSecondBGM(bgm_controller, false);
         }
 
-        if Hachimi::instance().game.region == Region::Japan || Hachimi::instance().game.region == Region::Taiwan {
+        if Hachimi::instance().game.region == Region::Japan
+            || Hachimi::instance().game.region == Region::Taiwan
+        {
             let trigger_start = RaceBGMController::get_firstTriggerBgmPlayStartTime(bgm_controller);
-            RaceBGMController::set_isPlayedFirstTriggerBgm(bgm_controller, target_time >= trigger_start);
+            RaceBGMController::set_isPlayedFirstTriggerBgm(
+                bgm_controller,
+                target_time >= trigger_start,
+            );
         }
 
         race_seek_stage(0); // idle
@@ -180,15 +259,27 @@ pub enum SoundGroup {
 }
 
 // private AudioPlayback PlayInternal(SoundGroup group, RequestCueInfo cueInfo, PlayParameters playParam, AutoStopType stopType) { }
-type PlayInternalFn = extern "C" fn(this: *mut Il2CppObject, group: SoundGroup,
-    cue_info: *mut RequestCueInfo, play_param: *mut Il2CppObject, stop_type: i32
+type PlayInternalFn = extern "C" fn(
+    this: *mut Il2CppObject,
+    group: SoundGroup,
+    cue_info: *mut RequestCueInfo,
+    play_param: *mut Il2CppObject,
+    stop_type: i32,
 ) -> AudioPlayback_t;
-extern "C" fn PlayInternal(this: *mut Il2CppObject, group: SoundGroup,
-    cue_info: *mut RequestCueInfo, play_param: *mut Il2CppObject, stop_type: i32
+extern "C" fn PlayInternal(
+    this: *mut Il2CppObject,
+    group: SoundGroup,
+    cue_info: *mut RequestCueInfo,
+    play_param: *mut Il2CppObject,
+    stop_type: i32,
 ) -> AudioPlayback_t {
-    let result = get_orig_fn!(PlayInternal, PlayInternalFn)(this, group, cue_info, play_param, stop_type);
+    let result =
+        get_orig_fn!(PlayInternal, PlayInternalFn)(this, group, cue_info, play_param, stop_type);
 
-    if group == SoundGroup::Voice && !cue_info.is_null() && Hachimi::instance().config.load().caption.caption_enable {
+    if group == SoundGroup::Voice
+        && !cue_info.is_null()
+        && Hachimi::instance().config.load().caption.caption_enable
+    {
         let cue_sheet_ptr = unsafe { *cue_info }.CueSheetName;
         if !cue_sheet_ptr.is_null() {
             let cue_sheet_ptr = unsafe { *cue_info }.CueSheetName;
@@ -207,13 +298,16 @@ extern "C" fn PlayInternal(this: *mut Il2CppObject, group: SoundGroup,
 
             let cue_id = unsafe { *cue_info }.CueId;
 
-            debug!("[captions] PlayInternal Voice: cue_sheet={}, name='{}', id={}", cue_sheet, cue_name, cue_id);
+            debug!(
+                "[captions] PlayInternal Voice: cue_sheet={}, name='{}', id={}",
+                cue_sheet, cue_name, cue_id
+            );
 
             if let Some(last) = cue_sheet.rsplit('_').next() {
                 if last.len() >= 6 {
                     if let Ok(chara_id) = last[..4].parse::<i32>() {
                         let caption_data = captions::CaptionData {
-                            text: String::new(), 
+                            text: String::new(),
                             cue_sheet: cue_sheet.clone(),
                             cue_id,
                             character_id: chara_id,

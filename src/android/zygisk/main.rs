@@ -2,20 +2,29 @@ use std::{cell::OnceCell, os::raw::c_long};
 
 use jni::{objects::JString, JNIEnv};
 
-use crate::{android::{game_impl, hook, plugin_loader, zygisk::{internal::{api_table, module_abi}, AppSpecializeArgs, ServerSpecializeArgs}}, core::{game::Region, Hachimi}};
+use crate::{
+    android::{
+        game_impl, hook, plugin_loader,
+        zygisk::{
+            internal::{api_table, module_abi},
+            AppSpecializeArgs, ServerSpecializeArgs,
+        },
+    },
+    core::{game::Region, Hachimi},
+};
 
 const ZYGISK_API_VERSION: c_long = 4;
 
 pub struct Module {
     env: *mut jni::sys::JNIEnv,
-    is_game: bool
+    is_game: bool,
 }
 
 impl Module {
     fn new(env: *mut jni::sys::JNIEnv) -> Self {
         Self {
             env,
-            is_game: false
+            is_game: false,
         }
     }
 }
@@ -46,21 +55,26 @@ unsafe extern "C" fn post_app_specialize(this: *mut Module, _args: *const AppSpe
     }
 }
 
-unsafe extern "C" fn pre_server_specialize(_this: *mut Module, _args: *mut ServerSpecializeArgs) {
+unsafe extern "C" fn pre_server_specialize(_this: *mut Module, _args: *mut ServerSpecializeArgs) {}
 
-}
-
-unsafe extern "C" fn post_server_specialize(_this: *mut Module, _args: *const ServerSpecializeArgs) {
-
+unsafe extern "C" fn post_server_specialize(
+    _this: *mut Module,
+    _args: *const ServerSpecializeArgs,
+) {
 }
 
 static mut MODULE: OnceCell<Module> = OnceCell::new();
 static mut ABI: OnceCell<module_abi<Module>> = OnceCell::new();
 
 #[no_mangle]
-pub unsafe extern "C" fn zygisk_module_entry(api: *mut api_table<Module>, env: *mut jni::sys::JNIEnv) {
+pub unsafe extern "C" fn zygisk_module_entry(
+    api: *mut api_table<Module>,
+    env: *mut jni::sys::JNIEnv,
+) {
     let module = Module::new(env);
-    if MODULE.set(module).is_err() { return; }
+    if MODULE.set(module).is_err() {
+        return;
+    }
 
     let abi = module_abi {
         api_version: ZYGISK_API_VERSION,
@@ -68,14 +82,14 @@ pub unsafe extern "C" fn zygisk_module_entry(api: *mut api_table<Module>, env: *
         preAppSpecialize: Some(pre_app_specialize),
         postAppSpecialize: Some(post_app_specialize),
         preServerSpecialize: Some(pre_server_specialize),
-        postServerSpecialize: Some(post_server_specialize)
+        postServerSpecialize: Some(post_server_specialize),
     };
-    if ABI.set(abi).is_err() { return; }
+    if ABI.set(abi).is_err() {
+        return;
+    }
 
     (*api).registerModule.unwrap()(api, ABI.get_mut().unwrap());
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn zygisk_companion_entry(_arg1: ::std::os::raw::c_int) {
-
-}
+pub unsafe extern "C" fn zygisk_companion_entry(_arg1: ::std::os::raw::c_int) {}

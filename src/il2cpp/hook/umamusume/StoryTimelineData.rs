@@ -4,10 +4,19 @@ use serde::{Deserialize, Serialize};
 use widestring::Utf16Str;
 
 use crate::{
-    core::{ext::Utf16StringExt, utils, Hachimi, SugoiClient}, 
+    core::{ext::Utf16StringExt, utils, Hachimi, SugoiClient},
     il2cpp::{
-        ext::{Il2CppStringExt, StringExt}, hook::{umamusume::{StoryTimelineCharaTrackData, StoryTimelineClipData}, UnityEngine_AssetBundleModule::AssetBundle::ASSET_PATH_PREFIX}, symbols::{get_field_from_name, get_field_object_value, get_field_value, set_field_object_value, set_field_value, IList}, types::*
-    }
+        ext::{Il2CppStringExt, StringExt},
+        hook::{
+            umamusume::{StoryTimelineCharaTrackData, StoryTimelineClipData},
+            UnityEngine_AssetBundleModule::AssetBundle::ASSET_PATH_PREFIX,
+        },
+        symbols::{
+            get_field_from_name, get_field_object_value, get_field_value, set_field_object_value,
+            set_field_value, IList,
+        },
+        types::*,
+    },
 };
 
 use super::{StoryTimelineBlockData, StoryTimelineTextClipData, StoryTimelineTrackData};
@@ -69,7 +78,7 @@ struct StoryTimelineDataDict {
     text_block_list: Vec<TextBlockDict>,
 
     #[serde(default)]
-    no_wrap: bool
+    no_wrap: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -88,7 +97,7 @@ struct TextBlockDict {
     #[serde(default)]
     color_text_info_list: Vec<String>,
 
-    new_clip_length: Option<i32>
+    new_clip_length: Option<i32>,
 }
 
 // hook::UnityEngine_AssetBundleModule::AssetBundle
@@ -114,11 +123,10 @@ pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &
 
     let localized_data = hachimi.localized_data.load();
 
-    let is_story_view = base_path.starts_with("story/data/") && (
-        base_path[11..].starts_with("02/") ||
-        base_path[11..].starts_with("04/") ||
-        base_path[11..].starts_with("09/")
-    );
+    let is_story_view = base_path.starts_with("story/data/")
+        && (base_path[11..].starts_with("02/")
+            || base_path[11..].starts_with("04/")
+            || base_path[11..].starts_with("09/"));
 
     // Init wrapping parameters
     let mut line_count = CLIP_TEXT_LINE_COUNT;
@@ -144,24 +152,26 @@ pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &
         size: StoryTimelineTextClipData::get_Size(this),
     };
 
-    let Some(dict): Option<StoryTimelineDataDict> = localized_data.load_assets_dict(Some(&dict_path)).or_else(|| {
-        if hachimi.config.load().auto_translate_stories {
-            let Some(full_dict_path) = localized_data.get_assets_path(&dict_path) else {
-                return None;
-            };
+    let Some(dict): Option<StoryTimelineDataDict> = localized_data
+        .load_assets_dict(Some(&dict_path))
+        .or_else(|| {
+            if hachimi.config.load().auto_translate_stories {
+                let Some(full_dict_path) = localized_data.get_assets_path(&dict_path) else {
+                    return None;
+                };
 
-            // check if file exists
-            if std::fs::metadata(&full_dict_path).is_ok() {
-                return None;
+                // check if file exists
+                if std::fs::metadata(&full_dict_path).is_ok() {
+                    return None;
+                }
+
+                dispatch_auto_tl_async(this, full_dict_path, wp.clone());
+                None
+            } else {
+                None
             }
-
-            dispatch_auto_tl_async(this, full_dict_path, wp.clone());
-            None
-        }
-        else {
-            None
-        }
-    }) else {
+        })
+    else {
         // Clip length adjustment independent of story patching
         // No need to adjust length if speed is faster
         if tcps_mult < 1.0 {
@@ -186,7 +196,9 @@ pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &
         total_len += orig_block_len;
 
         // First block is always empty, skip over it
-        if i == 0 { continue; }
+        if i == 0 {
+            continue;
+        }
         i -= 1;
 
         let Some(text_block_dict) = dict.text_block_list.get(i) else {
@@ -211,11 +223,12 @@ pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &
                     if let Some(wrapped) = utils::wrap_text(text, story_view_line_width) {
                         modified_text = Some(wrapped.join(" \n"));
                     }
-                }
-                else {
+                } else {
                     let size = StoryTimelineTextClipData::get_Size(this);
                     if size == StoryTimelineTextClipData::FontSize_Default {
-                        if let Some(fitted) = utils::wrap_fit_text(text, line_width, line_count, font_size) {
+                        if let Some(fitted) =
+                            utils::wrap_fit_text(text, line_width, line_count, font_size)
+                        {
                             modified_text = Some(fitted);
                         }
                     }
@@ -226,25 +239,33 @@ pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &
             StoryTimelineTextClipData::set_Text(clip_data, new_text.to_il2cpp_string());
 
             // Adjust clip length
-            if localized_data.config.auto_adjust_story_clip_length ||
-                text_block_dict.new_clip_length.is_some() ||
-                tcps_mult < 1.0
+            if localized_data.config.auto_adjust_story_clip_length
+                || text_block_dict.new_clip_length.is_some()
+                || tcps_mult < 1.0
             {
                 let new_clip_len = text_block_dict.new_clip_length.unwrap_or_else(|| {
-                    let text_len = utils::IsolateTags::new(new_text).fold(0, |total_len, (s, is_not_tag)| 
-                        if is_not_tag { total_len + s.chars().count() } else { total_len }
-                    );
+                    let text_len =
+                        utils::IsolateTags::new(new_text).fold(0, |total_len, (s, is_not_tag)| {
+                            if is_not_tag {
+                                total_len + s.chars().count()
+                            } else {
+                                total_len
+                            }
+                        });
                     // Everything else down here is in the unit of frames at 30fps
                     let typewrite_len = get_typewrite_length(text_len, tcps);
-                    return StoryTimelineTextClipData::get_WaitFrame(clip_data) +
-                        typewrite_len.max(StoryTimelineTextClipData::get_VoiceLength(clip_data));
+                    return StoryTimelineTextClipData::get_WaitFrame(clip_data)
+                        + typewrite_len.max(StoryTimelineTextClipData::get_VoiceLength(clip_data));
                 });
 
                 let orig_clip_len = StoryTimelineClipData::get_ClipLength(clip_data);
                 if new_clip_len > orig_clip_len {
                     let new_block_len = apply_clip_length(
-                        clip_data, orig_clip_len, new_clip_len,
-                        block_data, orig_block_len
+                        clip_data,
+                        orig_clip_len,
+                        new_clip_len,
+                        block_data,
+                        orig_block_len,
                     );
                     let block_len_diff = new_block_len - orig_block_len;
                     total_len += block_len_diff;
@@ -259,11 +280,16 @@ pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &
             for (j, choice_data) in choice_data_list.iter().enumerate() {
                 if let Some(text) = text_block_dict.choice_data_list.get(j) {
                     if !text.is_empty() {
-                        StoryTimelineTextClipData::ChoiceData::set_Text(choice_data, text.to_il2cpp_string())
+                        StoryTimelineTextClipData::ChoiceData::set_Text(
+                            choice_data,
+                            text.to_il2cpp_string(),
+                        )
                     }
-                }
-                else {
-                    warn!("choice data {} of block {} not found in dict: {}", j, i, dict_path);
+                } else {
+                    warn!(
+                        "choice data {} of block {} not found in dict: {}",
+                        j, i, dict_path
+                    );
                 }
             }
         }
@@ -273,11 +299,16 @@ pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &
             for (j, color_text_info) in color_text_info_list.iter().enumerate() {
                 if let Some(text) = text_block_dict.color_text_info_list.get(j) {
                     if !text.is_empty() {
-                        StoryTimelineTextClipData::ColorTextInfo::set_Text(color_text_info, text.to_il2cpp_string())
+                        StoryTimelineTextClipData::ColorTextInfo::set_Text(
+                            color_text_info,
+                            text.to_il2cpp_string(),
+                        )
                     }
-                }
-                else {
-                    warn!("color text info {} of block {} not found in dict: {}", j, i, dict_path);
+                } else {
+                    warn!(
+                        "color text info {} of block {} not found in dict: {}",
+                        j, i, dict_path
+                    );
                 }
             }
         }
@@ -314,15 +345,20 @@ fn adjust_clips_length_with_tcps(this: *mut Il2CppObject, tcps: f32) {
 
         total_len += if text.is_null() {
             orig_block_len
-        }
-        else {
+        } else {
             let orig_clip_len = StoryTimelineClipData::get_ClipLength(clip_data);
-            let new_clip_len = get_typewrite_length(unsafe { (*text).as_utf16str().chars().count() }, tcps);
+            let new_clip_len =
+                get_typewrite_length(unsafe { (*text).as_utf16str().chars().count() }, tcps);
 
             if new_clip_len > orig_clip_len {
-                apply_clip_length(clip_data, orig_clip_len, new_clip_len, block_data, orig_block_len)
-            }
-            else {
+                apply_clip_length(
+                    clip_data,
+                    orig_clip_len,
+                    new_clip_len,
+                    block_data,
+                    orig_block_len,
+                )
+            } else {
                 orig_block_len
             }
         }
@@ -333,8 +369,11 @@ fn adjust_clips_length_with_tcps(this: *mut Il2CppObject, tcps: f32) {
 
 /// Returns new block length
 fn apply_clip_length(
-    clip_data: *mut Il2CppObject, orig_clip_len: i32, new_clip_len: i32,
-    block_data: *mut Il2CppObject, orig_block_len: i32
+    clip_data: *mut Il2CppObject,
+    orig_clip_len: i32,
+    new_clip_len: i32,
+    block_data: *mut Il2CppObject,
+    orig_block_len: i32,
 ) -> i32 {
     StoryTimelineClipData::set_ClipLength(clip_data, new_clip_len);
     let new_block_len = StoryTimelineClipData::get_StartFrame(clip_data) + new_clip_len + 1;
@@ -343,10 +382,16 @@ fn apply_clip_length(
     let clip_len_diff = new_clip_len - orig_clip_len;
 
     // Adjust anim lengths
-    if let Some(chara_track_list) = <IList>::new(StoryTimelineBlockData::get_CharacterTrackList(block_data)) {
+    if let Some(chara_track_list) =
+        <IList>::new(StoryTimelineBlockData::get_CharacterTrackList(block_data))
+    {
         for chara_track_data in chara_track_list.iter() {
-            for motion_track_data in StoryTimelineCharaTrackData::motion_track_data_values(chara_track_data) {
-                let Some(clip_list) = <IList>::new(StoryTimelineTrackData::get_ClipList(motion_track_data)) else {
+            for motion_track_data in
+                StoryTimelineCharaTrackData::motion_track_data_values(chara_track_data)
+            {
+                let Some(clip_list) =
+                    <IList>::new(StoryTimelineTrackData::get_ClipList(motion_track_data))
+                else {
                     continue;
                 };
                 let Some(clip_data) = clip_list.get(clip_list.count() - 1) else {
@@ -361,9 +406,12 @@ fn apply_clip_length(
     }
 
     // Adjust screen effect lengths
-    if let Some(se_track_list) = <IList>::new(StoryTimelineBlockData::get_ScreenEffectTrackList(block_data)) {
+    if let Some(se_track_list) = <IList>::new(StoryTimelineBlockData::get_ScreenEffectTrackList(
+        block_data,
+    )) {
         for se_track_data in se_track_list.iter() {
-            let Some(clip_list) = <IList>::new(StoryTimelineTrackData::get_ClipList(se_track_data)) else {
+            let Some(clip_list) = <IList>::new(StoryTimelineTrackData::get_ClipList(se_track_data))
+            else {
                 continue;
             };
             let Some(clip_data) = clip_list.get(clip_list.count() - 1) else {
@@ -395,7 +443,11 @@ struct WrapParams {
     size: i32,
 }
 
-fn dispatch_auto_tl_async(this: *mut Il2CppObject, full_dict_path: std::path::PathBuf, wp: WrapParams) {
+fn dispatch_auto_tl_async(
+    this: *mut Il2CppObject,
+    full_dict_path: std::path::PathBuf,
+    wp: WrapParams,
+) {
     let Some(block_list) = <IList>::new(get_BlockList(this)) else {
         return;
     };
@@ -440,7 +492,9 @@ fn dispatch_auto_tl_async(this: *mut Il2CppObject, full_dict_path: std::path::Pa
             for choice_data in choice_data_list.iter() {
                 let text = StoryTimelineTextClipData::ChoiceData::get_Text(choice_data);
                 if !text.is_null() && unsafe { (*text).length > 0 } {
-                    block_dict.choice_data_list.push(unsafe { (*text).as_utf16str().to_string() });
+                    block_dict
+                        .choice_data_list
+                        .push(unsafe { (*text).as_utf16str().to_string() });
                 } else {
                     block_dict.choice_data_list.push(String::new());
                 }
@@ -452,7 +506,9 @@ fn dispatch_auto_tl_async(this: *mut Il2CppObject, full_dict_path: std::path::Pa
             for color_text_info in color_text_info_list.iter() {
                 let text = StoryTimelineTextClipData::ColorTextInfo::get_Text(color_text_info);
                 if !text.is_null() && unsafe { (*text).length > 0 } {
-                    block_dict.color_text_info_list.push(unsafe { (*text).as_utf16str().to_string() });
+                    block_dict
+                        .color_text_info_list
+                        .push(unsafe { (*text).as_utf16str().to_string() });
                 } else {
                     block_dict.color_text_info_list.push(String::new());
                 }
@@ -483,12 +539,18 @@ fn dispatch_auto_tl_async(this: *mut Il2CppObject, full_dict_path: std::path::Pa
                 return text.to_string();
             }
             if wp.is_story_view {
-                if let Some(wrapped) = crate::core::utils::wrap_text(text, wp.story_view_line_width) {
+                if let Some(wrapped) = crate::core::utils::wrap_text(text, wp.story_view_line_width)
+                {
                     return wrapped.join(" \n");
                 }
             } else {
                 if wp.size == StoryTimelineTextClipData::FontSize_Default {
-                    if let Some(fitted) = crate::core::utils::wrap_fit_text(text, wp.line_width, wp.line_count, wp.font_size) {
+                    if let Some(fitted) = crate::core::utils::wrap_fit_text(
+                        text,
+                        wp.line_width,
+                        wp.line_count,
+                        wp.font_size,
+                    ) {
                         return fitted;
                     }
                 }
@@ -500,7 +562,9 @@ fn dispatch_auto_tl_async(this: *mut Il2CppObject, full_dict_path: std::path::Pa
 
         if let Some(title) = &mut dict.title {
             if !title.is_empty() {
-                let trans = sugoi.get_cached(title).or_else(|| sugoi.translate_one(title.clone()).ok());
+                let trans = sugoi
+                    .get_cached(title)
+                    .or_else(|| sugoi.translate_one(title.clone()).ok());
                 if let Some(t) = trans {
                     let _ = tx.send((title.clone(), t.clone()));
                     *title = t;
@@ -516,7 +580,9 @@ fn dispatch_auto_tl_async(this: *mut Il2CppObject, full_dict_path: std::path::Pa
 
                 if let Some(name) = &mut block.name {
                     if !name.is_empty() {
-                        let trans = sugoi.get_cached(name).or_else(|| sugoi.translate_one(name.clone()).ok());
+                        let trans = sugoi
+                            .get_cached(name)
+                            .or_else(|| sugoi.translate_one(name.clone()).ok());
                         if let Some(t) = trans {
                             let _ = tx.send((name.clone(), t.clone()));
                             *name = t;
@@ -527,7 +593,9 @@ fn dispatch_auto_tl_async(this: *mut Il2CppObject, full_dict_path: std::path::Pa
 
                 if let Some(text) = &mut block.text {
                     if !text.is_empty() {
-                        let trans = sugoi.get_cached(text).or_else(|| sugoi.translate_one(text.clone()).ok());
+                        let trans = sugoi
+                            .get_cached(text)
+                            .or_else(|| sugoi.translate_one(text.clone()).ok());
                         if let Some(t) = trans {
                             let final_t = process_wrap(&t, true);
                             let _ = tx.send((text.clone(), final_t));
@@ -540,7 +608,9 @@ fn dispatch_auto_tl_async(this: *mut Il2CppObject, full_dict_path: std::path::Pa
 
                 for choice in block.choice_data_list.iter_mut() {
                     if !choice.is_empty() {
-                        let trans = sugoi.get_cached(choice).or_else(|| sugoi.translate_one(choice.clone()).ok());
+                        let trans = sugoi
+                            .get_cached(choice)
+                            .or_else(|| sugoi.translate_one(choice.clone()).ok());
                         if let Some(t) = trans {
                             let final_t = process_wrap(&t, false);
                             let _ = tx.send((choice.clone(), final_t));
@@ -552,7 +622,9 @@ fn dispatch_auto_tl_async(this: *mut Il2CppObject, full_dict_path: std::path::Pa
 
                 for color_text in block.color_text_info_list.iter_mut() {
                     if !color_text.is_empty() {
-                        let trans = sugoi.get_cached(color_text).or_else(|| sugoi.translate_one(color_text.clone()).ok());
+                        let trans = sugoi
+                            .get_cached(color_text)
+                            .or_else(|| sugoi.translate_one(color_text.clone()).ok());
                         if let Some(t) = trans {
                             let final_t = process_wrap(&t, false);
                             let _ = tx.send((color_text.clone(), final_t));
@@ -578,7 +650,8 @@ pub fn init(umamusume: *const Il2CppImage) {
         CLASS = StoryTimelineData;
         TITLE_FIELD = get_field_from_name(StoryTimelineData, c"Title");
         BLOCKLIST_FIELD = get_field_from_name(StoryTimelineData, c"BlockList");
-        TYPEWRITECOUNTPERSECOND_FIELD = get_field_from_name(StoryTimelineData, c"TypewriteCountPerSecond");
+        TYPEWRITECOUNTPERSECOND_FIELD =
+            get_field_from_name(StoryTimelineData, c"TypewriteCountPerSecond");
         LENGTH_FIELD = get_field_from_name(StoryTimelineData, c"Length");
     }
 }

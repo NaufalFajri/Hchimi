@@ -1,8 +1,6 @@
-use crate::{
-    il2cpp::{
-        symbols::{get_field_from_name, get_field_object_value},
-        types::*
-    }
+use crate::il2cpp::{
+    symbols::{get_field_from_name, get_field_object_value},
+    types::*,
 };
 
 static mut _BASERECTTRANSFORM_FIELD: *mut FieldInfo = 0 as _;

@@ -1,9 +1,4 @@
-use crate::{
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*
-    }
-};
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 pub mod CharacterSystemText;
 

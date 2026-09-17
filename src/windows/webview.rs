@@ -13,21 +13,25 @@ use rust_i18n::t;
 use std::{
     collections::HashMap,
     ffi::c_uint,
-    sync::{atomic::{AtomicBool, Ordering}, mpsc, Mutex, RwLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, Mutex, RwLock,
+    },
 };
 use webview2_com::{
+    CoreWebView2EnvironmentOptions, CreateCoreWebView2ControllerCompletedHandler,
+    CreateCoreWebView2EnvironmentCompletedHandler, ExecuteScriptCompletedHandler,
+    HistoryChangedEventHandler,
     Microsoft::Web::WebView2::Win32::{
         CreateCoreWebView2EnvironmentWithOptions, GetAvailableCoreWebView2BrowserVersionString,
         ICoreWebView2, ICoreWebView2Controller, ICoreWebView2Environment,
         ICoreWebView2Environment10, ICoreWebView2EnvironmentOptions,
         COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC,
     },
-    CoreWebView2EnvironmentOptions, CreateCoreWebView2ControllerCompletedHandler,
-    CreateCoreWebView2EnvironmentCompletedHandler, ExecuteScriptCompletedHandler,
-    HistoryChangedEventHandler, Result
+    Result,
 };
 use windows::{
-    core::{w, BOOL, Interface, IUnknown, HSTRING, PCWSTR, PWSTR},
+    core::{w, IUnknown, Interface, BOOL, HSTRING, PCWSTR, PWSTR},
     Win32::{
         Foundation::{E_POINTER, E_UNEXPECTED, HWND, LPARAM, RECT, TRUE},
         Globalization::{
@@ -124,14 +128,20 @@ struct InnerWebView {
 impl InnerWebView {
     pub fn new(parent: HWND, url: &str) -> Result<InnerWebView> {
         if !ensure_com_initialized() {
-            return Err(webview2_com::Error::WindowsError(windows::core::Error::from(E_UNEXPECTED)));
+            return Err(webview2_com::Error::WindowsError(
+                windows::core::Error::from(E_UNEXPECTED),
+            ));
         }
 
         let env = Self::create_environment()?;
         let controller = Self::create_controller(parent, &env)?;
         let (webview, history_changed_token) = Self::init_webview(&controller, url)?;
 
-        Ok(InnerWebView { controller, webview, history_changed_token })
+        Ok(InnerWebView {
+            controller,
+            webview,
+            history_changed_token,
+        })
     }
 
     fn set_bounds(&self, bounds: RECT) -> Result<()> {
@@ -209,7 +219,10 @@ impl InnerWebView {
         webview2_com::wait_with_pump(rx)?
     }
 
-    fn init_webview(controller: &ICoreWebView2Controller, url: &str) -> Result<(ICoreWebView2, i64)> {
+    fn init_webview(
+        controller: &ICoreWebView2Controller,
+        url: &str,
+    ) -> Result<(ICoreWebView2, i64)> {
         let webview = unsafe { controller.CoreWebView2()? };
 
         let handler = HistoryChangedEventHandler::create(Box::new(
@@ -223,7 +236,9 @@ impl InnerWebView {
             },
         ));
         let mut history_changed_token: i64 = 0;
-        unsafe { webview.add_HistoryChanged(&handler, &mut history_changed_token)?; }
+        unsafe {
+            webview.add_HistoryChanged(&handler, &mut history_changed_token)?;
+        }
 
         let h_url = HSTRING::from(url);
         unsafe {
@@ -234,7 +249,7 @@ impl InnerWebView {
 
         Ok((webview, history_changed_token))
     }
-    
+
     fn can_go_back(&self) -> bool {
         let mut result = BOOL::default();
         unsafe { self.webview.CanGoBack(&mut result) }.ok();
@@ -244,7 +259,10 @@ impl InnerWebView {
 
 impl Drop for InnerWebView {
     fn drop(&mut self) {
-        let _ = unsafe { self.webview.remove_HistoryChanged(self.history_changed_token) };
+        let _ = unsafe {
+            self.webview
+                .remove_HistoryChanged(self.history_changed_token)
+        };
         CAN_GO_BACK.store(false, Ordering::Release);
         let _ = unsafe { self.controller.Close() };
     }
@@ -256,7 +274,8 @@ unsafe impl Sync for InnerWebView {}
 unsafe impl Send for DialogWebView {}
 unsafe impl Sync for DialogWebView {}
 
-static DIALOG_WEBVIEW: Lazy<Mutex<DialogWebView>> = Lazy::new(|| Mutex::new(DialogWebView::new(get_target_hwnd())));
+static DIALOG_WEBVIEW: Lazy<Mutex<DialogWebView>> =
+    Lazy::new(|| Mutex::new(DialogWebView::new(get_target_hwnd())));
 
 pub fn process_message(umsg: c_uint, lparam: LPARAM) {
     let mut dialog = match DIALOG_WEBVIEW.lock() {
@@ -320,9 +339,11 @@ pub fn process_message(umsg: c_uint, lparam: LPARAM) {
     }
 }
 
-const URL_HANDLER: &[fn(&str, &str, &HashMap<&str, &str>) -> Option<(String, String)>] = &[news_url, general_url];
+const URL_HANDLER: &[fn(&str, &str, &HashMap<&str, &str>) -> Option<(String, String)>] =
+    &[news_url, general_url];
 const BASE_API_URL: &str = "https://api.games.umamusume.jp/umamusume/contents/v/index.html#/";
-static GACHA_URL_ID_MAP: Lazy<RwLock<HashMap<String, i32>>> = Lazy::new(|| RwLock::new(HashMap::new()));
+static GACHA_URL_ID_MAP: Lazy<RwLock<HashMap<String, i32>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 pub fn add_gacha_url(url: *mut Il2CppString, gacha_id: i32) {
     let url_string = unsafe { (*url).as_utf16str().to_string() };
@@ -337,17 +358,17 @@ fn gacha_url(url: &str, params: &HashMap<&str, &str>) -> Option<String> {
     let v = params.get("v")?;
     let r = params.get("r")?;
     let p = params.get("p")?;
-    Some(format!("{BASE_API_URL}gacha?v={}&r={}&g={}&p={}", v, r, gacha_id, p))
+    Some(format!(
+        "{BASE_API_URL}gacha?v={}&r={}&g={}&p={}",
+        v, r, gacha_id, p
+    ))
 }
 
-fn news_url(
-    _url: &str,
-    base_url: &str,
-    _params: &HashMap<&str, &str>,
-) -> Option<(String, String)> {
+fn news_url(_url: &str, base_url: &str, _params: &HashMap<&str, &str>) -> Option<(String, String)> {
     if base_url == "https://dmg.umamusume.jp/news" {
         return Some((
-            "https://api.games.umamusume.jp/umamusume/contents/v/index.html#/info?p=2&c=0".to_string(),
+            "https://api.games.umamusume.jp/umamusume/contents/v/index.html#/info?p=2&c=0"
+                .to_string(),
             "Notice".to_string(),
         ));
     }
@@ -371,9 +392,16 @@ fn general_url(
             _ => url.replacen("https://www.games.umamusume.jp/#/", BASE_API_URL, 1),
         };
 
-        (parsed_url, format!("ingame_webview_dialog.title.{url_type}"))
-    } else if url.starts_with("https://hachimi.leadrdrk.com/PakaNews") { // Lead's clone of PakaNews
-        (url.to_string(), "ingame_webview_dialog.title.general".to_string())
+        (
+            parsed_url,
+            format!("ingame_webview_dialog.title.{url_type}"),
+        )
+    } else if url.starts_with("https://hachimi.leadrdrk.com/PakaNews") {
+        // Lead's clone of PakaNews
+        (
+            url.to_string(),
+            "ingame_webview_dialog.title.general".to_string(),
+        )
     } else {
         return None;
     };
@@ -401,11 +429,7 @@ fn parse_url(url: &str) -> (&str, HashMap<&str, &str>) {
 pub fn open(url: *mut Il2CppString) -> bool {
     if Hachimi::instance().game.region != Region::Japan
         || !has_available_webview()
-        || !Hachimi::instance()
-            .config
-            .load()
-            .windows
-            .ingame_webview
+        || !Hachimi::instance().config.load().windows.ingame_webview
     {
         return false;
     }
@@ -479,7 +503,10 @@ impl Window for WebviewDialog {
                 unsafe {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                         let can_back = CAN_GO_BACK.load(Ordering::Acquire);
-                        if ui.add_enabled(can_back, egui::Button::new(t!("back"))).clicked() {
+                        if ui
+                            .add_enabled(can_back, egui::Button::new(t!("back")))
+                            .clicked()
+                        {
                             let _ = PostMessageW(
                                 Some(get_target_hwnd()),
                                 WM_WEBVIEW_GOBACK,
@@ -514,10 +541,10 @@ impl Window for WebviewDialog {
                 unsafe {
                     let scale = ctx.pixels_per_point();
                     let rect = RECT {
-                        left:  (inner_rect.min.x * scale) as i32,
-                        top:   (inner_rect.min.y * scale) as i32,
+                        left: (inner_rect.min.x * scale) as i32,
+                        top: (inner_rect.min.y * scale) as i32,
                         right: (inner_rect.max.x * scale) as i32,
-                        bottom:(inner_rect.max.y * scale) as i32,
+                        bottom: (inner_rect.max.y * scale) as i32,
                     };
 
                     if let Ok(mut lock) = WEBVIEW_RECT.write() {

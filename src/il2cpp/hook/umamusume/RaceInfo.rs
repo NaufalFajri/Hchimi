@@ -1,6 +1,6 @@
 use crate::{
-    core::{Hachimi, game::Region},
-    il2cpp::{symbols::get_method_addr, types::*}
+    core::{game::Region, Hachimi},
+    il2cpp::{symbols::get_method_addr, types::*},
 };
 
 def_method_wrapper_fn!(get_RaceType, GET_RACETYPE_ADDR, i32, this: *mut Il2CppObject);
@@ -26,11 +26,15 @@ pub fn init(umamusume: *const Il2CppImage) {
                 GET_PHASECALC_ADDR = get_method_addr(RaceInfo, c"get_PhaseCalc", 0);
             }
             _ => {
-                GET_COURSE_ONLY_DISTANCE_ADDR = get_method_addr(RaceInfo, c"get_CourseOnlyDistance", 0);
+                GET_COURSE_ONLY_DISTANCE_ADDR =
+                    get_method_addr(RaceInfo, c"get_CourseOnlyDistance", 0);
                 GET_RUN_UP_DISTANCE_ADDR = get_method_addr(RaceInfo, c"get_RunUpDistance", 0);
-                GET_PHASE_MIDDLE_START_DISTANCE_ADDR = get_method_addr(RaceInfo, c"get_PhaseMiddleStartDistance", 0);
-                GET_PHASE_END_START_DISTANCE_ADDR = get_method_addr(RaceInfo, c"get_PhaseEndStartDistance", 0);
-                GET_PHASE_LAST_START_DISTANCE_ADDR = get_method_addr(RaceInfo, c"get_PhaseLastStartDistance", 0);
+                GET_PHASE_MIDDLE_START_DISTANCE_ADDR =
+                    get_method_addr(RaceInfo, c"get_PhaseMiddleStartDistance", 0);
+                GET_PHASE_END_START_DISTANCE_ADDR =
+                    get_method_addr(RaceInfo, c"get_PhaseEndStartDistance", 0);
+                GET_PHASE_LAST_START_DISTANCE_ADDR =
+                    get_method_addr(RaceInfo, c"get_PhaseLastStartDistance", 0);
             }
         }
     }

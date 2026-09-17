@@ -1,7 +1,4 @@
-use crate::il2cpp::{
-    symbols::get_field_from_name,
-    types::*
-};
+use crate::il2cpp::{symbols::get_field_from_name, types::*};
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
 pub fn class() -> *mut Il2CppClass {

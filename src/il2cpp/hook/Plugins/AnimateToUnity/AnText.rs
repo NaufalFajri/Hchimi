@@ -29,11 +29,11 @@ impl_addr_wrapper_fn!(SetTextLinespace, SET_TEXT_LINESPACE_ADDR, (), this: *mut 
 static mut SET_TEXT_FONTSIZE_ADDR: usize = 0;
 impl_addr_wrapper_fn!(SetTextFontSize, SET_TEXT_FONTSIZE_ADDR, (), this: *mut Il2CppObject, fontSize: i32);
 
-
 type SetTextFn = extern "C" fn(this: *mut Il2CppObject, text: *mut Il2CppString);
 extern "C" fn SetText(this: *mut Il2CppObject, mut text: *mut Il2CppString) {
     let text_utf = unsafe { (*text).as_utf16str() };
-    if !text_utf.as_slice().contains(&36) { // 36 = dollar sign ($)
+    if !text_utf.as_slice().contains(&36) {
+        // 36 = dollar sign ($)
         return get_orig_fn!(SetText, SetTextFn)(this, text);
     }
 
@@ -48,7 +48,10 @@ extern "C" fn SetText(this: *mut Il2CppObject, mut text: *mut Il2CppString) {
 
     text = Hachimi::instance()
         .template_parser
-        .eval_with_context(&text_utf.to_string(), &mut TemplateContext { component: this })
+        .eval_with_context(
+            &text_utf.to_string(),
+            &mut TemplateContext { component: this },
+        )
         .to_il2cpp_string();
     get_orig_fn!(SetText, SetTextFn)(this, text);
 
@@ -124,7 +127,7 @@ impl template::Context for IgnoreATFiltersContext {
     fn on_filter_eval(&mut self, _name: &str, _args: &[template::Token]) -> Option<String> {
         match _name {
             "anchor" | "scale" | "ls" | "afit" | "wrap" => Some(String::new()),
-            _ => None
+            _ => None,
         }
     }
 }

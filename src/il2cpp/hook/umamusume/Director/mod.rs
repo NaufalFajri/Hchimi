@@ -5,17 +5,17 @@ use crate::{
         hook::UnityEngine_CoreModule::Camera,
         sql,
         symbols::{
-            get_assembly_image, get_class, get_field_from_name,
-            get_method_addr, Array, IList, SingletonLike
+            get_assembly_image, get_class, get_field_from_name, get_method_addr, Array, IList,
+            SingletonLike,
         },
         types::*,
     },
 };
+use serde::{Deserialize, Serialize};
 use std::{
     ptr::null_mut,
     sync::atomic::{AtomicBool, Ordering},
 };
-use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "android")]
 use crate::il2cpp::hook::umamusume::Screen;
@@ -25,22 +25,24 @@ pub mod LiveLoadSettings;
 use LiveLoadSettings::{CharacterInfo, RaceInfo};
 
 #[cfg(target_os = "windows")]
-use super::{
-    CharacterObject, LiveModelController, ModelController,
-};
+use super::{CharacterObject, LiveModelController, ModelController};
 #[cfg(target_os = "windows")]
 use crate::{
+    il2cpp::hook::UnityEngine_CoreModule::{GameObject, Transform},
     windows::free_camera::{self, CameraScene},
-    il2cpp::{
-        hook::UnityEngine_CoreModule::{GameObject, Transform},
-    }
 };
 
 #[cfg(target_os = "windows")]
-static LIVE_DISABLED_HEADS: free_camera::DisabledHeadStore = once_cell::sync::Lazy::new(free_camera::new_disabled_head_store);
+static LIVE_DISABLED_HEADS: free_camera::DisabledHeadStore =
+    once_cell::sync::Lazy::new(free_camera::new_disabled_head_store);
 
 #[cfg(target_os = "windows")]
-def_field_object_accessors!(get__multiCameraFinalCompositeArray, set__multiCameraFinalCompositeArray, MULTI_CAMERA_FINAL_COMPOSITE_ARRAY_FIELD, Il2CppArray);
+def_field_object_accessors!(
+    get__multiCameraFinalCompositeArray,
+    set__multiCameraFinalCompositeArray,
+    MULTI_CAMERA_FINAL_COMPOSITE_ARRAY_FIELD,
+    Il2CppArray
+);
 // MCFC = MultiCameraFinalComposite
 #[cfg(target_os = "windows")]
 static mut SET_MULTI_CAMERA_FADE_VALUE_ADDR: usize = 0;
@@ -62,7 +64,9 @@ def_field_value_accessors!(get get__state, _STATE_FIELD, i32);
 
 pub fn is_live_playing() -> bool {
     let director = instance();
-    if director.is_null() { return false; }
+    if director.is_null() {
+        return false;
+    }
 
     let state = get__state(director);
     // Director.State LivePlay = 6
@@ -86,7 +90,8 @@ pub fn instance() -> *mut Il2CppObject {
 pub enum DisplayMode {
     None = 0,
     Landscape = 1,
-    #[default] Portrait = 2
+    #[default]
+    Portrait = 2,
 }
 
 static mut GET_LIVECURRENTTIME_ADDR: usize = 0;
@@ -142,12 +147,29 @@ impl_addr_wrapper_fn!(
 );
 
 def_field_value_accessors!(set set__liveCurrentTime, _LIVECURRENTTIME_FIELD, f32);
-def_field_value_accessors!(get__trainerCameraFovRate, set__trainerCameraFovRate, _TRAINERCAMERAFOVRATE_FIELD, f32);
-def_field_value_accessors!(get__trainerCameraFovRateStart, set__trainerCameraFovRateStart, _TRAINERCAMERAFOVRATESTART_FIELD, f32);
-def_field_object_accessors!(get__trainerCameraTargetCamera, set__trainerCameraTargetCamera, _TRAINERCAMERATARGETCAMERA_FIELD, Il2CppObject);
+def_field_value_accessors!(
+    get__trainerCameraFovRate,
+    set__trainerCameraFovRate,
+    _TRAINERCAMERAFOVRATE_FIELD,
+    f32
+);
+def_field_value_accessors!(
+    get__trainerCameraFovRateStart,
+    set__trainerCameraFovRateStart,
+    _TRAINERCAMERAFOVRATESTART_FIELD,
+    f32
+);
 def_field_object_accessors!(
-    get__trainerCameraTargetCameraTransform, set__trainerCameraTargetCameraTransform,
-    _TRAINERCAMERATARGETCAMERATRANSFORM_FIELD, Il2CppObject
+    get__trainerCameraTargetCamera,
+    set__trainerCameraTargetCamera,
+    _TRAINERCAMERATARGETCAMERA_FIELD,
+    Il2CppObject
+);
+def_field_object_accessors!(
+    get__trainerCameraTargetCameraTransform,
+    set__trainerCameraTargetCameraTransform,
+    _TRAINERCAMERATARGETCAMERATRANSFORM_FIELD,
+    Il2CppObject
 );
 
 #[cfg(target_os = "windows")]
@@ -282,7 +304,8 @@ fn patch_champions_live(this: *mut Il2CppObject) {
     }
 
     let music_id = GetPlaySongId(this);
-    if music_id != 1054 { // Ms. VICTORIA
+    if music_id != 1054 {
+        // Ms. VICTORIA
         return;
     }
 
@@ -451,10 +474,13 @@ fn apply_free_camera_to_main_camera(director: *mut Il2CppObject) {
     Transform::set_position_Injected(camera_transform, &mut position);
     if let Some(mut rotation) = free_camera::camera_rotation() {
         Transform::set_rotation_Injected(camera_transform, &mut rotation);
-    }
-    else {
+    } else {
         let mut look_at = free_camera::camera_look_at();
-        let mut world_up = Vector3_t { x: 0.0, y: 1.0, z: 0.0 };
+        let mut world_up = Vector3_t {
+            x: 0.0,
+            y: 1.0,
+            z: 0.0,
+        };
         Transform::Internal_LookAt_Injected(camera_transform, &mut look_at, &mut world_up);
     }
 
@@ -495,7 +521,9 @@ pub fn apply_paused_free_camera() {
 
 pub fn is_trainer_live() -> bool {
     let director = instance();
-    if director.is_null() { return false; }
+    if director.is_null() {
+        return false;
+    }
     let music_id = GetPlaySongId(director);
     // music_id = sqlite3 master.mdb "SELECT \"index\" FROM text_data WHERE text LIKE 'JPSONGNAME' AND id = 16 AND category = 16;"
     // or category "16: {}" on text_data_dict.json from translation repo
@@ -504,7 +532,9 @@ pub fn is_trainer_live() -> bool {
 }
 
 fn is_trainer_live_director(director: *mut Il2CppObject) -> bool {
-    if director.is_null() { return false; }
+    if director.is_null() {
+        return false;
+    }
     let music_id = GetPlaySongId(director);
     music_id == 1156
 }
@@ -545,19 +575,31 @@ extern "C" fn ApplyTrainerCameraFov(this: *mut Il2CppObject) {
 
         let base_fov = 150.0;
         let fov_rate = get__trainerCameraFovRate(this);
-        let fov_rate: f32 = if fov_rate == 0.0 { 1.0 } else { fov_rate.clamp(0.1, 1.0) };
+        let fov_rate: f32 = if fov_rate == 0.0 {
+            1.0
+        } else {
+            fov_rate.clamp(0.1, 1.0)
+        };
         set__trainerCameraFovRate(this, fov_rate);
         Camera::set_fieldOfView(trainer_camera, base_fov * fov_rate);
     }
 }
 
 #[cfg(target_os = "windows")]
-type AlterUpdateFn = extern "C" fn(this: *mut Il2CppObject, delta_time: f32, is_update_delta_time: bool);
+type AlterUpdateFn =
+    extern "C" fn(this: *mut Il2CppObject, delta_time: f32, is_update_delta_time: bool);
 #[cfg(target_os = "windows")]
 extern "C" fn AlterUpdate(this: *mut Il2CppObject, delta_time: f32, is_update_delta_time: bool) {
     free_camera::begin_live_director_update();
     get_orig_fn!(AlterUpdate, AlterUpdateFn)(this, delta_time, is_update_delta_time);
-    if !Hachimi::instance().config.load().windows.free_camera.enabled && is_trainer_live_director(this) {
+    if !Hachimi::instance()
+        .config
+        .load()
+        .windows
+        .free_camera
+        .enabled
+        && is_trainer_live_director(this)
+    {
         if Hachimi::instance().config.load().trainer_live_landscape {
             let camera = get_MainCameraObject(this);
             if !camera.is_null() {
@@ -572,7 +614,6 @@ extern "C" fn AlterUpdate(this: *mut Il2CppObject, delta_time: f32, is_update_de
     update_live_free_camera_target(this);
     enforce_live_free_camera_output(this);
 }
-
 
 #[cfg(target_os = "windows")]
 type SetupOrientationFn = extern "C" fn(this: *mut Il2CppObject, display_mode: DisplayMode);
@@ -610,7 +651,8 @@ pub fn init(umamusume: *const Il2CppImage) {
         ISPAUSELIVE_ADDR = get_method_addr(Director, c"IsPauseLive", 0);
         GET_LOADSETTINGS_ADDR = get_method_addr(Director, c"get_LoadSettings", 0);
         GET_LIVETIMECONTROLLER_ADDR = get_method_addr(Director, c"get_LiveTimeController", 0);
-        REGISTER_DOWNLOAD_EXTRA_RESOURCE_ADDR = get_method_addr(Director, c"RegisterDownloadExtraResource", 2);
+        REGISTER_DOWNLOAD_EXTRA_RESOURCE_ADDR =
+            get_method_addr(Director, c"RegisterDownloadExtraResource", 2);
         GET_MAIN_CAMERA_OBJECT_ADDR = get_method_addr(Director, c"get_MainCameraObject", 0);
         SET_DISPLAYMODE_ADDR = get_method_addr(Director, c"set_displayMode", 1);
         GETPLAYSONGID_ADDR = get_method_addr(Director, c"GetPlaySongId", 0);
@@ -618,18 +660,25 @@ pub fn init(umamusume: *const Il2CppImage) {
         _LIVECURRENTTIME_FIELD = get_field_from_name(Director, c"_liveCurrentTime");
         _STATE_FIELD = get_field_from_name(Director, c"_state");
         _TRAINERCAMERAFOVRATE_FIELD = get_field_from_name(Director, c"_trainerCameraFovRate");
-        _TRAINERCAMERAFOVRATESTART_FIELD = get_field_from_name(Director, c"_trainerCameraFovRateStart");
-        _TRAINERCAMERATARGETCAMERA_FIELD = get_field_from_name(Director, c"_trainerCameraTargetCamera");
-        _TRAINERCAMERATARGETCAMERATRANSFORM_FIELD = get_field_from_name(Director, c"_trainerCameraTargetCameraTransform");
+        _TRAINERCAMERAFOVRATESTART_FIELD =
+            get_field_from_name(Director, c"_trainerCameraFovRateStart");
+        _TRAINERCAMERATARGETCAMERA_FIELD =
+            get_field_from_name(Director, c"_trainerCameraTargetCamera");
+        _TRAINERCAMERATARGETCAMERATRANSFORM_FIELD =
+            get_field_from_name(Director, c"_trainerCameraTargetCameraTransform");
 
         #[cfg(target_os = "windows")]
         {
-            GET_MAIN_CAMERA_TRANSFORM_ADDR = get_method_addr(Director, c"get_MainCameraTransform", 0);
-            GET_CHARACTER_OBJECT_FROM_POSITION_ID_ADDR = get_method_addr(Director, c"GetCharacterObjectFromPositionId", 1);
-            MULTI_CAMERA_FINAL_COMPOSITE_ARRAY_FIELD = get_field_from_name(Director, c"_multiCameraFinalCompositeArray");
+            GET_MAIN_CAMERA_TRANSFORM_ADDR =
+                get_method_addr(Director, c"get_MainCameraTransform", 0);
+            GET_CHARACTER_OBJECT_FROM_POSITION_ID_ADDR =
+                get_method_addr(Director, c"GetCharacterObjectFromPositionId", 1);
+            MULTI_CAMERA_FINAL_COMPOSITE_ARRAY_FIELD =
+                get_field_from_name(Director, c"_multiCameraFinalCompositeArray");
 
             get_class_or_return!(umamusume, "Gallop.Live", MultiCameraFinalComposite);
-            SET_MULTI_CAMERA_FADE_VALUE_ADDR = get_method_addr(MultiCameraFinalComposite, c"set_fadeValue", 1);
+            SET_MULTI_CAMERA_FADE_VALUE_ADDR =
+                get_method_addr(MultiCameraFinalComposite, c"set_fadeValue", 1);
         }
     }
 
@@ -641,7 +690,7 @@ pub fn init(umamusume: *const Il2CppImage) {
     } else {
         get_method_addr(Director, c"PauseLive", 1)
     };
-    
+
     new_hook!(pause_live_addr, PauseLive);
 
     #[cfg(target_os = "android")]

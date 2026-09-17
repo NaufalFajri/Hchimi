@@ -1,7 +1,10 @@
 use std::{
     collections::HashMap,
     ffi::CStr,
-    sync::{atomic::{AtomicU64, Ordering}, Mutex},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
 };
 
 use jni::{
@@ -57,7 +60,11 @@ fn get_activity<'a>(env: &mut JNIEnv<'a>) -> Option<JObject<'a>> {
     Some(activity)
 }
 
-fn load_class_from_dex(env: &mut JNIEnv, dex_bytes: &[u8], class_name: &str) -> Option<(GlobalRef, GlobalRef)> {
+fn load_class_from_dex(
+    env: &mut JNIEnv,
+    dex_bytes: &[u8],
+    class_name: &str,
+) -> Option<(GlobalRef, GlobalRef)> {
     let activity = match get_activity(env) {
         Some(activity) => activity,
         None => {
@@ -108,19 +115,29 @@ fn load_class_from_dex(env: &mut JNIEnv, dex_bytes: &[u8], class_name: &str) -> 
 }
 
 fn with_env<F: FnOnce(&mut JNIEnv) -> bool>(f: F) -> bool {
-    let Some(vm) = java_vm() else { return false; };
-    let Ok(mut env) = vm.attach_current_thread() else { return false; };
+    let Some(vm) = java_vm() else {
+        return false;
+    };
+    let Ok(mut env) = vm.attach_current_thread() else {
+        return false;
+    };
     f(&mut env)
 }
 
-pub fn dex_load(dex_ptr: *const u8, dex_len: usize, class_name: *const std::os::raw::c_char) -> u64 {
+pub fn dex_load(
+    dex_ptr: *const u8,
+    dex_len: usize,
+    class_name: *const std::os::raw::c_char,
+) -> u64 {
     if dex_ptr.is_null() || dex_len == 0 {
         return 0;
     }
     if class_name.is_null() {
         return 0;
     }
-    let Ok(class_name) = unsafe { CStr::from_ptr(class_name) }.to_str() else { return 0; };
+    let Ok(class_name) = unsafe { CStr::from_ptr(class_name) }.to_str() else {
+        return 0;
+    };
 
     let dex_bytes = unsafe { std::slice::from_raw_parts(dex_ptr, dex_len) };
 
@@ -133,13 +150,20 @@ pub fn dex_load(dex_ptr: *const u8, dex_len: usize, class_name: *const std::os::
         let handle = NEXT_HANDLE.fetch_add(1, Ordering::Relaxed);
         DEX_REGISTRY.lock().unwrap().insert(
             handle,
-            DexEntry { class_loader: loader_ref, class_obj: class_ref },
+            DexEntry {
+                class_loader: loader_ref,
+                class_obj: class_ref,
+            },
         );
         handle_out = handle;
         true
     });
 
-    if ok { handle_out } else { 0 }
+    if ok {
+        handle_out
+    } else {
+        0
+    }
 }
 
 pub fn dex_unload(handle: u64) -> bool {
@@ -147,13 +171,21 @@ pub fn dex_unload(handle: u64) -> bool {
 }
 
 pub fn call_static_noargs(handle: u64, method: &CStr, sig: &CStr) -> bool {
-    let Ok(method) = method.to_str() else { return false; };
-    let Ok(sig) = sig.to_str() else { return false; };
+    let Ok(method) = method.to_str() else {
+        return false;
+    };
+    let Ok(sig) = sig.to_str() else {
+        return false;
+    };
     let entry = DEX_REGISTRY.lock().unwrap().get(&handle).cloned();
-    let Some(entry) = entry else { return false; };
+    let Some(entry) = entry else {
+        return false;
+    };
 
     with_env(|env| {
-        let Ok(class_obj) = env.new_local_ref(entry.class_obj.as_obj()) else { return false; };
+        let Ok(class_obj) = env.new_local_ref(entry.class_obj.as_obj()) else {
+            return false;
+        };
         let class = JClass::from(class_obj);
         match env.call_static_method(class, method, sig, &[]) {
             Ok(_) => true,
@@ -167,16 +199,28 @@ pub fn call_static_noargs(handle: u64, method: &CStr, sig: &CStr) -> bool {
 }
 
 pub fn call_static_string(handle: u64, method: &CStr, sig: &CStr, arg: &CStr) -> bool {
-    let Ok(method) = method.to_str() else { return false; };
-    let Ok(sig) = sig.to_str() else { return false; };
-    let Ok(arg_str) = arg.to_str() else { return false; };
+    let Ok(method) = method.to_str() else {
+        return false;
+    };
+    let Ok(sig) = sig.to_str() else {
+        return false;
+    };
+    let Ok(arg_str) = arg.to_str() else {
+        return false;
+    };
     let entry = DEX_REGISTRY.lock().unwrap().get(&handle).cloned();
-    let Some(entry) = entry else { return false; };
+    let Some(entry) = entry else {
+        return false;
+    };
 
     with_env(|env| {
-        let Ok(class_obj) = env.new_local_ref(entry.class_obj.as_obj()) else { return false; };
+        let Ok(class_obj) = env.new_local_ref(entry.class_obj.as_obj()) else {
+            return false;
+        };
         let class = JClass::from(class_obj);
-        let Ok(jarg) = env.new_string(arg_str) else { return false; };
+        let Ok(jarg) = env.new_string(arg_str) else {
+            return false;
+        };
         match env.call_static_method(class, method, sig, &[JValue::Object(&jarg)]) {
             Ok(_) => true,
             Err(_) => {

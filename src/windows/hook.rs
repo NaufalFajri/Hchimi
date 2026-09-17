@@ -2,17 +2,31 @@
 
 use std::path::{Path, PathBuf};
 
-use windows::{core::{w, PCWSTR}, Win32::{Foundation::HMODULE, System::LibraryLoader::GetModuleHandleW}};
+use windows::{
+    core::{w, PCWSTR},
+    Win32::{Foundation::HMODULE, System::LibraryLoader::GetModuleHandleW},
+};
 
-use crate::{core::{Error, Hachimi}, windows::{main::DLL_HMODULE, steamworks, utils::{self, get_module_file_name}}};
+use crate::{
+    core::{Error, Hachimi},
+    windows::{
+        main::DLL_HMODULE,
+        steamworks,
+        utils::{self, get_module_file_name},
+    },
+};
 
-use super::{hachimi_impl, proxy, ffi};
+use super::{ffi, hachimi_impl, proxy};
 
 type LoadLibraryWFn = extern "C" fn(filename: PCWSTR) -> HMODULE;
 extern "C" fn LoadLibraryW(filename: PCWSTR) -> HMODULE {
     let hachimi = Hachimi::instance();
     let orig_fn: LoadLibraryWFn = unsafe {
-        std::mem::transmute(hachimi.interceptor.get_trampoline_addr(LoadLibraryW as *const () as usize))
+        std::mem::transmute(
+            hachimi
+                .interceptor
+                .get_trampoline_addr(LoadLibraryW as *const () as usize),
+        )
     };
 
     let handle = orig_fn(filename);
@@ -29,14 +43,19 @@ extern "C" fn LoadLibraryW(filename: PCWSTR) -> HMODULE {
     let needs_init_steamworks = steamworks::is_overlay_conflicting(&hachimi);
     if hachimi.on_dlopen(&filename_str, handle.0 as usize) {
         if !needs_init_steamworks {
-            hachimi.interceptor.unhook(LoadLibraryW as *const () as usize);
+            hachimi
+                .interceptor
+                .unhook(LoadLibraryW as *const () as usize);
         }
-    }
-    else if needs_init_steamworks &&
-        Path::new(&filename_str).file_name().is_some_and(|name| name == "steam_api64.dll")
+    } else if needs_init_steamworks
+        && Path::new(&filename_str)
+            .file_name()
+            .is_some_and(|name| name == "steam_api64.dll")
     {
         steamworks::init(handle);
-        hachimi.interceptor.unhook(LoadLibraryW as *const () as usize);
+        hachimi
+            .interceptor
+            .unhook(LoadLibraryW as *const () as usize);
     }
     handle
 }
@@ -45,7 +64,8 @@ fn init_internal() -> Result<(), Error> {
     let hachimi = Hachimi::instance();
 
     let module_name = PathBuf::from(unsafe { get_module_file_name(DLL_HMODULE) }.to_string())
-        .file_name().map(|s| s.to_string_lossy().to_ascii_lowercase());
+        .file_name()
+        .map(|s| s.to_string_lossy().to_ascii_lowercase());
 
     match module_name.as_deref() {
         Some("unityplayer.dll") => {
@@ -62,12 +82,15 @@ fn init_internal() -> Result<(), Error> {
     }
 
     info!("Hooking LoadLibraryW");
-    hachimi.interceptor.hook(ffi::LoadLibraryW as *const () as usize, LoadLibraryW as *const () as usize)?;
+    hachimi.interceptor.hook(
+        ffi::LoadLibraryW as *const () as usize,
+        LoadLibraryW as *const () as usize,
+    )?;
 
     if let Ok(handle) = unsafe { GetModuleHandleW(w!("GameAssembly.dll")) } {
         info!("Late loading detected");
         hachimi.on_dlopen("GameAssembly.dll", handle.0 as _);
-        hachimi.on_hooking_finished();   
+        hachimi.on_hooking_finished();
     }
 
     Ok(())

@@ -1,6 +1,9 @@
 use std::ptr::null_mut;
 
-use crate::il2cpp::{symbols::{get_field_from_name, get_field_value, set_field_value}, types::*};
+use crate::il2cpp::{
+    symbols::{get_field_from_name, get_field_value, set_field_value},
+    types::*,
+};
 
 static mut CLIPLENGTH_FIELD: *mut FieldInfo = null_mut();
 pub fn get_ClipLength(this: *mut Il2CppObject) -> i32 {

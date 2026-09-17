@@ -18,8 +18,16 @@ const HEIGHT: f32 = 50.0;
 static mut GET_LABEL_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_Label, GET_LABEL_ADDR, *mut Il2CppObject, this: *mut Il2CppObject);
 
-type InitFn = extern "C" fn(this: *mut Il2CppObject, nickname: *mut Il2CppObject, isLandscape: bool) -> *mut Il2CppObject;
-extern "C" fn Initialize(this: *mut Il2CppObject, nickname: *mut Il2CppObject, isLandscape: bool) -> *mut Il2CppObject {
+type InitFn = extern "C" fn(
+    this: *mut Il2CppObject,
+    nickname: *mut Il2CppObject,
+    isLandscape: bool,
+) -> *mut Il2CppObject;
+extern "C" fn Initialize(
+    this: *mut Il2CppObject,
+    nickname: *mut Il2CppObject,
+    isLandscape: bool,
+) -> *mut Il2CppObject {
     let orig = get_orig_fn!(Initialize, InitFn)(this, nickname, isLandscape);
     fit_text(this);
     orig

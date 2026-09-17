@@ -1,11 +1,11 @@
 #![allow(non_snake_case)]
 
+use glow::HasContext;
+use std::cell::OnceCell;
 use std::num::NonZeroU32;
 use std::os::raw::c_char;
 use std::os::raw::{c_uint, c_void};
 use std::sync::Arc;
-use std::cell::OnceCell;
-use glow::HasContext;
 
 use crate::core::{Error, Gui, Hachimi};
 
@@ -17,7 +17,11 @@ type EGLint = i32;
 const EGL_WIDTH: EGLint = 0x3057;
 const EGL_HEIGHT: EGLint = 0x3056;
 
-fn get_binding_parameter<T>(gl: &Arc<glow::Context>, parameter: u32, create_wrapper: fn(NonZeroU32) -> T) -> Option<T> {
+fn get_binding_parameter<T>(
+    gl: &Arc<glow::Context>,
+    parameter: u32,
+    create_wrapper: fn(NonZeroU32) -> T,
+) -> Option<T> {
     let v = unsafe { gl.get_parameter_i32(parameter) };
     if let Some(value) = NonZeroU32::new(v as u32) {
         return Some(create_wrapper(value));
@@ -27,8 +31,18 @@ fn get_binding_parameter<T>(gl: &Arc<glow::Context>, parameter: u32, create_wrap
 }
 
 static mut EGLQUERYSURFACE_ADDR: usize = 0;
-type EGLQuerySurfaceFn = extern "C" fn(display: EGLDisplay, surface: EGLSurface, attribute: EGLint, value: *mut EGLint) -> EGLBoolean;
-fn eglQuerySurface(display: EGLDisplay, surface: EGLSurface, attribute: EGLint, value: *mut EGLint) -> EGLBoolean {
+type EGLQuerySurfaceFn = extern "C" fn(
+    display: EGLDisplay,
+    surface: EGLSurface,
+    attribute: EGLint,
+    value: *mut EGLint,
+) -> EGLBoolean;
+fn eglQuerySurface(
+    display: EGLDisplay,
+    surface: EGLSurface,
+    attribute: EGLint,
+    value: *mut EGLint,
+) -> EGLBoolean {
     let orig_fn: EGLQuerySurfaceFn = unsafe { std::mem::transmute(EGLQUERYSURFACE_ADDR) };
     orig_fn(display, surface, attribute, value)
 }
@@ -38,7 +52,9 @@ static mut EGLSWAPBUFFERS_ADDR: usize = 0;
 type EGLSwapBuffersFn = extern "C" fn(display: EGLDisplay, surface: EGLSurface) -> EGLBoolean;
 extern "C" fn eglSwapBuffers(display: EGLDisplay, surface: EGLSurface) -> EGLBoolean {
     let orig_fn: EGLSwapBuffersFn = unsafe { std::mem::transmute(EGLSWAPBUFFERS_ADDR) };
-    let mut gui = Gui::instance_or_init("android.menu_open_key").lock().unwrap();
+    let mut gui = Gui::instance_or_init("android.menu_open_key")
+        .lock()
+        .unwrap();
     // Big fat state destroyer, initialize it as soon as possible
     let painter = match init_painter() {
         Ok(v) => v,
@@ -47,7 +63,9 @@ extern "C" fn eglSwapBuffers(display: EGLDisplay, surface: EGLSurface) -> EGLBoo
             info!("Unhooking eglSwapBuffers");
 
             let res = orig_fn(display, surface);
-            Hachimi::instance().interceptor.unhook(eglSwapBuffers as usize);
+            Hachimi::instance()
+                .interceptor
+                .unhook(eglSwapBuffers as usize);
             return res;
         }
     };
@@ -65,7 +83,9 @@ extern "C" fn eglSwapBuffers(display: EGLDisplay, surface: EGLSurface) -> EGLBoo
     gui.set_screen_size(width, height);
     let output = gui.run();
 
-    let clipped_primitives = gui.context.tessellate(output.shapes, output.pixels_per_point);
+    let clipped_primitives = gui
+        .context
+        .tessellate(output.shapes, output.pixels_per_point);
     let dimensions: [u32; 2] = [width as u32, height as u32];
 
     // Backup state
@@ -77,7 +97,8 @@ extern "C" fn eglSwapBuffers(display: EGLDisplay, surface: EGLSurface) -> EGLBoo
     let prev_enable_depth_test = unsafe { gl.is_enabled(glow::DEPTH_TEST) };
     let prev_enable_blend = unsafe { gl.is_enabled(glow::BLEND) };
     let prev_blend_equation_rgb = unsafe { gl.get_parameter_i32(glow::BLEND_EQUATION_RGB) as _ };
-    let prev_blend_equation_alpha = unsafe { gl.get_parameter_i32(glow::BLEND_EQUATION_ALPHA) as _ };
+    let prev_blend_equation_alpha =
+        unsafe { gl.get_parameter_i32(glow::BLEND_EQUATION_ALPHA) as _ };
     let prev_blend_src_rgb = unsafe { gl.get_parameter_i32(glow::BLEND_SRC_RGB) as _ };
     let prev_blend_dst_rgb = unsafe { gl.get_parameter_i32(glow::BLEND_DST_RGB) as _ };
     let prev_blend_src_alpha = unsafe { gl.get_parameter_i32(glow::BLEND_SRC_ALPHA) as _ };
@@ -86,18 +107,44 @@ extern "C" fn eglSwapBuffers(display: EGLDisplay, surface: EGLSurface) -> EGLBoo
     let prev_texture = get_binding_parameter(&gl, glow::TEXTURE_BINDING_2D, glow::NativeTexture);
     let prev_active_texture = unsafe { gl.get_parameter_i32(glow::ACTIVE_TEXTURE) as _ };
 
-    painter.paint_and_update_textures(dimensions, output.pixels_per_point, &clipped_primitives, &output.textures_delta);
+    painter.paint_and_update_textures(
+        dimensions,
+        output.pixels_per_point,
+        &clipped_primitives,
+        &output.textures_delta,
+    );
 
     // Restore state
     unsafe {
         gl.bind_buffer(glow::ARRAY_BUFFER, prev_vbo);
         gl.bind_vertex_array(prev_vao);
-        if prev_enable_scissor_test { gl.enable(glow::SCISSOR_TEST) } else { gl.disable(glow::SCISSOR_TEST) }
-        if prev_enable_cull_face    { gl.enable(glow::CULL_FACE) }    else { gl.disable(glow::CULL_FACE) }
-        if prev_enable_depth_test   { gl.enable(glow::DEPTH_TEST) }   else { gl.disable(glow::DEPTH_TEST) }
-        if prev_enable_blend        { gl.enable(glow::BLEND) }        else { gl.disable(glow::BLEND) }
+        if prev_enable_scissor_test {
+            gl.enable(glow::SCISSOR_TEST)
+        } else {
+            gl.disable(glow::SCISSOR_TEST)
+        }
+        if prev_enable_cull_face {
+            gl.enable(glow::CULL_FACE)
+        } else {
+            gl.disable(glow::CULL_FACE)
+        }
+        if prev_enable_depth_test {
+            gl.enable(glow::DEPTH_TEST)
+        } else {
+            gl.disable(glow::DEPTH_TEST)
+        }
+        if prev_enable_blend {
+            gl.enable(glow::BLEND)
+        } else {
+            gl.disable(glow::BLEND)
+        }
         gl.blend_equation_separate(prev_blend_equation_rgb, prev_blend_equation_alpha);
-        gl.blend_func_separate(prev_blend_src_rgb, prev_blend_dst_rgb, prev_blend_src_alpha, prev_blend_dst_alpha);
+        gl.blend_func_separate(
+            prev_blend_src_rgb,
+            prev_blend_dst_rgb,
+            prev_blend_src_alpha,
+            prev_blend_dst_alpha,
+        );
         if prev_program.is_none() || gl.is_program(prev_program.unwrap()) {
             gl.use_program(prev_program);
         }
@@ -134,10 +181,9 @@ impl From<egui_glow::PainterError> for Error {
 type EGLGetProcAddressFn = extern "C" fn(proc_name: *const c_char) -> *mut c_void;
 static mut EGLGETPROCADDRESS_ADDR: usize = 0;
 fn init_gl() -> glow::Context {
-    let egl_get_proc_address: EGLGetProcAddressFn = unsafe { std::mem::transmute(EGLGETPROCADDRESS_ADDR) };
-    unsafe {
-        glow::Context::from_loader_function_cstr(|s| egl_get_proc_address(s.as_ptr()))
-    }
+    let egl_get_proc_address: EGLGetProcAddressFn =
+        unsafe { std::mem::transmute(EGLGETPROCADDRESS_ADDR) };
+    unsafe { glow::Context::from_loader_function_cstr(|s| egl_get_proc_address(s.as_ptr())) }
 }
 
 fn init_internal() -> Result<(), Error> {
@@ -146,7 +192,9 @@ fn init_internal() -> Result<(), Error> {
     let eglSwapBuffers_addr = unsafe { libc::dlsym(egl_handle, c"eglSwapBuffers".as_ptr()) };
 
     unsafe {
-        EGLSWAPBUFFERS_ADDR = Hachimi::instance().interceptor.hook(eglSwapBuffers_addr as usize, eglSwapBuffers as usize)?;
+        EGLSWAPBUFFERS_ADDR = Hachimi::instance()
+            .interceptor
+            .hook(eglSwapBuffers_addr as usize, eglSwapBuffers as usize)?;
         EGLGETPROCADDRESS_ADDR = libc::dlsym(egl_handle, c"eglGetProcAddress".as_ptr()) as usize;
         EGLQUERYSURFACE_ADDR = libc::dlsym(egl_handle, c"eglQuerySurface".as_ptr()) as usize
     }

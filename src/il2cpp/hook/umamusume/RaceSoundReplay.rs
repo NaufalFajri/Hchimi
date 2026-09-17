@@ -2,7 +2,7 @@ use crate::il2cpp::{
     api::il2cpp_class_is_assignable_from,
     ext::Il2CppObjectExt,
     symbols::{get_field_from_name, get_method_addr},
-    types::*
+    types::*,
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
@@ -19,7 +19,12 @@ pub fn is_replay_sound(obj: *mut Il2CppObject) -> bool {
     !obj_class.is_null() && il2cpp_class_is_assignable_from(class(), obj_class)
 }
 
-def_field_object_accessors!(get_BGMController, set_BGMController, BGM_CONTROLLER_FIELD, Il2CppObject);
+def_field_object_accessors!(
+    get_BGMController,
+    set_BGMController,
+    BGM_CONTROLLER_FIELD,
+    Il2CppObject
+);
 
 def_method_wrapper_fn!(GetBGMVolume, GET_BGM_VOLUME_ADDR, f32, this: *mut Il2CppObject);
 

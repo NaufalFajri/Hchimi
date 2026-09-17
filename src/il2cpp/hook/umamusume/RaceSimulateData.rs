@@ -1,20 +1,32 @@
 use crate::{
-    core::{Hachimi, game::Region},
+    core::{game::Region, Hachimi},
     il2cpp::{
         symbols::{get_class, get_field_from_name, get_method_addr},
-        types::*
-    }
+        types::*,
+    },
 };
 
 def_method_wrapper_fn!(get_FrameDataList, GET_FRAME_DATA_LIST_ADDR, *mut Il2CppObject, this: *mut Il2CppObject);
-def_field_object_accessors!(get__simEvDataList, set__simEvDataList, SIM_EV_DATA_LIST_FIELD, Il2CppObject);
+def_field_object_accessors!(
+    get__simEvDataList,
+    set__simEvDataList,
+    SIM_EV_DATA_LIST_FIELD,
+    Il2CppObject
+);
 
 pub fn init(umamusume: *const Il2CppImage) {
-    if !matches!(Hachimi::instance().game.region, Region::Japan | Region::Global) {
+    if !matches!(
+        Hachimi::instance().game.region,
+        Region::Japan | Region::Global
+    ) {
         return;
     }
 
-    let namespace = if Hachimi::instance().game.region == Region::Global { c"Gallop" } else { c"StandaloneSimulator" };
+    let namespace = if Hachimi::instance().game.region == Region::Global {
+        c"Gallop"
+    } else {
+        c"StandaloneSimulator"
+    };
     let RaceSimulateData = match get_class(umamusume, namespace, c"RaceSimulateData") {
         Ok(v) => v,
         Err(e) => {

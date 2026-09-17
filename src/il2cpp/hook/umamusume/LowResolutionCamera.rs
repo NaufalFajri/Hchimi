@@ -2,7 +2,7 @@ use std::sync::atomic::{self, AtomicBool};
 
 use crate::{
     core::{game::Region, Hachimi},
-    il2cpp::{symbols::get_method_addr, types::*}
+    il2cpp::{symbols::get_method_addr, types::*},
 };
 
 static CREATING_RENDER_TEXTURE: AtomicBool = AtomicBool::new(false);
@@ -37,7 +37,8 @@ pub fn init(umamusume: *const Il2CppImage) {
     new_hook!(Initialize_addr, Initialize);
 
     if Hachimi::instance().game.region == Region::Japan {
-        let RemakeRendererTexture_addr = get_method_addr(LowResolutionCamera, c"RemakeRendererTexture", 0);
+        let RemakeRendererTexture_addr =
+            get_method_addr(LowResolutionCamera, c"RemakeRendererTexture", 0);
         new_hook!(RemakeRendererTexture_addr, RemakeRendererTexture);
     }
 }

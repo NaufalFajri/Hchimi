@@ -1,5 +1,7 @@
 use super::{StoryViewTextControllerLandscape, StoryViewTextControllerSingleMode, TextFrame};
-use crate::il2cpp::{ext::Il2CppObjectExt, hook::UnityEngine_UI::Text, symbols::get_method_addr, types::*, utils};
+use crate::il2cpp::{
+    ext::Il2CppObjectExt, hook::UnityEngine_UI::Text, symbols::get_method_addr, types::*, utils,
+};
 use std::ptr::null_mut;
 
 static mut CLASS_SINGLE: *mut Il2CppClass = null_mut();

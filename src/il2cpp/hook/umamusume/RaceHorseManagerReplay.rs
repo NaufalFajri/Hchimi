@@ -1,8 +1,6 @@
 use crate::il2cpp::{
-    api::il2cpp_class_is_assignable_from,
-    ext::Il2CppObjectExt,
-    symbols::get_field_from_name,
-    types::*
+    api::il2cpp_class_is_assignable_from, ext::Il2CppObjectExt, symbols::get_field_from_name,
+    types::*,
 };
 
 def_field_object_accessors!(get__reader, set__reader, READER_FIELD, Il2CppObject);

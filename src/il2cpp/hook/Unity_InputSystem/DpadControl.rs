@@ -13,7 +13,11 @@ static mut GET_RIGHT_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_right, GET_RIGHT_ADDR, *mut Il2CppObject, this: *mut Il2CppObject);
 
 pub fn init(Unity_InputSystem: *const Il2CppImage) {
-    get_class_or_return!(Unity_InputSystem, "UnityEngine.InputSystem.Controls", DpadControl);
+    get_class_or_return!(
+        Unity_InputSystem,
+        "UnityEngine.InputSystem.Controls",
+        DpadControl
+    );
 
     unsafe {
         GET_UP_ADDR = get_method_addr(DpadControl, c"get_up", 0);

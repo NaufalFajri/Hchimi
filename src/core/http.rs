@@ -1,20 +1,14 @@
+use std::thread;
 use std::{
     fs,
-    io::{
-        Read,
-        Write,
-        Seek,
-        SeekFrom
-    },
+    io::{Read, Seek, SeekFrom, Write},
     path::Path,
     sync::{
         atomic::{self, AtomicBool},
-        Arc,
-        Mutex
+        Arc, Mutex,
     },
-    time::Duration
+    time::Duration,
 };
-use std::thread;
 use thread_priority::{ThreadBuilderExt, ThreadPriority};
 
 use arc_swap::ArcSwap;
@@ -28,7 +22,7 @@ pub struct AsyncRequest<T: Send + Sync> {
     request: Mutex<Option<http::Request<ureq::Body>>>,
     map_fn: fn(http::Response<ureq::Body>) -> Result<T, Error>,
     running: AtomicBool,
-    pub result: ArcSwap<Option<Result<T, Error>>>
+    pub result: ArcSwap<Option<Result<T, Error>>>,
 }
 
 pub fn ureq_config() -> ureq::config::Config {
@@ -39,31 +33,43 @@ pub fn ureq_config_with_timeout(timeout: Option<Duration>) -> ureq::config::Conf
     use ureq::config::IpFamily::*;
 
     ureq::config::Config::builder()
-        .ip_family(if Hachimi::instance().config.load().ipv4_only { Ipv4Only } else { Any })
+        .ip_family(if Hachimi::instance().config.load().ipv4_only {
+            Ipv4Only
+        } else {
+            Any
+        })
         .timeout_connect(timeout)
         .build()
 }
 
 impl<T: Send + Sync + 'static> AsyncRequest<T> {
-    pub fn new(request: http::Request<ureq::Body>, map_fn: fn(http::Response<ureq::Body>) -> Result<T, Error>) -> Self {
+    pub fn new(
+        request: http::Request<ureq::Body>,
+        map_fn: fn(http::Response<ureq::Body>) -> Result<T, Error>,
+    ) -> Self {
         AsyncRequest {
             request: Mutex::new(Some(request)),
             map_fn,
             running: AtomicBool::new(false),
-            result: ArcSwap::default()
+            result: ArcSwap::default(),
         }
     }
 
     pub fn call(self: Arc<Self>) {
         self.result.store(Arc::new(None));
         self.running.store(true, atomic::Ordering::Release);
-        let req = self.request.lock().unwrap().take().expect("Request run twice");
+        let req = self
+            .request
+            .lock()
+            .unwrap()
+            .take()
+            .expect("Request run twice");
         std::thread::spawn(move || {
             let agent = ureq::Agent::new_with_config(ureq_config());
 
             let res = match agent.run(req) {
                 Ok(v) => (self.map_fn)(v),
-                Err(e) => Err(Error::from(e))
+                Err(e) => Err(Error::from(e)),
             };
             self.result.store(Arc::new(Some(res)));
             self.running.store(false, atomic::Ordering::Release);
@@ -77,9 +83,9 @@ impl<T: Send + Sync + 'static> AsyncRequest<T> {
 
 impl<T: Send + Sync + 'static + DeserializeOwned> AsyncRequest<T> {
     pub fn with_json_response(request: http::Request<ureq::Body>) -> AsyncRequest<T> {
-        AsyncRequest::new(request, |res|
+        AsyncRequest::new(request, |res| {
             Ok(serde_json::from_str(&res.into_body().read_to_string()?)?)
-        )
+        })
     }
 }
 
@@ -89,7 +95,10 @@ pub fn get_json<T: DeserializeOwned>(url: &str) -> Result<T, Error> {
     Ok(serde_json::from_str(&res.into_body().read_to_string()?)?)
 }
 
-pub fn get_json_with_timeout<T: DeserializeOwned>(url: &str, timeout: Duration) -> Result<T, Error> {
+pub fn get_json_with_timeout<T: DeserializeOwned>(
+    url: &str,
+    timeout: Duration,
+) -> Result<T, Error> {
     let agent: ureq::Agent = ureq::Agent::new_with_config(ureq_config_with_timeout(Some(timeout)));
     let res = agent.get(url).call()?;
     Ok(serde_json::from_str(&res.into_body().read_to_string()?)?)
@@ -103,17 +112,26 @@ pub fn get_github_json<T: DeserializeOwned>(url: &str) -> Result<T, Error> {
     Ok(serde_json::from_str(&res.into_body().read_to_string()?)?)
 }
 
-pub fn download_file_parallel(url: &str, file_path: &Path, num_threads: usize,
-    min_chunk_size: u64, chunk_size: usize, progress_callback: Arc<dyn Fn(usize) + Send + Sync>
+pub fn download_file_parallel(
+    url: &str,
+    file_path: &Path,
+    num_threads: usize,
+    min_chunk_size: u64,
+    chunk_size: usize,
+    progress_callback: Arc<dyn Fn(usize) + Send + Sync>,
 ) -> Result<(), Error> {
     let agent: ureq::Agent = ureq::Agent::new_with_config(ureq_config());
     let res = agent.head(url).call()?;
 
-    let content_length = res.headers()
+    let content_length = res
+        .headers()
         .get("Content-Length")
         .and_then(|h| h.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok());
-    let accepts_ranges = res.headers().get("Accept-Ranges").map_or(false, |v| v == "bytes");
+    let accepts_ranges = res
+        .headers()
+        .get("Accept-Ranges")
+        .map_or(false, |v| v == "bytes");
 
     let mut actual_length = 0u64;
     let mut use_parallel = false;
@@ -156,19 +174,29 @@ pub fn download_file_parallel(url: &str, file_path: &Path, num_threads: usize,
             let handle = thread::Builder::new()
                 .name("downloader_chunk".into())
                 .spawn_with_priority(ThreadPriority::Min, move |result| {
-                    if result.is_err() { warn!("Failed to set downloader thread priority."); }
+                    if result.is_err() {
+                        warn!("Failed to set downloader thread priority.");
+                    }
                     let mut file = match fs::File::options().write(true).open(&path_clone) {
                         Ok(f) => f,
-                        Err(e) => { *fatal_error_clone.lock().unwrap() = Some(e.into()); return; }
+                        Err(e) => {
+                            *fatal_error_clone.lock().unwrap() = Some(e.into());
+                            return;
+                        }
                     };
                     let mut buffer = vec![0u8; chunk_size];
                     while let Ok((start, end)) = receiver_clone.recv() {
-                        if stop_signal_clone.load(atomic::Ordering::Relaxed) { break; }
+                        if stop_signal_clone.load(atomic::Ordering::Relaxed) {
+                            break;
+                        }
 
                         let expected_bytes = end - start + 1;
                         let range_header = format!("bytes={}-{}", start, end);
                         let result = (|| -> Result<(), Error> {
-                            let res = agent_clone.get(&url_clone).header("Range", &range_header).call()?;
+                            let res = agent_clone
+                                .get(&url_clone)
+                                .header("Range", &range_header)
+                                .call()?;
 
                             if res.status() == 200 {
                                 needs_fallback_clone.store(true, atomic::Ordering::Relaxed);
@@ -178,7 +206,8 @@ pub fn download_file_parallel(url: &str, file_path: &Path, num_threads: usize,
 
                             if res.status() != 206 {
                                 return Err(Error::RuntimeError(format!(
-                                    "Parallel chunk failed: Expected 206 Partial Content, got {}", res.status()
+                                    "Parallel chunk failed: Expected 206 Partial Content, got {}",
+                                    res.status()
                                 )));
                             }
 
@@ -191,16 +220,23 @@ pub fn download_file_parallel(url: &str, file_path: &Path, num_threads: usize,
                             loop {
                                 let to_read = (buffer.len() as u64).min(remaining) as usize;
                                 let bytes_read = reader.read(&mut buffer[..to_read])?;
-                                if bytes_read == 0 { break; }
+                                if bytes_read == 0 {
+                                    break;
+                                }
                                 file.write_all(&buffer[..bytes_read])?;
                                 progress_callback_clone(bytes_read);
 
                                 remaining -= bytes_read as u64;
-                                if remaining == 0 { break; }
+                                if remaining == 0 {
+                                    break;
+                                }
                             }
 
                             if remaining > 0 {
-                                return Err(Error::RuntimeError(format!("Parallel chunk truncated. Missing {} bytes", remaining)));
+                                return Err(Error::RuntimeError(format!(
+                                    "Parallel chunk truncated. Missing {} bytes",
+                                    remaining
+                                )));
                             }
                             Ok(())
                         })();
@@ -210,14 +246,17 @@ pub fn download_file_parallel(url: &str, file_path: &Path, num_threads: usize,
                             break;
                         }
                     }
-                }).unwrap();
+                })
+                .unwrap();
             handles.push(handle);
         }
 
         for i in 0..num_chunks {
             let start = i * chunk_size_per_thread;
             let end = (start + chunk_size_per_thread - 1).min(actual_length - 1);
-            if sender.send((start, end)).is_err() { break; }
+            if sender.send((start, end)).is_err() {
+                break;
+            }
         }
         drop(sender);
 
@@ -240,7 +279,8 @@ pub fn download_file_parallel(url: &str, file_path: &Path, num_threads: usize,
     debug!("Using single-threaded download for: {}", url);
     let res = agent.get(url).call()?;
 
-    let fallback_length = res.headers()
+    let fallback_length = res
+        .headers()
         .get("Content-Length")
         .and_then(|h| h.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok());
@@ -266,7 +306,12 @@ pub fn download_file_parallel(url: &str, file_path: &Path, num_threads: usize,
     Ok(())
 }
 
-pub fn download_file_buffered(res: http::Response<ureq::Body>, file: &mut std::fs::File, buffer: &mut [u8], mut add_bytes: impl FnMut(&[u8])) -> Result<(), Error> {
+pub fn download_file_buffered(
+    res: http::Response<ureq::Body>,
+    file: &mut std::fs::File,
+    buffer: &mut [u8],
+    mut add_bytes: impl FnMut(&[u8]),
+) -> Result<(), Error> {
     let mut body = res.into_body();
     let mut reader = body.as_reader();
     let mut buffer_pos = 0usize;

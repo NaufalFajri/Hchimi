@@ -2,8 +2,8 @@ use crate::{
     core::captions,
     il2cpp::{
         symbols::{get_method_addr, get_method_overload_addr},
-        types::*
-    }
+        types::*,
+    },
 };
 
 use super::CriAtomExPlayback::CriAtomExPlayback_t;
@@ -60,7 +60,8 @@ pub fn init(CriMw_CriWare_Runtime: *const Il2CppImage) {
 
     unsafe {
         STOP_ADDR = get_method_addr(CriAtomExPlayer, c"Stop", 1);
-        STOPWITHOUTRELEASETIME_ADDR = get_method_addr(CriAtomExPlayer, c"StopWithoutReleaseTime", 0);
+        STOPWITHOUTRELEASETIME_ADDR =
+            get_method_addr(CriAtomExPlayer, c"StopWithoutReleaseTime", 0);
         START_ADDR = get_method_addr(CriAtomExPlayer, c"Start", 0);
         PAUSE_ADDR = get_method_addr(CriAtomExPlayer, c"Pause", 1);
         SETSTARTTIME_ADDR = get_method_addr(CriAtomExPlayer, c"SetStartTime", 1);
@@ -70,9 +71,14 @@ pub fn init(CriMw_CriWare_Runtime: *const Il2CppImage) {
     let stop_addr = get_method_addr(CriAtomExPlayer, c"Stop", 0);
     new_hook!(stop_addr, StopHook);
 
-    let stop_without_release_time_addr = get_method_addr(CriAtomExPlayer, c"StopWithoutReleaseTime", 0);
+    let stop_without_release_time_addr =
+        get_method_addr(CriAtomExPlayer, c"StopWithoutReleaseTime", 0);
     new_hook!(stop_without_release_time_addr, StopWithoutReleaseTimeHook);
 
-    let pause_addr = get_method_overload_addr(CriAtomExPlayer, "Pause", &[Il2CppTypeEnum_IL2CPP_TYPE_BOOLEAN]);
+    let pause_addr = get_method_overload_addr(
+        CriAtomExPlayer,
+        "Pause",
+        &[Il2CppTypeEnum_IL2CPP_TYPE_BOOLEAN],
+    );
     new_hook!(pause_addr, PauseHook);
 }

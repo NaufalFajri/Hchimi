@@ -1,6 +1,10 @@
-use crate::{core::taskbar::{self, TBPF_NOPROGRESS}, il2cpp::{symbols::get_method_addr, types::*}};
+use crate::{
+    core::taskbar::{self, TBPF_NOPROGRESS},
+    il2cpp::{symbols::get_method_addr, types::*},
+};
 
-type UpdateViewFn = extern "C" fn(this: *mut Il2CppObject, download_size: f32, all_download_size: f32);
+type UpdateViewFn =
+    extern "C" fn(this: *mut Il2CppObject, download_size: f32, all_download_size: f32);
 extern "C" fn UpdateView(this: *mut Il2CppObject, download_size: f32, all_download_size: f32) {
     let progress = download_size / all_download_size;
     if progress >= 1.0 {

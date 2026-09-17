@@ -1,8 +1,20 @@
 use fnv::FnvHashSet;
 use widestring::Utf16Str;
 
-use crate::{il2cpp::{api::{il2cpp_class_get_type, il2cpp_type_get_object}, hook::{Plugins::AnimateToUnity::AnRoot, UnityEngine_CoreModule::{GameObject, Object}}, symbols::{IList, get_method_addr}, types::*, ext::Il2CppStringExt}, core::{hachimi::AssetInfo, Hachimi}};
 use super::{TweenAnimationTimelineData, TweenAnimationTimelineSheetData};
+use crate::{
+    core::{hachimi::AssetInfo, Hachimi},
+    il2cpp::{
+        api::{il2cpp_class_get_type, il2cpp_type_get_object},
+        ext::Il2CppStringExt,
+        hook::{
+            Plugins::AnimateToUnity::AnRoot,
+            UnityEngine_CoreModule::{GameObject, Object},
+        },
+        symbols::{get_method_addr, IList},
+        types::*,
+    },
+};
 
 static mut TYPE_OBJECT: *mut Il2CppObject = 0 as _;
 pub fn type_object() -> *mut Il2CppObject {
@@ -14,7 +26,9 @@ impl_addr_wrapper_fn!(GetTimelineData, GETTIMELINEDATA_ADDR, *mut Il2CppObject, 
 
 pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, _name: &Utf16Str) {
     let timeline_data = GetTimelineData(this);
-    let Some(sheet_data_list) = IList::new(TweenAnimationTimelineData::get_SheetDataList(timeline_data)) else {
+    let Some(sheet_data_list) =
+        IList::new(TweenAnimationTimelineData::get_SheetDataList(timeline_data))
+    else {
         return;
     };
 
@@ -43,7 +57,8 @@ pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, _name: 
             if let Some(category) = parts.next() {
                 let base_path = format!("uianimation/flash/{}/prefab/{}", category, prefab_name);
 
-                let asset_info: AssetInfo<AnRoot::AnRootData> = localized_data.load_asset_info(&base_path);
+                let asset_info: AssetInfo<AnRoot::AnRootData> =
+                    localized_data.load_asset_info(&base_path);
                 AnRoot::patch_asset(root, asset_info.data.as_ref());
             }
         }
@@ -54,7 +69,9 @@ pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, TweenAnimationTimelineComponent);
 
     unsafe {
-        TYPE_OBJECT = il2cpp_type_get_object(il2cpp_class_get_type(TweenAnimationTimelineComponent));
-        GETTIMELINEDATA_ADDR = get_method_addr(TweenAnimationTimelineComponent, c"GetTimelineData", 0);
+        TYPE_OBJECT =
+            il2cpp_type_get_object(il2cpp_class_get_type(TweenAnimationTimelineComponent));
+        GETTIMELINEDATA_ADDR =
+            get_method_addr(TweenAnimationTimelineComponent, c"GetTimelineData", 0);
     }
 }

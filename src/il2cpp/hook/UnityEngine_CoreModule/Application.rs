@@ -1,10 +1,15 @@
-use std::sync::{atomic};
+use std::sync::atomic;
 
-use crate::{core::Hachimi, il2cpp::{api::il2cpp_resolve_icall, symbols::get_method_addr, types::*}};
+use crate::{
+    core::Hachimi,
+    il2cpp::{api::il2cpp_resolve_icall, symbols::get_method_addr, types::*},
+};
 
 type SetTargetFrameRateFn = extern "C" fn(value: i32);
 pub extern "C" fn set_targetFrameRate(mut value: i32) {
-    let target_fps = Hachimi::instance().target_fps.load(atomic::Ordering::Relaxed);
+    let target_fps = Hachimi::instance()
+        .target_fps
+        .load(atomic::Ordering::Relaxed);
     if target_fps != -1 {
         value = target_fps;
     }
@@ -12,16 +17,20 @@ pub extern "C" fn set_targetFrameRate(mut value: i32) {
 }
 
 #[cfg(target_os = "windows")]
-type OpenURLFn = extern "C" fn(il2cpp_url:*mut Il2CppString);
+type OpenURLFn = extern "C" fn(il2cpp_url: *mut Il2CppString);
 #[cfg(target_os = "windows")]
-pub extern "C" fn OpenURL(url: *mut Il2CppString){
-    if !crate::windows::webview::open(url){
+pub extern "C" fn OpenURL(url: *mut Il2CppString) {
+    if !crate::windows::webview::open(url) {
         get_orig_fn!(OpenURL, OpenURLFn)(url);
     }
 }
 
 static mut GET_PERSISTENTDATAPATH_ADDR: usize = 0;
-impl_addr_wrapper_fn!(get_persistentDataPath, GET_PERSISTENTDATAPATH_ADDR, *mut Il2CppString,);
+impl_addr_wrapper_fn!(
+    get_persistentDataPath,
+    GET_PERSISTENTDATAPATH_ADDR,
+    *mut Il2CppString,
+);
 
 #[cfg(target_os = "android")]
 static mut OPENURL_ADDR: usize = 0;
@@ -29,13 +38,13 @@ static mut OPENURL_ADDR: usize = 0;
 impl_addr_wrapper_fn!(OpenURL, OPENURL_ADDR, (), url: *mut Il2CppString);
 
 static mut GET_SYSTEMLANGUAGE_ADDR: usize = 0;
-impl_addr_wrapper_fn!(systemLanguage, GET_SYSTEMLANGUAGE_ADDR, i32, );
+impl_addr_wrapper_fn!(systemLanguage, GET_SYSTEMLANGUAGE_ADDR, i32,);
 
 pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
     get_class_or_return!(UnityEngine_CoreModule, UnityEngine, Application);
 
     let set_targetFrameRate_addr = il2cpp_resolve_icall(
-        c"UnityEngine.Application::set_targetFrameRate(System.Int32)".as_ptr()
+        c"UnityEngine.Application::set_targetFrameRate(System.Int32)".as_ptr(),
     );
     new_hook!(set_targetFrameRate_addr, set_targetFrameRate);
 
@@ -51,6 +60,7 @@ pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
         {
             OPENURL_ADDR = get_method_addr(Application, c"OpenURL", 1);
         }
-        GET_SYSTEMLANGUAGE_ADDR = il2cpp_resolve_icall(c"UnityEngine.Application::get_systemLanguage()".as_ptr());
+        GET_SYSTEMLANGUAGE_ADDR =
+            il2cpp_resolve_icall(c"UnityEngine.Application::get_systemLanguage()".as_ptr());
     }
 }

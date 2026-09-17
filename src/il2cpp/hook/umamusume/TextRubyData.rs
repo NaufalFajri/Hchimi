@@ -1,13 +1,17 @@
-use widestring::Utf16Str;
 use std::ffi::c_void;
+use widestring::Utf16Str;
 
 use crate::{
-    core::{Hachimi, hachimi::CustomRubyBlock},
+    core::{hachimi::CustomRubyBlock, Hachimi},
     il2cpp::{
-        api::{il2cpp_array_new, il2cpp_class_get_method_from_name, il2cpp_field_get_type, il2cpp_class_from_type, il2cpp_object_new, il2cpp_runtime_invoke, il2cpp_string_new_utf16},
+        api::{
+            il2cpp_array_new, il2cpp_class_from_type, il2cpp_class_get_method_from_name,
+            il2cpp_field_get_type, il2cpp_object_new, il2cpp_runtime_invoke,
+            il2cpp_string_new_utf16,
+        },
         symbols::{get_field_from_name, set_field_object_value, set_field_value},
-        types::*
-    }
+        types::*,
+    },
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
@@ -47,13 +51,23 @@ unsafe fn inject_custom_ruby_blocks(this: *mut Il2CppObject, blocks: &[CustomRub
     for (i, block) in blocks.iter().enumerate() {
         let list_obj = il2cpp_object_new(list_class);
         if !list_ctor.is_null() {
-            il2cpp_runtime_invoke(list_ctor, list_obj as *mut c_void, std::ptr::null_mut(), std::ptr::null_mut());
+            il2cpp_runtime_invoke(
+                list_ctor,
+                list_obj as *mut c_void,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            );
         }
 
         for ruby in &block.rubies {
             let data_obj = il2cpp_object_new(RUBYDATA_CLASS);
             if !data_ctor.is_null() {
-                il2cpp_runtime_invoke(data_ctor, data_obj as *mut c_void, std::ptr::null_mut(), std::ptr::null_mut());
+                il2cpp_runtime_invoke(
+                    data_ctor,
+                    data_obj as *mut c_void,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                );
             }
 
             set_field_value(data_obj, START_INDEX_FIELD, &invalid_idx);
@@ -61,17 +75,32 @@ unsafe fn inject_custom_ruby_blocks(this: *mut Il2CppObject, blocks: &[CustomRub
             set_field_value(data_obj, CHAR_X_FIELD, &ruby.char_x);
             set_field_value(data_obj, CHAR_Y_FIELD, &ruby.char_y);
 
-            let utf16_ruby: Vec<u16> = ruby.ruby_text.encode_utf16().chain(std::iter::once(0)).collect();
-            let il2cpp_str = il2cpp_string_new_utf16(utf16_ruby.as_ptr(), (utf16_ruby.len() - 1) as i32);
+            let utf16_ruby: Vec<u16> = ruby
+                .ruby_text
+                .encode_utf16()
+                .chain(std::iter::once(0))
+                .collect();
+            let il2cpp_str =
+                il2cpp_string_new_utf16(utf16_ruby.as_ptr(), (utf16_ruby.len() - 1) as i32);
             set_field_object_value(data_obj, RUBY_TEXT_FIELD, il2cpp_str as *mut Il2CppObject);
 
             let mut args = [data_obj as *mut c_void];
-            il2cpp_runtime_invoke(list_add, list_obj as *mut c_void, args.as_mut_ptr(), std::ptr::null_mut());
+            il2cpp_runtime_invoke(
+                list_add,
+                list_obj as *mut c_void,
+                args.as_mut_ptr(),
+                std::ptr::null_mut(),
+            );
         }
 
         let block_obj = il2cpp_object_new(RUBYBLOCKDATA_CLASS);
         if !block_ctor.is_null() {
-            il2cpp_runtime_invoke(block_ctor, block_obj as *mut c_void, std::ptr::null_mut(), std::ptr::null_mut());
+            il2cpp_runtime_invoke(
+                block_ctor,
+                block_obj as *mut c_void,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            );
         }
 
         set_field_value(block_obj, BLOCK_INDEX_FIELD, &block.block_index);
@@ -88,9 +117,10 @@ pub fn on_LoadAsset(_bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &
     let localized_data = Hachimi::instance().localized_data.load();
 
     if let Some(custom_blocks) = localized_data.load_custom_story_ruby(&asset_name) {
-        unsafe { inject_custom_ruby_blocks(this, &custom_blocks); }
-    }
-    else if localized_data.config.remove_ruby {
+        unsafe {
+            inject_custom_ruby_blocks(this, &custom_blocks);
+        }
+    } else if localized_data.config.remove_ruby {
         let empty_array = unsafe { il2cpp_array_new(RUBYBLOCKDATA_CLASS, 0) };
         set_DataArray(this, empty_array);
     }

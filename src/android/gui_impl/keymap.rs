@@ -167,7 +167,7 @@ pub fn get_key(key_code: jint) -> Option<Key> {
         KEYCODE_F10 => Some(Key::F10),
         KEYCODE_F11 => Some(Key::F11),
         KEYCODE_F12 => Some(Key::F12),
-        _ => None
+        _ => None,
     }
 }
 
@@ -222,8 +222,6 @@ pub fn keycode_display_label(keycode: i32) -> String {
         KEYCODE_F1..=KEYCODE_F12 => {
             format!("F{}", keycode - KEYCODE_F1 + 1)
         }
-        other => {
-            t!("key_names.unknown", code = other).into_owned()
-        }
+        other => t!("key_names.unknown", code = other).into_owned(),
     }
 }

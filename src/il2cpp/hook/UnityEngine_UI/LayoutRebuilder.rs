@@ -5,8 +5,9 @@ impl_addr_wrapper_fn!(ForceRebuildLayoutImmediate, FORCEREBUILDLAYOUTIMMEDIATE_A
 
 pub fn init(UnityEngine_UI: *const Il2CppImage) {
     get_class_or_return!(UnityEngine_UI, "UnityEngine.UI", LayoutRebuilder);
-    
+
     unsafe {
-        FORCEREBUILDLAYOUTIMMEDIATE_ADDR = get_method_addr(LayoutRebuilder, c"ForceRebuildLayoutImmediate", 1);
+        FORCEREBUILDLAYOUTIMMEDIATE_ADDR =
+            get_method_addr(LayoutRebuilder, c"ForceRebuildLayoutImmediate", 1);
     }
 }

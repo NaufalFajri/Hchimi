@@ -1,4 +1,7 @@
-use crate::il2cpp::{symbols::{get_method_addr, SingletonLike}, types::*};
+use crate::il2cpp::{
+    symbols::{get_method_addr, SingletonLike},
+    types::*,
+};
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
 pub fn class() -> *mut Il2CppClass {

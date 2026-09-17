@@ -7,13 +7,21 @@ use widestring::Utf16Str;
 use crate::{
     core::{ext::Utf16StringExt, hachimi::AssetInfo, Hachimi},
     il2cpp::{
-        api::{il2cpp_class_get_type, il2cpp_type_get_object}, ext::{Il2CppStringExt, StringExt}, hook::{Plugins::AnimateToUnity::AnKeyParameter, UnityEngine_AssetBundleModule::AssetBundle, UnityEngine_CoreModule::Object}, symbols::{IList, get_field_from_name, get_field_object_value}, types::*, utils::replace_texture_with_diff
-    }
+        api::{il2cpp_class_get_type, il2cpp_type_get_object},
+        ext::{Il2CppStringExt, StringExt},
+        hook::{
+            Plugins::AnimateToUnity::AnKeyParameter, UnityEngine_AssetBundleModule::AssetBundle,
+            UnityEngine_CoreModule::Object,
+        },
+        symbols::{get_field_from_name, get_field_object_value, IList},
+        types::*,
+        utils::replace_texture_with_diff,
+    },
 };
 
 use super::{
-    AnMeshInfoParameterGroup, AnMeshParameter, AnMeshParameterGroup, AnMotionParameter, AnMotionParameterGroup,
-    AnObjectParameterBase, AnRootParameter, AnTextParameter
+    AnMeshInfoParameterGroup, AnMeshParameter, AnMeshParameterGroup, AnMotionParameter,
+    AnMotionParameterGroup, AnObjectParameterBase, AnRootParameter, AnTextParameter,
 };
 
 static mut TYPE_OBJECT: *mut Il2CppObject = 0 as _;
@@ -41,7 +49,7 @@ pub fn get__topObject(this: *mut Il2CppObject) -> *mut Il2CppObject {
 #[derive(Deserialize)]
 pub struct AnRootData {
     #[serde(default)]
-    motion_parameter_list: FnvHashMap<i32, AnMotionParameterData>
+    motion_parameter_list: FnvHashMap<i32, AnMotionParameterData>,
 }
 
 #[derive(Deserialize)]
@@ -49,14 +57,14 @@ struct AnMotionParameterData {
     #[serde(default)]
     text_param_list: FnvHashMap<i32, AnTextParameterData>,
     #[serde(default)]
-    plane_param_list: FnvHashMap<i32, AnPlaneParameterData>
+    plane_param_list: FnvHashMap<i32, AnPlaneParameterData>,
 }
 
 #[derive(Deserialize)]
 struct AnObjectParameterBaseData {
     position_offset: Option<Vector3_t>,
     scale: Option<Vector3_t>,
-    anim_pos_offset_adj: Option<Vector2_t>
+    anim_pos_offset_adj: Option<Vector2_t>,
 }
 
 #[derive(Deserialize)]
@@ -64,13 +72,13 @@ struct AnTextParameterData {
     text: Option<String>,
 
     #[serde(flatten)]
-    base: AnObjectParameterBaseData
+    base: AnObjectParameterBaseData,
 }
 
 #[derive(Deserialize)]
 struct AnPlaneParameterData {
     #[serde(flatten)]
-    base: AnObjectParameterBaseData
+    base: AnObjectParameterBaseData,
 }
 
 pub fn on_LoadAsset(bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &Utf16Str) {
@@ -89,13 +97,15 @@ pub fn on_LoadAsset(bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &U
 pub fn patch_asset(this: *mut Il2CppObject, data_opt: Option<&AnRootData>) {
     /*** Texture set replacement ***/
     let param_group = get__meshParameterGroup(this);
-    let Some(param_list) = IList::new(AnMeshParameterGroup::get__meshParameterList(param_group)) else {
+    let Some(param_list) = IList::new(AnMeshParameterGroup::get__meshParameterList(param_group))
+    else {
         return;
     };
 
     let localized_data = Hachimi::instance().localized_data.load();
     for param in param_list.iter() {
-        let Some(group_list) = IList::new(AnMeshParameter::get__meshParameterGroupList(param)) else {
+        let Some(group_list) = IList::new(AnMeshParameter::get__meshParameterGroupList(param))
+        else {
             return;
         };
 
@@ -137,30 +147,45 @@ pub fn patch_asset(this: *mut Il2CppObject, data_opt: Option<&AnRootData>) {
 
         let root_param = get__parameter(this);
         let motion_param_group = AnRootParameter::get__motionParameterGroup(root_param);
-        let Some(motion_param_list) = IList::new(AnMotionParameterGroup::get__motionParameterList(motion_param_group)) else {
+        let Some(motion_param_list) = IList::new(AnMotionParameterGroup::get__motionParameterList(
+            motion_param_group,
+        )) else {
             return;
         };
 
         for (i, motion_param_data) in data.motion_parameter_list.iter() {
             // quick escape!!!11
-            if motion_param_data.text_param_list.is_empty() && motion_param_data.plane_param_list.is_empty() {
+            if motion_param_data.text_param_list.is_empty()
+                && motion_param_data.plane_param_list.is_empty()
+            {
                 continue;
             }
 
             let Some(motion_param) = motion_param_list.get(*i) else {
-                warn!("motion param {} out of range (max {})", *i, motion_param_list.count());
+                warn!(
+                    "motion param {} out of range (max {})",
+                    *i,
+                    motion_param_list.count()
+                );
                 continue;
             };
 
             if !motion_param_data.text_param_list.is_empty() {
-                let Some(text_param_list) = IList::new(AnMotionParameter::get__textParamList(motion_param)) else {
+                let Some(text_param_list) =
+                    IList::new(AnMotionParameter::get__textParamList(motion_param))
+                else {
                     warn!("Failed to get text_param_list for motion param {}", *i);
-                     continue;
-                 };
+                    continue;
+                };
 
                 for (j, text_param_data) in motion_param_data.text_param_list.iter() {
                     let Some(text_param) = text_param_list.get(*j) else {
-                        warn!("text param {} of motion param {} out of range (max {})", *j, *i, text_param_list.count());
+                        warn!(
+                            "text param {} of motion param {} out of range (max {})",
+                            *j,
+                            *i,
+                            text_param_list.count()
+                        );
                         continue;
                     };
 
@@ -179,14 +204,21 @@ pub fn patch_asset(this: *mut Il2CppObject, data_opt: Option<&AnRootData>) {
             }
 
             if !motion_param_data.plane_param_list.is_empty() {
-                let Some(plane_param_list) = IList::new(AnMotionParameter::get__planeParamList(motion_param)) else {
+                let Some(plane_param_list) =
+                    IList::new(AnMotionParameter::get__planeParamList(motion_param))
+                else {
                     warn!("Failed to get plane_param_list for motion param {}", *i);
                     continue;
                 };
 
                 for (j, plane_param_data) in motion_param_data.plane_param_list.iter() {
                     let Some(plane_param) = plane_param_list.get(*j) else {
-                        warn!("plane param {} of motion param {} out of range (max {})", *j, *i, plane_param_list.count());
+                        warn!(
+                            "plane param {} of motion param {} out of range (max {})",
+                            *j,
+                            *i,
+                            plane_param_list.count()
+                        );
                         continue;
                     };
 
@@ -198,10 +230,14 @@ pub fn patch_asset(this: *mut Il2CppObject, data_opt: Option<&AnRootData>) {
                     }
                     if let Some(anim_pos_offset) = &plane_param_data.base.anim_pos_offset_adj {
                         // Count should be 3 if present, representing XYZ axes. We ignore Z.
-                        if let Some(pos_offset_keyparam_list) = IList::new(AnObjectParameterBase::get__positionOffsetKeyParamList(plane_param)) {
+                        if let Some(pos_offset_keyparam_list) = IList::new(
+                            AnObjectParameterBase::get__positionOffsetKeyParamList(plane_param),
+                        ) {
                             if pos_offset_keyparam_list.count() > 1 {
                                 let x_axis_key_param = pos_offset_keyparam_list.get(0).unwrap();
-                                if let Some(x_axis_key_list) = IList::<Vector2_t>::new(AnKeyParameter::get__keyList(x_axis_key_param)) {
+                                if let Some(x_axis_key_list) = IList::<Vector2_t>::new(
+                                    AnKeyParameter::get__keyList(x_axis_key_param),
+                                ) {
                                     for k in 0..x_axis_key_list.count() {
                                         let mut key_values = x_axis_key_list.get(k).unwrap();
                                         key_values.y += anim_pos_offset.x;
@@ -209,7 +245,9 @@ pub fn patch_asset(this: *mut Il2CppObject, data_opt: Option<&AnRootData>) {
                                     }
                                 }
                                 let y_axis_key_param = pos_offset_keyparam_list.get(1).unwrap();
-                                if let Some(y_axis_key_list) = IList::<Vector2_t>::new(AnKeyParameter::get__keyList(y_axis_key_param)) {
+                                if let Some(y_axis_key_list) = IList::<Vector2_t>::new(
+                                    AnKeyParameter::get__keyList(y_axis_key_param),
+                                ) {
                                     for k in 0..y_axis_key_list.count() {
                                         let mut key_values = y_axis_key_list.get(k).unwrap();
                                         key_values.y += anim_pos_offset.y;
@@ -217,8 +255,7 @@ pub fn patch_asset(this: *mut Il2CppObject, data_opt: Option<&AnRootData>) {
                                     }
                                 }
                             }
-                        }
-                        else {
+                        } else {
                             warn!("Failed to get pos_offset_keyparams for plane param {} of motion param {}", *j, *i);
                         }
                     }

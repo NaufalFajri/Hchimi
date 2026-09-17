@@ -1,10 +1,22 @@
 use crate::{
     core::Hachimi,
-    il2cpp::{symbols::get_method_addr, types::*}
+    il2cpp::{symbols::get_method_addr, types::*},
 };
 
-type GetSingCharaIdListFn = extern "C" fn(songId: i32, songPartNumber: i32, allCharaIdArray: *mut Il2CppArray, vocalCharaIdArray: *mut Il2CppArray, shuffledCharaDataList: *mut Il2CppObject) -> *mut Il2CppObject;
-extern "C" fn GetSingCharaIdList(songId: i32, songPartNumber: i32, allCharaIdArray: *mut Il2CppArray, vocalCharaIdArray: *mut Il2CppArray, shuffledCharaDataList: *mut Il2CppObject) -> *mut Il2CppObject {
+type GetSingCharaIdListFn = extern "C" fn(
+    songId: i32,
+    songPartNumber: i32,
+    allCharaIdArray: *mut Il2CppArray,
+    vocalCharaIdArray: *mut Il2CppArray,
+    shuffledCharaDataList: *mut Il2CppObject,
+) -> *mut Il2CppObject;
+extern "C" fn GetSingCharaIdList(
+    songId: i32,
+    songPartNumber: i32,
+    allCharaIdArray: *mut Il2CppArray,
+    vocalCharaIdArray: *mut Il2CppArray,
+    shuffledCharaDataList: *mut Il2CppObject,
+) -> *mut Il2CppObject {
     let chara_vo_ids = &Hachimi::instance().config.load().live_vocals_swap;
 
     if songId > 0 {
@@ -15,7 +27,7 @@ extern "C" fn GetSingCharaIdList(songId: i32, songPartNumber: i32, allCharaIdArr
 
                 for i in 0..len.min(chara_vo_ids.len()) {
                     if chara_vo_ids[i] != 0 {
-                        *data_ptr.add(i) = chara_vo_ids[i];              
+                        *data_ptr.add(i) = chara_vo_ids[i];
                     }
                 }
             }
@@ -34,7 +46,13 @@ extern "C" fn GetSingCharaIdList(songId: i32, songPartNumber: i32, allCharaIdArr
         }
     }
 
-    get_orig_fn!(GetSingCharaIdList, GetSingCharaIdListFn)(songId, songPartNumber, allCharaIdArray, vocalCharaIdArray, shuffledCharaDataList)
+    get_orig_fn!(GetSingCharaIdList, GetSingCharaIdListFn)(
+        songId,
+        songPartNumber,
+        allCharaIdArray,
+        vocalCharaIdArray,
+        shuffledCharaDataList,
+    )
 }
 
 pub fn init(umamusume: *const Il2CppImage) {
@@ -43,4 +61,3 @@ pub fn init(umamusume: *const Il2CppImage) {
     let GetSingCharaIdList_addr = get_method_addr(LiveUtil, c"GetSingCharaIdList", 5);
     new_hook!(GetSingCharaIdList_addr, GetSingCharaIdList);
 }
-

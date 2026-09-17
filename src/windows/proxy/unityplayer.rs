@@ -5,7 +5,10 @@ use std::path::PathBuf;
 use widestring::U16CString;
 use windows::{core::PCWSTR, Win32::System::LibraryLoader::LoadLibraryW};
 
-use crate::{core::{utils::get_file_modified_time, Hachimi}, windows::utils};
+use crate::{
+    core::{utils::get_file_modified_time, Hachimi},
+    windows::utils,
+};
 
 proxy_proc!(UnityMain, UnityMain_orig);
 proxy_proc!(UnityMain2, UnityMain2_orig);
@@ -28,11 +31,10 @@ fn prepare_orig_dll() -> std::io::Result<PathBuf> {
         Err(e) => {
             if e.kind() == std::io::ErrorKind::AlreadyExists {
                 Ok(())
-            }
-            else {
+            } else {
                 Err(e)
             }
-        },
+        }
     }?;
     std::fs::copy(&src_dll, &dest_dll)?;
 

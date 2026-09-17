@@ -1,9 +1,6 @@
-use crate::{
-    il2cpp::{
-        hook::CriMw_CriWare_Runtime::CriAtomExPlayback::CriAtomExPlayback_t,
-        symbols::get_method_addr,
-        types::*
-    }
+use crate::il2cpp::{
+    hook::CriMw_CriWare_Runtime::CriAtomExPlayback::CriAtomExPlayback_t, symbols::get_method_addr,
+    types::*,
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;

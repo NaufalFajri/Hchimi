@@ -1,8 +1,7 @@
-use crate::{core::Hachimi, il2cpp::{symbols::get_method_addr, types::*}};
-use super::{
-    GameDefine::BgSeason,
-    MasterDataManager,
-    MasterItemExchangeTop
+use super::{GameDefine::BgSeason, MasterDataManager, MasterItemExchangeTop};
+use crate::{
+    core::Hachimi,
+    il2cpp::{symbols::get_method_addr, types::*},
 };
 
 // public static BgSeason GetSeasonForHome(DateTime dateTime) { }
@@ -17,7 +16,9 @@ extern "C" fn GetSeasonForHome(dateTime: *mut Il2CppObject) -> BgSeason {
     }
 
     let master_itex_top = MasterDataManager::get_masterItemExchangeTop(master_mgr);
-    if master_itex_top.is_null() { return orig; }
+    if master_itex_top.is_null() {
+        return orig;
+    }
 
     // Overriding BgSeason during anniversary & half anniversary breaks the game so this has to be gated
     let in_term_anniv_shop = MasterItemExchangeTop::get_IsInTermAnyAnnivShop(master_itex_top);
@@ -31,7 +32,7 @@ extern "C" fn GetSeasonForHome(dateTime: *mut Il2CppObject) -> BgSeason {
 
 pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, TimeUtil);
-    
+
     let GetSeasonForHome_addr = get_method_addr(TimeUtil, c"GetSeasonForHome", 1);
     new_hook!(GetSeasonForHome_addr, GetSeasonForHome);
 }

@@ -1,4 +1,7 @@
-use std::{ptr::null_mut, sync::atomic::{AtomicU8, Ordering}};
+use std::{
+    ptr::null_mut,
+    sync::atomic::{AtomicU8, Ordering},
+};
 
 use crate::{
     core::Hachimi,
@@ -40,7 +43,10 @@ type GetLimitSizeFn = extern "C" fn() -> Vector2_t;
 extern "C" fn GetLimitSize() -> Vector2_t {
     preserve_hook_identity(&GET_LIMIT_SIZE_HOOK_ID);
     if freeform_enabled() {
-        return Vector2_t { x: f32::MAX, y: f32::MAX };
+        return Vector2_t {
+            x: f32::MAX,
+            y: f32::MAX,
+        };
     }
 
     get_orig_fn!(GetLimitSize, GetLimitSizeFn)()
@@ -75,11 +81,19 @@ extern "C" fn KeepAspectRatio(width: f32, height: f32) {
     get_orig_fn!(KeepAspectRatio, ResizeFn)(width, height);
 }
 
-pub fn update_window_state(client_width: i32, client_height: i32, window_width: i32, window_height: i32) {
+pub fn update_window_state(
+    client_width: i32,
+    client_height: i32,
+    window_width: i32,
+    window_height: i32,
+) {
     unsafe {
         set_static_field_value(WINDOW_LAST_WIDTH_FIELD, window_width);
         set_static_field_value(WINDOW_LAST_HEIGHT_FIELD, window_height);
-        set_static_field_value(ASPECT_RATIO_FIELD, client_width as f32 / client_height as f32);
+        set_static_field_value(
+            ASPECT_RATIO_FIELD,
+            client_width as f32 / client_height as f32,
+        );
         set_static_field_value(IS_PREVENT_RESHAPE_FIELD, true);
         set_static_field_value(IS_VIRT_FIELD, client_width < client_height);
     }
@@ -128,12 +142,16 @@ pub fn init(umamusume: *const Il2CppImage) {
         WINDOW_LAST_WIDTH_FIELD = get_field_from_name(StandaloneWindowResize, c"windowLastWidth");
         WINDOW_LAST_HEIGHT_FIELD = get_field_from_name(StandaloneWindowResize, c"windowLastHeight");
         ASPECT_RATIO_FIELD = get_field_from_name(StandaloneWindowResize, c"_aspectRatio");
-        IS_PREVENT_RESHAPE_FIELD = get_field_from_name(StandaloneWindowResize, c"_isPreventReShape");
+        IS_PREVENT_RESHAPE_FIELD =
+            get_field_from_name(StandaloneWindowResize, c"_isPreventReShape");
         IS_VIRT_FIELD = get_field_from_name(StandaloneWindowResize, c"_isVirt");
-        IS_WINDOW_SIZE_CHANGING_FIELD = get_field_from_name(StandaloneWindowResize, c"_isWindowSizeChanging");
-        IS_WINDOW_DRAGGING_FIELD = get_field_from_name(StandaloneWindowResize, c"_isWindowDragging");
+        IS_WINDOW_SIZE_CHANGING_FIELD =
+            get_field_from_name(StandaloneWindowResize, c"_isWindowSizeChanging");
+        IS_WINDOW_DRAGGING_FIELD =
+            get_field_from_name(StandaloneWindowResize, c"_isWindowDragging");
 
         SAVE_CHANGED_WIDTH_ADDR = get_method_addr(StandaloneWindowResize, c"SaveChangedWidth", 2);
-        ENABLE_WINDOW_HIT_TEST_ADDR = get_method_addr(StandaloneWindowResize, c"EnableWindowHitTest", 0);
+        ENABLE_WINDOW_HIT_TEST_ADDR =
+            get_method_addr(StandaloneWindowResize, c"EnableWindowHitTest", 0);
     }
 }

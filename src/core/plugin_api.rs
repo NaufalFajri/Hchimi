@@ -1,9 +1,22 @@
-use std::{ffi::{c_char, c_void, CStr, CString}, sync::atomic::AtomicI32};
+use std::{
+    ffi::{c_char, c_void, CStr, CString},
+    sync::atomic::AtomicI32,
+};
 
-use once_cell::sync::OnceCell;
 use egui::Align;
+use once_cell::sync::OnceCell;
 
-use crate::{core::{utils::get_data_path, Hachimi, Interceptor, gui}, il2cpp::{self, types::{FieldInfo, Il2CppArray, Il2CppClass, Il2CppImage, Il2CppMethodPointer, Il2CppObject, Il2CppString, Il2CppThread, Il2CppTypeEnum, MethodInfo, il2cpp_array_size_t}}};
+use crate::{
+    core::{gui, utils::get_data_path, Hachimi, Interceptor},
+    il2cpp::{
+        self,
+        types::{
+            il2cpp_array_size_t, FieldInfo, Il2CppArray, Il2CppClass, Il2CppImage,
+            Il2CppMethodPointer, Il2CppObject, Il2CppString, Il2CppThread, Il2CppTypeEnum,
+            MethodInfo,
+        },
+    },
+};
 
 const VERSION: i32 = 3;
 
@@ -27,14 +40,14 @@ static NEXT_PLUGIN_WINDOW_ID: AtomicI32 = AtomicI32::new(0);
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum InitResult {
     Error,
-    Ok
+    Ok,
 }
 
 impl InitResult {
     pub fn is_ok(&self) -> bool {
         match self {
             Self::Ok => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -48,30 +61,42 @@ unsafe extern "C" fn hachimi_get_interceptor(this: *const Hachimi) -> *const Int
 }
 
 unsafe extern "C" fn interceptor_hook(
-    this: *const Interceptor, orig_addr: *mut c_void, hook_addr: *mut c_void
+    this: *const Interceptor,
+    orig_addr: *mut c_void,
+    hook_addr: *mut c_void,
 ) -> *mut c_void {
-    (*this).hook(orig_addr as _, hook_addr as _)
+    (*this)
+        .hook(orig_addr as _, hook_addr as _)
         .inspect_err(|e| error!("{}", e))
         .unwrap_or(0) as _
 }
 
 unsafe extern "C" fn interceptor_hook_vtable(
-    this: *const Interceptor, vtable: *mut *mut c_void, vtable_index: usize, hook_addr: *mut c_void
+    this: *const Interceptor,
+    vtable: *mut *mut c_void,
+    vtable_index: usize,
+    hook_addr: *mut c_void,
 ) -> *mut c_void {
-    (*this).hook_vtable(vtable as _, vtable_index as _, hook_addr as _)
+    (*this)
+        .hook_vtable(vtable as _, vtable_index as _, hook_addr as _)
         .inspect_err(|e| error!("{}", e))
         .unwrap_or(0) as _
 }
 
-unsafe extern "C" fn interceptor_get_trampoline_addr(this: *const Interceptor, hook_addr: *mut c_void) -> *mut c_void {
+unsafe extern "C" fn interceptor_get_trampoline_addr(
+    this: *const Interceptor,
+    hook_addr: *mut c_void,
+) -> *mut c_void {
     (*this).get_trampoline_addr(hook_addr as _) as _
 }
 
-unsafe extern "C" fn interceptor_unhook(this: *const Interceptor, hook_addr: *mut c_void) -> *mut c_void {
+unsafe extern "C" fn interceptor_unhook(
+    this: *const Interceptor,
+    hook_addr: *mut c_void,
+) -> *mut c_void {
     if let Some(handle) = (*this).unhook(hook_addr as _) {
         handle.orig_addr as _
-    }
-    else {
+    } else {
         0 as _
     }
 }
@@ -90,7 +115,9 @@ unsafe extern "C" fn il2cpp_get_assembly_image(assembly_name: *const c_char) -> 
 }
 
 unsafe extern "C" fn il2cpp_get_class(
-    image: *const Il2CppImage, namespace: *const c_char, class_name: *const c_char
+    image: *const Il2CppImage,
+    namespace: *const c_char,
+    class_name: *const c_char,
 ) -> *mut Il2CppClass {
     il2cpp::symbols::get_class(image, CStr::from_ptr(namespace), CStr::from_ptr(class_name))
         .inspect_err(|e| error!("{}", e))
@@ -98,7 +125,9 @@ unsafe extern "C" fn il2cpp_get_class(
 }
 
 unsafe extern "C" fn il2cpp_get_method(
-    class: *mut Il2CppClass, name: *const c_char, args_count: i32
+    class: *mut Il2CppClass,
+    name: *const c_char,
+    args_count: i32,
 ) -> *const MethodInfo {
     il2cpp::symbols::get_method(class, CStr::from_ptr(name), args_count)
         .inspect_err(|e| error!("{}", e))
@@ -106,7 +135,10 @@ unsafe extern "C" fn il2cpp_get_method(
 }
 
 unsafe extern "C" fn il2cpp_get_method_overload(
-    class: *mut Il2CppClass, name: *const c_char, params: *const Il2CppTypeEnum, param_count: usize
+    class: *mut Il2CppClass,
+    name: *const c_char,
+    params: *const Il2CppTypeEnum,
+    param_count: usize,
 ) -> *const MethodInfo {
     let name = CStr::from_ptr(name).to_string_lossy();
     let params = std::slice::from_raw_parts(params, param_count);
@@ -116,13 +148,18 @@ unsafe extern "C" fn il2cpp_get_method_overload(
 }
 
 unsafe extern "C" fn il2cpp_get_method_addr(
-    class: *mut Il2CppClass, name: *const c_char, args_count: i32
+    class: *mut Il2CppClass,
+    name: *const c_char,
+    args_count: i32,
 ) -> *mut c_void {
     il2cpp::symbols::get_method_addr(class, CStr::from_ptr(name), args_count) as _
 }
 
 unsafe extern "C" fn il2cpp_get_method_overload_addr(
-    class: *mut Il2CppClass, name: *const c_char, params: *const Il2CppTypeEnum, param_count: usize
+    class: *mut Il2CppClass,
+    name: *const c_char,
+    params: *const Il2CppTypeEnum,
+    param_count: usize,
 ) -> *mut c_void {
     let name = CStr::from_ptr(name).to_string_lossy();
     let params = std::slice::from_raw_parts(params, param_count);
@@ -130,7 +167,9 @@ unsafe extern "C" fn il2cpp_get_method_overload_addr(
 }
 
 unsafe extern "C" fn il2cpp_get_method_cached(
-    class: *mut Il2CppClass, name: *const c_char, args_count: i32
+    class: *mut Il2CppClass,
+    name: *const c_char,
+    args_count: i32,
 ) -> *const MethodInfo {
     il2cpp::symbols::get_method_cached(class, CStr::from_ptr(name), args_count)
         .inspect_err(|e| error!("{}", e))
@@ -138,13 +177,16 @@ unsafe extern "C" fn il2cpp_get_method_cached(
 }
 
 unsafe extern "C" fn il2cpp_get_method_addr_cached(
-    class: *mut Il2CppClass, name: *const c_char, args_count: i32
+    class: *mut Il2CppClass,
+    name: *const c_char,
+    args_count: i32,
 ) -> *mut c_void {
     il2cpp::symbols::get_method_addr_cached(class, CStr::from_ptr(name), args_count) as _
 }
 
 unsafe extern "C" fn il2cpp_find_nested_class(
-    class: *mut Il2CppClass, name: *const c_char
+    class: *mut Il2CppClass,
+    name: *const c_char,
 ) -> *mut Il2CppClass {
     il2cpp::symbols::find_nested_class(class, CStr::from_ptr(name))
         .inspect_err(|e| error!("{}", e))
@@ -155,41 +197,45 @@ unsafe extern "C" fn il2cpp_resolve_icall(name: *const c_char) -> Il2CppMethodPo
     il2cpp::api::il2cpp_resolve_icall(name)
 }
 
-unsafe extern "C" fn il2cpp_class_get_methods(klass: *mut Il2CppClass, iter: *mut *mut c_void) -> *const MethodInfo {
+unsafe extern "C" fn il2cpp_class_get_methods(
+    klass: *mut Il2CppClass,
+    iter: *mut *mut c_void,
+) -> *const MethodInfo {
     il2cpp::api::il2cpp_class_get_methods(klass, iter)
 }
 
 unsafe extern "C" fn il2cpp_get_field_from_name(
-    class: *mut Il2CppClass, name: *const c_char
+    class: *mut Il2CppClass,
+    name: *const c_char,
 ) -> *mut FieldInfo {
     il2cpp::api::il2cpp_class_get_field_from_name(class, name)
 }
 
 unsafe extern "C" fn il2cpp_get_field_value(
-    obj: *mut Il2CppObject, field: *mut FieldInfo, out_value: *mut c_void
+    obj: *mut Il2CppObject,
+    field: *mut FieldInfo,
+    out_value: *mut c_void,
 ) {
     il2cpp::api::il2cpp_field_get_value(obj, field, out_value)
 }
 
 unsafe extern "C" fn il2cpp_set_field_value(
-    obj: *mut Il2CppObject, field: *mut FieldInfo, value: *const c_void
+    obj: *mut Il2CppObject,
+    field: *mut FieldInfo,
+    value: *const c_void,
 ) {
     il2cpp::api::il2cpp_field_set_value(obj, field, value as _)
 }
 
-unsafe extern "C" fn il2cpp_get_static_field_value(
-    field: *mut FieldInfo, out_value: *mut c_void
-) {
+unsafe extern "C" fn il2cpp_get_static_field_value(field: *mut FieldInfo, out_value: *mut c_void) {
     il2cpp::api::il2cpp_field_static_get_value(field, out_value)
 }
 
-unsafe extern "C" fn il2cpp_set_static_field_value(
-    field: *mut FieldInfo, value: *const c_void
-) {
+unsafe extern "C" fn il2cpp_set_static_field_value(field: *mut FieldInfo, value: *const c_void) {
     il2cpp::api::il2cpp_field_static_set_value(field, value as _)
 }
 
-unsafe extern "C" fn il2cpp_object_new(klass: *const Il2CppClass) -> *mut Il2CppObject{
+unsafe extern "C" fn il2cpp_object_new(klass: *const Il2CppClass) -> *mut Il2CppObject {
     return il2cpp::api::il2cpp_object_new(klass);
 }
 
@@ -227,17 +273,23 @@ unsafe extern "C" fn il2cpp_get_attached_threads(out_size: *mut usize) -> *mut *
     il2cpp::api::il2cpp_thread_get_all_attached_threads(out_size)
 }
 
-unsafe extern "C" fn il2cpp_schedule_on_thread(thread: *mut Il2CppThread, callback: unsafe extern "C" fn()) {
+unsafe extern "C" fn il2cpp_schedule_on_thread(
+    thread: *mut Il2CppThread,
+    callback: unsafe extern "C" fn(),
+) {
     il2cpp::symbols::Thread::from_raw(thread).schedule(std::mem::transmute(callback));
 }
 
 unsafe extern "C" fn il2cpp_create_array(
-    element_type: *mut Il2CppClass, length: il2cpp_array_size_t
+    element_type: *mut Il2CppClass,
+    length: il2cpp_array_size_t,
 ) -> *mut Il2CppArray {
     il2cpp::api::il2cpp_array_new(element_type, length)
 }
 
-unsafe extern "C" fn il2cpp_get_singleton_like_instance(class: *mut Il2CppClass) -> *mut Il2CppObject {
+unsafe extern "C" fn il2cpp_get_singleton_like_instance(
+    class: *mut Il2CppClass,
+) -> *mut Il2CppObject {
     il2cpp::symbols::SingletonLike::new(class)
         .map(|s| s.instance())
         .unwrap_or(0 as _)
@@ -253,7 +305,7 @@ unsafe extern "C" fn log(level: i32, target: *const c_char, message: *const c_ch
         4 => log::Level::Debug,
         5 => log::Level::Trace,
 
-        _ => log::Level::Info
+        _ => log::Level::Info,
     };
     log!(target: &target, level, "{}", message);
 }
@@ -261,7 +313,7 @@ unsafe extern "C" fn log(level: i32, target: *const c_char, message: *const c_ch
 unsafe extern "C" fn gui_register_menu_item(
     label: *const c_char,
     callback: Option<GuiMenuCallback>,
-    userdata: *mut c_void
+    userdata: *mut c_void,
 ) -> bool {
     if label.is_null() {
         return false;
@@ -275,7 +327,7 @@ unsafe extern "C" fn gui_register_menu_item(
 
 unsafe extern "C" fn gui_register_menu_section(
     callback: Option<GuiMenuSectionCallback>,
-    userdata: *mut c_void
+    userdata: *mut c_void,
 ) -> bool {
     let Some(callback) = callback else {
         return false;
@@ -286,7 +338,7 @@ unsafe extern "C" fn gui_register_menu_section(
 
 unsafe extern "C" fn hachimi_register_on_game_initialized(
     callback: Option<GameInitializedCallback>,
-    userdata: *mut c_void
+    userdata: *mut c_void,
 ) -> bool {
     let Some(callback) = callback else {
         return false;
@@ -300,7 +352,7 @@ unsafe extern "C" fn hachimi_register_on_game_initialized(
 #[cfg(target_os = "windows")]
 unsafe extern "C" fn hachimi_register_present_callback(
     callback: Option<PresentCallback>,
-    userdata: *mut c_void
+    userdata: *mut c_void,
 ) -> bool {
     let Some(callback) = callback else {
         return false;
@@ -314,7 +366,7 @@ unsafe extern "C" fn hachimi_register_present_callback(
 #[cfg(not(target_os = "windows"))]
 unsafe extern "C" fn hachimi_register_present_callback(
     _callback: Option<PresentCallback>,
-    _userdata: *mut c_void
+    _userdata: *mut c_void,
 ) -> bool {
     false
 }
@@ -345,46 +397,62 @@ unsafe fn cstr_or_empty(ptr: *const c_char) -> &'static str {
 }
 
 unsafe extern "C" fn gui_ui_heading(ui: *mut c_void, text: *const c_char) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
     ui.heading(cstr_or_empty(text));
     true
 }
 
 unsafe extern "C" fn gui_ui_label(ui: *mut c_void, text: *const c_char) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
     ui.label(cstr_or_empty(text));
     true
 }
 
 unsafe extern "C" fn gui_ui_small(ui: *mut c_void, text: *const c_char) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
     ui.small(cstr_or_empty(text));
     true
 }
 
 unsafe extern "C" fn gui_ui_separator(ui: *mut c_void) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
     ui.separator();
     true
 }
 
 unsafe extern "C" fn gui_ui_button(ui: *mut c_void, text: *const c_char) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
     ui.button(cstr_or_empty(text)).clicked()
 }
 
 unsafe extern "C" fn gui_ui_small_button(ui: *mut c_void, text: *const c_char) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
     ui.small_button(cstr_or_empty(text)).clicked()
 }
 
 unsafe extern "C" fn gui_ui_checkbox(
     ui: *mut c_void,
     text: *const c_char,
-    value: *mut bool
+    value: *mut bool,
 ) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
-    if value.is_null() { return false; }
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
+    if value.is_null() {
+        return false;
+    }
     let mut current = *value;
     let changed = ui.checkbox(&mut current, cstr_or_empty(text)).changed();
     if changed {
@@ -396,24 +464,28 @@ unsafe extern "C" fn gui_ui_checkbox(
 unsafe extern "C" fn gui_ui_text_edit_singleline(
     ui: *mut c_void,
     buffer: *mut c_char,
-    buffer_len: usize
+    buffer_len: usize,
 ) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
-    if buffer.is_null() || buffer_len == 0 { return false; }
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
+    if buffer.is_null() || buffer_len == 0 {
+        return false;
+    }
 
     let bytes = std::slice::from_raw_parts_mut(buffer as *mut u8, buffer_len);
     let end = bytes.iter().position(|b| *b == 0).unwrap_or(buffer_len);
 
     let id = ui.make_persistent_id(buffer as usize);
-    let mut value = ui.memory(|mem| {
-        mem.data.get_temp::<String>(id)
-    }).unwrap_or_else(|| String::from_utf8_lossy(&bytes[..end]).into_owned());
+    let mut value = ui
+        .memory(|mem| mem.data.get_temp::<String>(id))
+        .unwrap_or_else(|| String::from_utf8_lossy(&bytes[..end]).into_owned());
     let original_value = value.clone();
 
     let response = ui.add(
         egui::TextEdit::singleline(&mut value)
             .id(id)
-            .desired_width(80.0)
+            .desired_width(80.0),
     );
     #[cfg(target_os = "android")]
     gui::handle_android_keyboard(&response, &mut value);
@@ -438,10 +510,14 @@ unsafe extern "C" fn gui_ui_text_edit_singleline(
 unsafe extern "C" fn gui_ui_horizontal(
     ui: *mut c_void,
     callback: Option<GuiUiCallback>,
-    userdata: *mut c_void
+    userdata: *mut c_void,
 ) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
-    let Some(callback) = callback else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
+    let Some(callback) = callback else {
+        return false;
+    };
     ui.horizontal(|ui| {
         callback(ui as *mut _ as *mut c_void, userdata);
     });
@@ -455,10 +531,14 @@ unsafe extern "C" fn gui_ui_grid(
     spacing_x: f32,
     spacing_y: f32,
     callback: Option<GuiUiCallback>,
-    userdata: *mut c_void
+    userdata: *mut c_void,
 ) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
-    let Some(callback) = callback else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
+    let Some(callback) = callback else {
+        return false;
+    };
     let id = cstr_or_empty(id);
     egui::Grid::new(id)
         .num_columns(columns)
@@ -470,7 +550,9 @@ unsafe extern "C" fn gui_ui_grid(
 }
 
 unsafe extern "C" fn gui_ui_end_row(ui: *mut c_void) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
     ui.end_row();
     true
 }
@@ -481,10 +563,15 @@ unsafe extern "C" fn gui_ui_colored_label(
     g: u8,
     b: u8,
     a: u8,
-    text: *const c_char
+    text: *const c_char,
 ) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
-    ui.colored_label(egui::Color32::from_rgba_unmultiplied(r, g, b, a), cstr_or_empty(text));
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
+    ui.colored_label(
+        egui::Color32::from_rgba_unmultiplied(r, g, b, a),
+        cstr_or_empty(text),
+    );
     true
 }
 
@@ -497,7 +584,9 @@ unsafe extern "C" fn gui_ui_combo_menu(
     search_term: *mut c_char,
     search_term_len: usize,
 ) -> bool {
-    let Some(ui) = ui_from_ptr(ui) else { return false; };
+    let Some(ui) = ui_from_ptr(ui) else {
+        return false;
+    };
     if selected_index.is_null() || items.is_null() || item_count == 0 {
         return false;
     }
@@ -523,7 +612,8 @@ unsafe extern "C" fn gui_ui_combo_menu(
         "Unknown"
     };
 
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(fixed_width, row_height), egui::Sense::hover());
+    let (rect, _) =
+        ui.allocate_exact_size(egui::vec2(fixed_width, row_height), egui::Sense::hover());
     let button_res = ui.interact(rect, button_id, egui::Sense::click());
 
     if ui.is_rect_visible(rect) {
@@ -539,25 +629,25 @@ unsafe extern "C" fn gui_ui_combo_menu(
             visuals.corner_radius,
             visuals.weak_bg_fill,
             visuals.bg_stroke,
-            egui::epaint::StrokeKind::Inside
+            egui::epaint::StrokeKind::Inside,
         );
 
         let icon_size = 12.0 * scale;
         let icon_rect = egui::Rect::from_center_size(
             egui::pos2(rect.right() - padding.x - icon_size / 2.0, rect.center().y),
-            egui::vec2(icon_size, icon_size)
+            egui::vec2(icon_size, icon_size),
         );
         gui::Gui::down_triangle_icon(ui.painter(), icon_rect, visuals);
 
         let galley = ui.painter().layout_no_wrap(
             selected_text.to_owned(),
             egui::TextStyle::Button.resolve(ui.style()),
-            visuals.text_color()
+            visuals.text_color(),
         );
 
         let text_pos = egui::pos2(
             rect.left() + padding.x,
-            rect.center().y - galley.size().y / 2.0
+            rect.center().y - galley.size().y / 2.0,
         );
         ui.painter().galley(text_pos, galley, visuals.text_color());
     }
@@ -572,55 +662,62 @@ unsafe extern "C" fn gui_ui_combo_menu(
     }
 
     egui::Popup::menu(&button_res)
-    .id(popup_id)
-    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-    .show(|ui| {
-        ui.set_width(fixed_width);
-        ui.set_max_width(fixed_width);
+        .id(popup_id)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .show(|ui| {
+            ui.set_width(fixed_width);
+            ui.set_max_width(fixed_width);
 
-        ui.horizontal(|ui| {
-            let res = ui.add_sized(
-                [ui.available_width() - 30.0 * scale, row_height],
-                egui::TextEdit::singleline(&mut search).hint_text("Search...")
-            );
-            #[cfg(target_os = "android")]
-            gui::handle_android_keyboard(&res, &mut search);
+            ui.horizontal(|ui| {
+                let res = ui.add_sized(
+                    [ui.available_width() - 30.0 * scale, row_height],
+                    egui::TextEdit::singleline(&mut search).hint_text("Search..."),
+                );
+                #[cfg(target_os = "android")]
+                gui::handle_android_keyboard(&res, &mut search);
 
-            if ui.button("X").clicked() {
-                search.clear();
-                res.surrender_focus();
-            }
-        });
-
-        ui.separator();
-
-        egui::ScrollArea::vertical()
-        .max_height(250.0 * scale)
-        .hscroll(false)
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
-
-            ui.with_layout(egui::Layout::top_down_justified(egui::Align::Min), |ui| {
-                for i in 0..item_count {
-                    let item_ptr = *items.add(i);
-                    if item_ptr.is_null() { continue; }
-                    let label = CStr::from_ptr(item_ptr).to_str().unwrap_or("");
-                    if !search.is_empty() && !label.to_lowercase().contains(&search.to_lowercase()) {
-                        continue;
-                    }
-
-                    let is_selected = current_idx == i;
-                    if ui.add(egui::Button::selectable(is_selected, label)).clicked() {
-                        *selected_index = i as i32;
-                        changed = true;
-                        egui::Popup::close_id(ui.ctx(), popup_id);
-                        search.clear();
-                    }
+                if ui.button("X").clicked() {
+                    search.clear();
+                    res.surrender_focus();
                 }
             });
+
+            ui.separator();
+
+            egui::ScrollArea::vertical()
+                .max_height(250.0 * scale)
+                .hscroll(false)
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+
+                    ui.with_layout(egui::Layout::top_down_justified(egui::Align::Min), |ui| {
+                        for i in 0..item_count {
+                            let item_ptr = *items.add(i);
+                            if item_ptr.is_null() {
+                                continue;
+                            }
+                            let label = CStr::from_ptr(item_ptr).to_str().unwrap_or("");
+                            if !search.is_empty()
+                                && !label.to_lowercase().contains(&search.to_lowercase())
+                            {
+                                continue;
+                            }
+
+                            let is_selected = current_idx == i;
+                            if ui
+                                .add(egui::Button::selectable(is_selected, label))
+                                .clicked()
+                            {
+                                *selected_index = i as i32;
+                                changed = true;
+                                egui::Popup::close_id(ui.ctx(), popup_id);
+                                search.clear();
+                            }
+                        }
+                    });
+                });
         });
-    });
 
     if !search_term.is_null() && search_term_len > 0 {
         let bytes = std::slice::from_raw_parts_mut(search_term as *mut u8, search_term_len);
@@ -642,7 +739,7 @@ unsafe extern "C" fn gui_register_menu_item_icon(
     label: *const c_char,
     icon_uri: *const c_char,
     icon_ptr: *const u8,
-    icon_len: usize
+    icon_len: usize,
 ) -> bool {
     if label.is_null() || icon_ptr.is_null() || icon_len == 0 {
         return false;
@@ -652,8 +749,7 @@ unsafe extern "C" fn gui_register_menu_item_icon(
     };
     let uri = if icon_uri.is_null() {
         format!("bytes://plugin-icon/{}.png", label)
-    }
-    else {
+    } else {
         let Ok(uri) = CStr::from_ptr(icon_uri).to_str() else {
             return false;
         };
@@ -669,7 +765,7 @@ unsafe extern "C" fn gui_register_menu_section_with_icon(
     icon_ptr: *const u8,
     icon_len: usize,
     callback: Option<GuiMenuSectionCallback>,
-    userdata: *mut c_void
+    userdata: *mut c_void,
 ) -> bool {
     let Some(callback) = callback else {
         return false;
@@ -682,8 +778,7 @@ unsafe extern "C" fn gui_register_menu_section_with_icon(
     };
     let uri = if icon_uri.is_null() {
         format!("bytes://plugin-section/{}.png", title)
-    }
-    else {
+    } else {
         let Ok(uri) = CStr::from_ptr(icon_uri).to_str() else {
             return false;
         };
@@ -695,7 +790,7 @@ unsafe extern "C" fn gui_register_menu_section_with_icon(
         uri,
         bytes.to_vec(),
         callback,
-        userdata
+        userdata,
     )
 }
 
@@ -708,10 +803,14 @@ unsafe extern "C" fn gui_show_window(
     title: *const c_char,
     contents_callback: Option<GuiWindowCallback>,
     bottom_callback: Option<GuiWindowCallback>,
-    userdata: *mut c_void
+    userdata: *mut c_void,
 ) -> bool {
-    if title.is_null() { return false; }
-    let Ok(title_str) = CStr::from_ptr(title).to_str() else { return false; };
+    if title.is_null() {
+        return false;
+    }
+    let Ok(title_str) = CStr::from_ptr(title).to_str() else {
+        return false;
+    };
 
     gui::show_plugin_window(
         id,
@@ -728,12 +827,20 @@ unsafe extern "C" fn gui_close_window(id: i32) {
 }
 
 #[cfg(target_os = "android")]
-unsafe extern "C" fn android_dex_load(dex_ptr: *const u8, dex_len: usize, class_name: *const c_char) -> u64 {
+unsafe extern "C" fn android_dex_load(
+    dex_ptr: *const u8,
+    dex_len: usize,
+    class_name: *const c_char,
+) -> u64 {
     crate::android::dex_bridge::dex_load(dex_ptr, dex_len, class_name)
 }
 
 #[cfg(not(target_os = "android"))]
-unsafe extern "C" fn android_dex_load(_dex_ptr: *const u8, _dex_len: usize, _class_name: *const c_char) -> u64 {
+unsafe extern "C" fn android_dex_load(
+    _dex_ptr: *const u8,
+    _dex_len: usize,
+    _class_name: *const c_char,
+) -> u64 {
     0
 }
 
@@ -748,19 +855,32 @@ unsafe extern "C" fn android_dex_unload(_handle: u64) -> bool {
 }
 
 #[cfg(target_os = "android")]
-unsafe extern "C" fn android_dex_call_static_noargs(handle: u64, method: *const c_char, sig: *const c_char) -> bool {
+unsafe extern "C" fn android_dex_call_static_noargs(
+    handle: u64,
+    method: *const c_char,
+    sig: *const c_char,
+) -> bool {
     let method = CStr::from_ptr(method);
     let sig = CStr::from_ptr(sig);
     crate::android::dex_bridge::call_static_noargs(handle, method, sig)
 }
 
 #[cfg(not(target_os = "android"))]
-unsafe extern "C" fn android_dex_call_static_noargs(_handle: u64, _method: *const c_char, _sig: *const c_char) -> bool {
+unsafe extern "C" fn android_dex_call_static_noargs(
+    _handle: u64,
+    _method: *const c_char,
+    _sig: *const c_char,
+) -> bool {
     false
 }
 
 #[cfg(target_os = "android")]
-unsafe extern "C" fn android_dex_call_static_string(handle: u64, method: *const c_char, sig: *const c_char, arg: *const c_char) -> bool {
+unsafe extern "C" fn android_dex_call_static_string(
+    handle: u64,
+    method: *const c_char,
+    sig: *const c_char,
+    arg: *const c_char,
+) -> bool {
     let method = CStr::from_ptr(method);
     let sig = CStr::from_ptr(sig);
     let arg = CStr::from_ptr(arg);
@@ -768,7 +888,12 @@ unsafe extern "C" fn android_dex_call_static_string(handle: u64, method: *const 
 }
 
 #[cfg(not(target_os = "android"))]
-unsafe extern "C" fn android_dex_call_static_string(_handle: u64, _method: *const c_char, _sig: *const c_char, _arg: *const c_char) -> bool {
+unsafe extern "C" fn android_dex_call_static_string(
+    _handle: u64,
+    _method: *const c_char,
+    _sig: *const c_char,
+    _arg: *const c_char,
+) -> bool {
     false
 }
 
@@ -803,78 +928,99 @@ pub struct Vtable {
     pub hachimi_get_interceptor: unsafe extern "C" fn(this: *const Hachimi) -> *const Interceptor,
 
     pub interceptor_hook: unsafe extern "C" fn(
-        this: *const Interceptor, orig_addr: *mut c_void, hook_addr: *mut c_void
+        this: *const Interceptor,
+        orig_addr: *mut c_void,
+        hook_addr: *mut c_void,
     ) -> *mut c_void,
     pub interceptor_hook_vtable: unsafe extern "C" fn(
-        this: *const Interceptor, vtable: *mut *mut c_void, vtable_index: usize, hook_addr: *mut c_void
+        this: *const Interceptor,
+        vtable: *mut *mut c_void,
+        vtable_index: usize,
+        hook_addr: *mut c_void,
     ) -> *mut c_void,
-    pub interceptor_get_trampoline_addr: unsafe extern "C" fn(
-        this: *const Interceptor, hook_addr: *mut c_void
-    ) -> *mut c_void,
-    pub interceptor_unhook: unsafe extern "C" fn(this: *const Interceptor, hook_addr: *mut c_void) -> *mut c_void,
+    pub interceptor_get_trampoline_addr:
+        unsafe extern "C" fn(this: *const Interceptor, hook_addr: *mut c_void) -> *mut c_void,
+    pub interceptor_unhook:
+        unsafe extern "C" fn(this: *const Interceptor, hook_addr: *mut c_void) -> *mut c_void,
 
     pub il2cpp_resolve_symbol: unsafe extern "C" fn(name: *const c_char) -> *mut c_void,
-    pub il2cpp_get_assembly_image: unsafe extern "C" fn(assembly_name: *const c_char) -> *const Il2CppImage,
+    pub il2cpp_get_assembly_image:
+        unsafe extern "C" fn(assembly_name: *const c_char) -> *const Il2CppImage,
     pub il2cpp_get_class: unsafe extern "C" fn(
-        image: *const Il2CppImage, namespace: *const c_char, class_name: *const c_char
+        image: *const Il2CppImage,
+        namespace: *const c_char,
+        class_name: *const c_char,
     ) -> *mut Il2CppClass,
     pub il2cpp_get_method: unsafe extern "C" fn(
-        class: *mut Il2CppClass, name: *const c_char, args_count: i32
+        class: *mut Il2CppClass,
+        name: *const c_char,
+        args_count: i32,
     ) -> *const MethodInfo,
     pub il2cpp_get_method_overload: unsafe extern "C" fn(
-        class: *mut Il2CppClass, name: *const c_char, params: *const Il2CppTypeEnum, param_count: usize
+        class: *mut Il2CppClass,
+        name: *const c_char,
+        params: *const Il2CppTypeEnum,
+        param_count: usize,
     ) -> *const MethodInfo,
     pub il2cpp_get_method_addr: unsafe extern "C" fn(
-        class: *mut Il2CppClass, name: *const c_char, args_count: i32
+        class: *mut Il2CppClass,
+        name: *const c_char,
+        args_count: i32,
     ) -> *mut c_void,
     pub il2cpp_get_method_overload_addr: unsafe extern "C" fn(
-        class: *mut Il2CppClass, name: *const c_char, params: *const Il2CppTypeEnum, param_count: usize
+        class: *mut Il2CppClass,
+        name: *const c_char,
+        params: *const Il2CppTypeEnum,
+        param_count: usize,
     ) -> *mut c_void,
-        pub il2cpp_get_method_cached: unsafe extern "C" fn(
-        class: *mut Il2CppClass, name: *const c_char, args_count: i32
+    pub il2cpp_get_method_cached: unsafe extern "C" fn(
+        class: *mut Il2CppClass,
+        name: *const c_char,
+        args_count: i32,
     ) -> *const MethodInfo,
     pub il2cpp_get_method_addr_cached: unsafe extern "C" fn(
-        class: *mut Il2CppClass, name: *const c_char, args_count: i32
+        class: *mut Il2CppClass,
+        name: *const c_char,
+        args_count: i32,
     ) -> *mut c_void,
-    pub il2cpp_find_nested_class: unsafe extern "C" fn(
-        class: *mut Il2CppClass, name: *const c_char
-    ) -> *mut Il2CppClass,
+    pub il2cpp_find_nested_class:
+        unsafe extern "C" fn(class: *mut Il2CppClass, name: *const c_char) -> *mut Il2CppClass,
     pub il2cpp_resolve_icall: unsafe extern "C" fn(name: *const c_char) -> Il2CppMethodPointer,
-    pub il2cpp_class_get_methods: unsafe extern "C" fn(klass: *mut Il2CppClass, iter: *mut *mut c_void) -> *const MethodInfo,
-    pub il2cpp_get_field_from_name: unsafe extern "C" fn(
-        class: *mut Il2CppClass, name: *const c_char
-    ) -> *mut FieldInfo,
-    pub il2cpp_get_field_value: unsafe extern "C" fn(
-        obj: *mut Il2CppObject, field: *mut FieldInfo, out_value: *mut c_void
-    ),
-    pub il2cpp_set_field_value: unsafe extern "C" fn(
-        obj: *mut Il2CppObject, field: *mut FieldInfo, value: *const c_void
-    ),
-    pub il2cpp_get_static_field_value: unsafe extern "C" fn(
-        field: *mut FieldInfo, out_value: *mut c_void
-    ),
-    pub il2cpp_set_static_field_value: unsafe extern "C" fn(
-        field: *mut FieldInfo, value: *const c_void
-    ),
+    pub il2cpp_class_get_methods:
+        unsafe extern "C" fn(klass: *mut Il2CppClass, iter: *mut *mut c_void) -> *const MethodInfo,
+    pub il2cpp_get_field_from_name:
+        unsafe extern "C" fn(class: *mut Il2CppClass, name: *const c_char) -> *mut FieldInfo,
+    pub il2cpp_get_field_value:
+        unsafe extern "C" fn(obj: *mut Il2CppObject, field: *mut FieldInfo, out_value: *mut c_void),
+    pub il2cpp_set_field_value:
+        unsafe extern "C" fn(obj: *mut Il2CppObject, field: *mut FieldInfo, value: *const c_void),
+    pub il2cpp_get_static_field_value:
+        unsafe extern "C" fn(field: *mut FieldInfo, out_value: *mut c_void),
+    pub il2cpp_set_static_field_value:
+        unsafe extern "C" fn(field: *mut FieldInfo, value: *const c_void),
     pub il2cpp_object_new: unsafe extern "C" fn(klass: *const Il2CppClass) -> *mut Il2CppObject,
     pub il2cpp_unbox: unsafe extern "C" fn(obj: *mut Il2CppObject) -> *mut c_void,
     pub il2cpp_get_main_thread: unsafe extern "C" fn() -> *mut Il2CppThread,
-    pub il2cpp_get_attached_threads: unsafe extern "C" fn(out_size: *mut usize) -> *mut *mut Il2CppThread,
-    pub il2cpp_schedule_on_thread: unsafe extern "C" fn(thread: *mut Il2CppThread, callback: unsafe extern "C" fn()),
+    pub il2cpp_get_attached_threads:
+        unsafe extern "C" fn(out_size: *mut usize) -> *mut *mut Il2CppThread,
+    pub il2cpp_schedule_on_thread:
+        unsafe extern "C" fn(thread: *mut Il2CppThread, callback: unsafe extern "C" fn()),
     pub il2cpp_create_array: unsafe extern "C" fn(
-        element_type: *mut Il2CppClass, length: il2cpp_array_size_t
+        element_type: *mut Il2CppClass,
+        length: il2cpp_array_size_t,
     ) -> *mut Il2CppArray,
-    pub il2cpp_get_singleton_like_instance: unsafe extern "C" fn(class: *mut Il2CppClass) -> *mut Il2CppObject,
+    pub il2cpp_get_singleton_like_instance:
+        unsafe extern "C" fn(class: *mut Il2CppClass) -> *mut Il2CppObject,
 
     pub log: unsafe extern "C" fn(level: i32, target: *const c_char, message: *const c_char),
     pub gui_register_menu_item: unsafe extern "C" fn(
         label: *const c_char,
         callback: Option<GuiMenuCallback>,
-        userdata: *mut c_void
+        userdata: *mut c_void,
     ) -> bool,
     pub gui_register_menu_section: unsafe extern "C" fn(
         callback: Option<GuiMenuSectionCallback>,
-        userdata: *mut c_void
+        userdata: *mut c_void,
     ) -> bool,
     pub gui_show_notification: unsafe extern "C" fn(message: *const c_char) -> bool,
     pub gui_ui_heading: unsafe extern "C" fn(ui: *mut c_void, text: *const c_char) -> bool,
@@ -883,16 +1029,14 @@ pub struct Vtable {
     pub gui_ui_separator: unsafe extern "C" fn(ui: *mut c_void) -> bool,
     pub gui_ui_button: unsafe extern "C" fn(ui: *mut c_void, text: *const c_char) -> bool,
     pub gui_ui_small_button: unsafe extern "C" fn(ui: *mut c_void, text: *const c_char) -> bool,
-    pub gui_ui_checkbox: unsafe extern "C" fn(ui: *mut c_void, text: *const c_char, value: *mut bool) -> bool,
-    pub gui_ui_text_edit_singleline: unsafe extern "C" fn(
-        ui: *mut c_void,
-        buffer: *mut c_char,
-        buffer_len: usize
-    ) -> bool,
+    pub gui_ui_checkbox:
+        unsafe extern "C" fn(ui: *mut c_void, text: *const c_char, value: *mut bool) -> bool,
+    pub gui_ui_text_edit_singleline:
+        unsafe extern "C" fn(ui: *mut c_void, buffer: *mut c_char, buffer_len: usize) -> bool,
     pub gui_ui_horizontal: unsafe extern "C" fn(
         ui: *mut c_void,
         callback: Option<GuiUiCallback>,
-        userdata: *mut c_void
+        userdata: *mut c_void,
     ) -> bool,
     pub gui_ui_grid: unsafe extern "C" fn(
         ui: *mut c_void,
@@ -901,7 +1045,7 @@ pub struct Vtable {
         spacing_x: f32,
         spacing_y: f32,
         callback: Option<GuiUiCallback>,
-        userdata: *mut c_void
+        userdata: *mut c_void,
     ) -> bool,
     pub gui_ui_end_row: unsafe extern "C" fn(ui: *mut c_void) -> bool,
     pub gui_ui_colored_label: unsafe extern "C" fn(
@@ -910,13 +1054,13 @@ pub struct Vtable {
         g: u8,
         b: u8,
         a: u8,
-        text: *const c_char
+        text: *const c_char,
     ) -> bool,
     pub gui_register_menu_item_icon: unsafe extern "C" fn(
         label: *const c_char,
         icon_uri: *const c_char,
         icon_ptr: *const u8,
-        icon_len: usize
+        icon_len: usize,
     ) -> bool,
     pub gui_register_menu_section_with_icon: unsafe extern "C" fn(
         title: *const c_char,
@@ -924,7 +1068,7 @@ pub struct Vtable {
         icon_ptr: *const u8,
         icon_len: usize,
         callback: Option<GuiMenuSectionCallback>,
-        userdata: *mut c_void
+        userdata: *mut c_void,
     ) -> bool,
     // Window management (version >= 3)
     pub gui_new_window_id: unsafe extern "C" fn() -> i32,
@@ -933,14 +1077,21 @@ pub struct Vtable {
         title: *const c_char,
         contents_callback: Option<GuiWindowCallback>,
         bottom_callback: Option<GuiWindowCallback>,
-        userdata: *mut c_void
+        userdata: *mut c_void,
     ) -> bool,
     pub gui_close_window: unsafe extern "C" fn(id: i32),
 
-    pub android_dex_load: unsafe extern "C" fn(dex_ptr: *const u8, dex_len: usize, class_name: *const c_char) -> u64,
+    pub android_dex_load:
+        unsafe extern "C" fn(dex_ptr: *const u8, dex_len: usize, class_name: *const c_char) -> u64,
     pub android_dex_unload: unsafe extern "C" fn(handle: u64) -> bool,
-    pub android_dex_call_static_noargs: unsafe extern "C" fn(handle: u64, method: *const c_char, sig: *const c_char) -> bool,
-    pub android_dex_call_static_string: unsafe extern "C" fn(handle: u64, method: *const c_char, sig: *const c_char, arg: *const c_char) -> bool,
+    pub android_dex_call_static_noargs:
+        unsafe extern "C" fn(handle: u64, method: *const c_char, sig: *const c_char) -> bool,
+    pub android_dex_call_static_string: unsafe extern "C" fn(
+        handle: u64,
+        method: *const c_char,
+        sig: *const c_char,
+        arg: *const c_char,
+    ) -> bool,
 
     pub il2cpp_runtime_object_init: unsafe extern "C" fn(object: *mut Il2CppObject),
     pub il2cpp_string_new: unsafe extern "C" fn(text: *const c_char) -> *mut Il2CppString,
@@ -959,10 +1110,8 @@ pub struct Vtable {
         callback: Option<GameInitializedCallback>,
         userdata: *mut c_void,
     ) -> bool,
-    pub hachimi_register_present_callback: unsafe extern "C" fn(
-        callback: Option<PresentCallback>,
-        userdata: *mut c_void,
-    ) -> bool,
+    pub hachimi_register_present_callback:
+        unsafe extern "C" fn(callback: Option<PresentCallback>, userdata: *mut c_void) -> bool,
     pub gui_get_menu_width: unsafe extern "C" fn() -> f32,
     pub gui_set_menu_width: unsafe extern "C" fn(width: f32),
     pub hachimi_get_base_dir: unsafe extern "C" fn() -> *const c_char,
@@ -1113,7 +1262,9 @@ pub extern "C" fn hachimi_get_api(name: *const c_char) -> *mut c_void {
         "il2cpp_string_chars" => il2cpp_string_chars as *mut c_void,
         "il2cpp_string_length" => il2cpp_string_length as *mut c_void,
         "gui_ui_combo_menu" => gui_ui_combo_menu as *mut c_void,
-        "hachimi_register_on_game_initialized" => hachimi_register_on_game_initialized as *mut c_void,
+        "hachimi_register_on_game_initialized" => {
+            hachimi_register_on_game_initialized as *mut c_void
+        }
         "hachimi_register_present_callback" => hachimi_register_present_callback as *mut c_void,
         "gui_get_menu_width" => gui_get_menu_width as *mut c_void,
         "gui_set_menu_width" => gui_set_menu_width as *mut c_void,
@@ -1130,7 +1281,7 @@ pub enum PluginInit {
 
 pub struct Plugin {
     pub name: String,
-    pub init_fn: PluginInit
+    pub init_fn: PluginInit,
 }
 
 impl Plugin {
@@ -1139,10 +1290,8 @@ impl Plugin {
             PluginInit::V2(init) => {
                 let vtable = PLUGIN_VTABLE.get_or_init(Vtable::instantiate);
                 init(vtable as *const Vtable, 2)
-            },
-            PluginInit::V3(init) => {
-                init(hachimi_get_api, VERSION)
             }
+            PluginInit::V3(init) => init(hachimi_get_api, VERSION),
         }
     }
 }

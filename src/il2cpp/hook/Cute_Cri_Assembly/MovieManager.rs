@@ -1,9 +1,20 @@
 use std::path::Path;
 
-use crate::{core::Hachimi, il2cpp::{ext::{Il2CppStringExt, StringExt}, symbols::get_method_addr, types::*}};
+use crate::{
+    core::Hachimi,
+    il2cpp::{
+        ext::{Il2CppStringExt, StringExt},
+        symbols::get_method_addr,
+        types::*,
+    },
+};
 
-type GetMovieFilePathFn = extern "C" fn(this: *mut Il2CppObject, movie_file: *mut Il2CppString) -> *mut Il2CppString;
-extern "C" fn GetMovieFilePath(this: *mut Il2CppObject, movie_file: *mut Il2CppString) -> *mut Il2CppString {
+type GetMovieFilePathFn =
+    extern "C" fn(this: *mut Il2CppObject, movie_file: *mut Il2CppString) -> *mut Il2CppString;
+extern "C" fn GetMovieFilePath(
+    this: *mut Il2CppObject,
+    movie_file: *mut Il2CppString,
+) -> *mut Il2CppString {
     let orig_fn = get_orig_fn!(GetMovieFilePath, GetMovieFilePathFn);
 
     let movie_file_str = unsafe { (*movie_file).as_utf16str().to_string() };
@@ -17,7 +28,8 @@ extern "C" fn GetMovieFilePath(this: *mut Il2CppObject, movie_file: *mut Il2CppS
 
     if let Ok(metadata) = std::fs::metadata(&replace_path) {
         if metadata.is_file() {
-            return replace_path.to_str()
+            return replace_path
+                .to_str()
                 .map(|s| s.to_il2cpp_string())
                 .unwrap_or_else(|| orig_fn(this, movie_file));
         }

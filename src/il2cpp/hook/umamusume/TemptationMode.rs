@@ -5,7 +5,7 @@ pub enum TemptationMode {
     PositionSashi = 1,
     PositionSenko = 2,
     PositionNige = 3,
-    Boost = 4
+    Boost = 4,
 }
 
 impl_enum_eq!(TemptationMode);

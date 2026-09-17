@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{core::Hachimi, il2cpp::{symbols::{get_field_from_name, get_method_addr, set_field_value}, types::*}};
+use crate::{
+    core::Hachimi,
+    il2cpp::{
+        symbols::{get_field_from_name, get_method_addr, set_field_value},
+        types::*,
+    },
+};
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[repr(i32)]
@@ -8,7 +14,7 @@ pub enum SpringUpdateMode {
     ModeNormal,
     Mode60FPS,
     SkipFrame,
-    SkipFramePostAlways
+    SkipFramePostAlways,
 }
 
 static mut UPDATEMODE_FIELD: *mut FieldInfo = 0 as _;
@@ -20,7 +26,12 @@ type InitFn = extern "C" fn(this: *mut Il2CppObject);
 extern "C" fn Init(this: *mut Il2CppObject) {
     get_orig_fn!(Init, InitFn)(this);
 
-    if let Some(mode) = Hachimi::instance().config.load().physics_update_mode.as_ref() {
+    if let Some(mode) = Hachimi::instance()
+        .config
+        .load()
+        .physics_update_mode
+        .as_ref()
+    {
         set_UpdateMode(this, mode);
     }
 }

@@ -1,9 +1,4 @@
-use crate::{
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*
-    }
-};
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 // protected RectTransform get_ContentsRoot() { }
 static mut GET_CONTENTSROOT_ADDR: usize = 0;

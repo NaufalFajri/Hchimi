@@ -1,8 +1,5 @@
 use crate::il2cpp::{
-    api::il2cpp_class_is_assignable_from,
-    ext::Il2CppObjectExt,
-    symbols::get_method_addr,
-    types::*
+    api::il2cpp_class_is_assignable_from, ext::Il2CppObjectExt, symbols::get_method_addr, types::*,
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
@@ -41,7 +38,8 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     unsafe {
         CLASS = RaceEventPlayer;
-        CHANGE_LAST_EVENT_INDEX_BY_TIME_ADDR = get_method_addr(RaceEventPlayer, c"ChangeLastEventIndexByTime", 1);
+        CHANGE_LAST_EVENT_INDEX_BY_TIME_ADDR =
+            get_method_addr(RaceEventPlayer, c"ChangeLastEventIndexByTime", 1);
         GET_SKILL_EVENT_PARAM_ADDR = get_method_addr(RaceEventPlayer, c"GetSkillEventParam", 10);
     }
 }

@@ -1,10 +1,10 @@
 use crate::{
-    core::{Hachimi, game::Region},
+    core::{game::Region, Hachimi},
     il2cpp::{
         ext::{Il2CppStringExt, StringExt},
         hook::UnityEngine_TextRenderingModule::TextGenerator::IgnoreTGFiltersContext,
         symbols::get_method_addr,
-        types::{Il2CppClass, Il2CppObject, Il2CppDelegate, Il2CppString},
+        types::{Il2CppClass, Il2CppDelegate, Il2CppObject, Il2CppString},
     },
 };
 
@@ -29,8 +29,13 @@ extern "C" fn SetText(this: *mut Il2CppObject, text: *mut Il2CppString) {
     get_orig_fn!(SetText, SetTextFn)(this, text);
 }
 
-type PlayFn = extern "C" fn(this: *mut Il2CppObject, text: *mut Il2CppString, callback: *mut Il2CppDelegate);
-extern "C" fn Play(this: *mut Il2CppObject, text: *mut Il2CppString, callback: *mut Il2CppDelegate) {
+type PlayFn =
+    extern "C" fn(this: *mut Il2CppObject, text: *mut Il2CppString, callback: *mut Il2CppDelegate);
+extern "C" fn Play(
+    this: *mut Il2CppObject,
+    text: *mut Il2CppString,
+    callback: *mut Il2CppDelegate,
+) {
     let text = process_text(text);
     get_orig_fn!(Play, PlayFn)(this, text, callback);
 }

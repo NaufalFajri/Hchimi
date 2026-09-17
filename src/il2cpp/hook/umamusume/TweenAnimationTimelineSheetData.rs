@@ -1,6 +1,9 @@
 use std::ptr::null_mut;
 
-use crate::il2cpp::{symbols::{get_field_from_name, get_field_object_value}, types::*};
+use crate::il2cpp::{
+    symbols::{get_field_from_name, get_field_object_value},
+    types::*,
+};
 
 static mut A2UPREFAB_FIELD: *mut FieldInfo = null_mut();
 pub fn get_A2UPrefab(this: *mut Il2CppObject) -> *mut Il2CppObject {

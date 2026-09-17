@@ -1,4 +1,7 @@
-use crate::il2cpp::{symbols::{get_field_from_name, get_field_object_value}, types::*};
+use crate::il2cpp::{
+    symbols::{get_field_from_name, get_field_object_value},
+    types::*,
+};
 
 // List<AnMotionParameter>
 static mut _MOTIONPARAMETERLIST_FIELD: *mut FieldInfo = 0 as _;
@@ -10,6 +13,7 @@ pub fn init(Plugins: *const Il2CppImage) {
     get_class_or_return!(Plugins, AnimateToUnity, AnMotionParameterGroup);
 
     unsafe {
-        _MOTIONPARAMETERLIST_FIELD = get_field_from_name(AnMotionParameterGroup, c"_motionParameterList");
+        _MOTIONPARAMETERLIST_FIELD =
+            get_field_from_name(AnMotionParameterGroup, c"_motionParameterList");
     }
 }

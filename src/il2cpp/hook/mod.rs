@@ -1,28 +1,33 @@
 #![allow(non_upper_case_globals)]
 
 macro_rules! new_hook {
-    ($orig:ident, $hook:ident) => (
+    ($orig:ident, $hook:ident) => {
         let hachimi = crate::core::Hachimi::instance();
-        if !hachimi.config.load().disabled_hooks.contains(stringify!($hook)) {
+        if !hachimi
+            .config
+            .load()
+            .disabled_hooks
+            .contains(stringify!($hook))
+        {
             info!("new_hook!: {}", stringify!($hook));
             if ($orig != 0) {
-                let res = hachimi.interceptor.hook($orig as usize, $hook as *const () as usize);
+                let res = hachimi
+                    .interceptor
+                    .hook($orig as usize, $hook as *const () as usize);
                 if let Err(e) = res {
                     error!("{}", e);
                 }
-            }
-            else {
+            } else {
                 error!("{} is null", stringify!($orig));
             }
-        }
-        else {
+        } else {
             info!("[DISABLED] new_hook!: {}", stringify!($hook));
         }
-    )
+    };
 }
 
 macro_rules! get_assembly_image_or_return {
-    ($var_name:ident, $assembly_name:tt) => (
+    ($var_name:ident, $assembly_name:tt) => {
         let $var_name = match crate::il2cpp::symbols::get_assembly_image(cstr!($assembly_name)) {
             Ok(v) => v,
             Err(e) => {
@@ -30,31 +35,36 @@ macro_rules! get_assembly_image_or_return {
                 return;
             }
         };
-    )
+    };
 }
 
 macro_rules! get_class_or_return {
-    ($image:ident, $namespace:tt, $class_name:ident) => (
-        let $class_name = match crate::il2cpp::symbols::get_class($image, cstr!($namespace), cstr!($class_name)) {
+    ($image:ident, $namespace:tt, $class_name:ident) => {
+        let $class_name = match crate::il2cpp::symbols::get_class(
+            $image,
+            cstr!($namespace),
+            cstr!($class_name),
+        ) {
             Ok(v) => v,
             Err(e) => {
                 error!("{}", e);
                 return;
             }
         };
-    )
+    };
 }
 
 macro_rules! find_nested_class_or_return {
-    ($parent:ident, $class_name:ident) => (
-        let $class_name = match crate::il2cpp::symbols::find_nested_class($parent, cstr!($class_name)) {
-            Ok(v) => v,
-            Err(e) => {
-                error!("{}", e);
-                return;
-            }
-        };
-    )
+    ($parent:ident, $class_name:ident) => {
+        let $class_name =
+            match crate::il2cpp::symbols::find_nested_class($parent, cstr!($class_name)) {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
+    };
 }
 
 // shorter ver of doing impl_addr_wrapper_fn!()
@@ -173,13 +183,13 @@ macro_rules! def_field_object_accessors {
 
 pub mod mscorlib;
 
-pub mod UnityEngine_CoreModule;
 pub mod UnityEngine_AssetBundleModule;
-pub mod UnityEngine_TextRenderingModule;
+pub mod UnityEngine_CoreModule;
 pub mod UnityEngine_ImageConversionModule;
-pub mod Unity_RenderPipelines_Universal_Runtime;
+pub mod UnityEngine_TextRenderingModule;
 pub mod UnityEngine_UI;
 pub mod UnityEngine_UIModule;
+pub mod Unity_RenderPipelines_Universal_Runtime;
 pub mod Unity_TextMeshPro;
 
 #[cfg(target_os = "windows")]
@@ -187,13 +197,13 @@ pub mod UnityEngine_InputLegacyModule;
 #[cfg(target_os = "windows")]
 pub mod Unity_InputSystem;
 
-pub mod LibNative_Runtime;
-pub mod umamusume;
-pub mod Cute_UI_Assembly;
-pub mod Plugins;
-pub mod Cute_Cri_Assembly;
 pub mod CriMw_CriWare_Runtime;
+pub mod Cute_Cri_Assembly;
+pub mod Cute_UI_Assembly;
 mod DOTween;
+pub mod LibNative_Runtime;
+pub mod Plugins;
+pub mod umamusume;
 
 #[cfg(target_os = "android")]
 mod Cute_Core_Assembly;

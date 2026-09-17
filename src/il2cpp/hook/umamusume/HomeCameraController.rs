@@ -1,14 +1,11 @@
 use crate::{
-    il2cpp::{
-        hook::UnityEngine_CoreModule::Transform,
-        symbols::get_method_addr,
-        types::*,
-    },
+    il2cpp::{hook::UnityEngine_CoreModule::Transform, symbols::get_method_addr, types::*},
     windows::free_camera::{self, CameraScene},
 };
 
 type NoArgsFn = extern "C" fn(this: *mut Il2CppObject);
-type GetCameraTransFn = extern "C" fn(this: *mut Il2CppObject, camera_pos: i32) -> *mut Il2CppObject;
+type GetCameraTransFn =
+    extern "C" fn(this: *mut Il2CppObject, camera_pos: i32) -> *mut Il2CppObject;
 type GetCurrentCameraPosFn = extern "C" fn(this: *mut Il2CppObject) -> i32;
 
 static mut GET_CAMERA_TRANS_ADDR: usize = 0;
@@ -42,13 +39,15 @@ extern "C" fn HomeCameraSwitcher_AlterUpdate(this: *mut Il2CppObject) {
     Transform::set_position_Injected(camera_transform, &mut position);
     if let Some(mut rotation) = free_camera::camera_rotation() {
         Transform::set_rotation_Injected(camera_transform, &mut rotation);
-    }
-    else {
+    } else {
         let mut look_at = free_camera::camera_look_at();
-        let mut world_up = Vector3_t { x: 0.0, y: 1.0, z: 0.0 };
+        let mut world_up = Vector3_t {
+            x: 0.0,
+            y: 1.0,
+            z: 0.0,
+        };
         Transform::Internal_LookAt_Injected(camera_transform, &mut look_at, &mut world_up);
     }
-
 }
 
 pub fn init(umamusume: *const Il2CppImage) {
@@ -56,7 +55,8 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     unsafe {
         GET_CAMERA_TRANS_ADDR = get_method_addr(HomeCameraSwitcher, c"GetCameraTrans", 1);
-        GET_CURRENT_CAMERA_POS_ADDR = get_method_addr(HomeCameraSwitcher, c"get_CurrentCameraPos", 0);
+        GET_CURRENT_CAMERA_POS_ADDR =
+            get_method_addr(HomeCameraSwitcher, c"get_CurrentCameraPos", 0);
     }
 
     let alter_update_addr = get_method_addr(HomeCameraSwitcher, c"AlterUpdate", 0);

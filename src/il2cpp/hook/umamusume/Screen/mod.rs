@@ -1,4 +1,7 @@
-use crate::il2cpp::{symbols::{get_method_addr, IEnumerator}, types::*};
+use crate::il2cpp::{
+    symbols::{get_method_addr, IEnumerator},
+    types::*,
+};
 
 pub mod ScreenOrientationClassWrapper;
 
@@ -10,11 +13,11 @@ use std::ptr::null_mut;
 
 #[cfg(target_os = "windows")]
 use crate::{
-    core::{Hachimi, game::Region},
+    core::{game::Region, Hachimi},
     il2cpp::{
         api::il2cpp_field_static_set_value,
         hook::UnityEngine_CoreModule::Screen as UnityScreen,
-        symbols::{MoveNextFn, get_field_from_name},
+        symbols::{get_field_from_name, MoveNextFn},
     },
 };
 
@@ -105,7 +108,9 @@ pub fn get_Width_orig() -> i32 {
 type GetHeightFn = extern "C" fn() -> i32;
 #[cfg(target_os = "windows")]
 extern "C" fn get_Height() -> i32 {
-    if Hachimi::instance().config.load().windows.freeform_window && Hachimi::instance().game.region != Region::Global {
+    if Hachimi::instance().config.load().windows.freeform_window
+        && Hachimi::instance().game.region != Region::Global
+    {
         return UnityScreen::get_height();
     }
 
@@ -166,7 +171,9 @@ extern "C" fn SetResolution(
     force_update: bool,
     skip_keep_aspect: bool,
 ) {
-    if !Hachimi::instance().config.load().windows.freeform_window || Hachimi::instance().game.region == Region::Global {
+    if !Hachimi::instance().config.load().windows.freeform_window
+        || Hachimi::instance().game.region == Region::Global
+    {
         get_orig_fn!(SetResolution, SetResolutionFn)(
             width,
             height,
@@ -181,7 +188,9 @@ extern "C" fn SetResolution(
 type IsCurrentOrientationFn = extern "C" fn(target: ScreenOrientation) -> bool;
 #[cfg(target_os = "windows")]
 extern "C" fn IsCurrentOrientation(target: ScreenOrientation) -> bool {
-    if Hachimi::instance().config.load().windows.freeform_window && Hachimi::instance().game.region != Region::Global {
+    if Hachimi::instance().config.load().windows.freeform_window
+        && Hachimi::instance().game.region != Region::Global
+    {
         return true;
     }
 
@@ -193,7 +202,9 @@ type WaitDeviceOrientationFn = extern "C" fn(target: ScreenOrientation) -> IEnum
 #[cfg(target_os = "windows")]
 extern "C" fn WaitDeviceOrientation(target: ScreenOrientation) -> IEnumerator {
     let enumerator = get_orig_fn!(WaitDeviceOrientation, WaitDeviceOrientationFn)(target);
-    if Hachimi::instance().config.load().windows.freeform_window && Hachimi::instance().game.region != Region::Global {
+    if Hachimi::instance().config.load().windows.freeform_window
+        && Hachimi::instance().game.region != Region::Global
+    {
         if let Err(e) = enumerator.hook_move_next(WaitDeviceOrientation_MoveNext) {
             error!("Failed to stop WaitDeviceOrientation: {}", e);
         }
@@ -214,12 +225,16 @@ extern "C" fn WaitDeviceOrientation_MoveNext(_enumerator: *mut Il2CppObject) -> 
     get_orig_fn!(WaitDeviceOrientation_MoveNext, MoveNextFn)(_enumerator)
 }
 
-type ChangeScreenOrientationFn = extern "C" fn(target: ScreenOrientation, force: bool) -> IEnumerator;
+type ChangeScreenOrientationFn =
+    extern "C" fn(target: ScreenOrientation, force: bool) -> IEnumerator;
 extern "C" fn ChangeScreenOrientation(target: ScreenOrientation, force: bool) -> IEnumerator {
     #[cfg(target_os = "windows")]
     {
-        let enumerator = get_orig_fn!(ChangeScreenOrientation, ChangeScreenOrientationFn)(target, force);
-        if Hachimi::instance().config.load().windows.freeform_window && Hachimi::instance().game.region != Region::Global {
+        let enumerator =
+            get_orig_fn!(ChangeScreenOrientation, ChangeScreenOrientationFn)(target, force);
+        if Hachimi::instance().config.load().windows.freeform_window
+            && Hachimi::instance().game.region != Region::Global
+        {
             if let Err(e) = enumerator.hook_move_next(ChangeScreenOrientation_MoveNext) {
                 error!("Failed to stop ChangeScreenOrientation: {}", e);
             }
@@ -229,8 +244,15 @@ extern "C" fn ChangeScreenOrientation(target: ScreenOrientation, force: bool) ->
     #[cfg(target_os = "android")]
     {
         if should_force_orientation() {
-            let force_orientation = Hachimi::instance().config.load().android.force_orientation_mode;
-            return get_orig_fn!(ChangeScreenOrientation, ChangeScreenOrientationFn)(force_orientation, true);
+            let force_orientation = Hachimi::instance()
+                .config
+                .load()
+                .android
+                .force_orientation_mode;
+            return get_orig_fn!(ChangeScreenOrientation, ChangeScreenOrientationFn)(
+                force_orientation,
+                true,
+            );
         }
         get_orig_fn!(ChangeScreenOrientation, ChangeScreenOrientationFn)(target, force)
     }
@@ -267,7 +289,9 @@ extern "C" fn ChangeScreenOrientationLandscapeAsyncWindows() -> IEnumerator {
         ChangeScreenOrientationLandscapeAsyncWindows,
         ChangeScreenOrientationAsyncFn
     )();
-    if Hachimi::instance().config.load().windows.freeform_window && Hachimi::instance().game.region != Region::Global {
+    if Hachimi::instance().config.load().windows.freeform_window
+        && Hachimi::instance().game.region != Region::Global
+    {
         if let Err(e) =
             enumerator.hook_move_next(ChangeScreenOrientationLandscapeAsyncWindows_MoveNext)
         {
@@ -304,7 +328,9 @@ extern "C" fn ChangeScreenOrientationPortraitAsyncWindows() -> IEnumerator {
         ChangeScreenOrientationPortraitAsyncWindows,
         ChangeScreenOrientationAsyncFn
     )();
-    if Hachimi::instance().config.load().windows.freeform_window && Hachimi::instance().game.region != Region::Global {
+    if Hachimi::instance().config.load().windows.freeform_window
+        && Hachimi::instance().game.region != Region::Global
+    {
         if let Err(e) =
             enumerator.hook_move_next(ChangeScreenOrientationPortraitAsyncWindows_MoveNext)
         {
@@ -351,13 +377,15 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     #[cfg(target_os = "android")]
     {
-        let ChangeScreenOrientationLandscapeAsync_addr = get_method_addr(Screen, c"ChangeScreenOrientationLandscapeAsync", 0);
+        let ChangeScreenOrientationLandscapeAsync_addr =
+            get_method_addr(Screen, c"ChangeScreenOrientationLandscapeAsync", 0);
         new_hook!(
             ChangeScreenOrientationLandscapeAsync_addr,
             ChangeScreenOrientationLandscapeAsync
         );
 
-        let ChangeScreenOrientationPortraitAsync_addr = get_method_addr(Screen, c"ChangeScreenOrientationPortraitAsync", 0);
+        let ChangeScreenOrientationPortraitAsync_addr =
+            get_method_addr(Screen, c"ChangeScreenOrientationPortraitAsync", 0);
         new_hook!(
             ChangeScreenOrientationPortraitAsync_addr,
             ChangeScreenOrientationPortraitAsync
@@ -368,7 +396,7 @@ pub fn init(umamusume: *const Il2CppImage) {
     {
         let get_Width_addr = get_method_addr(Screen, c"get_Width", 0);
         new_hook!(get_Width_addr, get_Width);
- 
+
         let get_Height_addr = get_method_addr(Screen, c"get_Height", 0);
         new_hook!(get_Height_addr, get_Height);
 
@@ -381,13 +409,15 @@ pub fn init(umamusume: *const Il2CppImage) {
         let WaitDeviceOrientation_addr = get_method_addr(Screen, c"WaitDeviceOrientation", 1);
         new_hook!(WaitDeviceOrientation_addr, WaitDeviceOrientation);
 
-        let ChangeScreenOrientationLandscapeAsyncWindows_addr = get_method_addr(Screen, c"ChangeScreenOrientationLandscapeAsync", 0);
+        let ChangeScreenOrientationLandscapeAsyncWindows_addr =
+            get_method_addr(Screen, c"ChangeScreenOrientationLandscapeAsync", 0);
         new_hook!(
             ChangeScreenOrientationLandscapeAsyncWindows_addr,
             ChangeScreenOrientationLandscapeAsyncWindows
         );
 
-        let ChangeScreenOrientationPortraitAsyncWindows_addr = get_method_addr(Screen, c"ChangeScreenOrientationPortraitAsync", 0);
+        let ChangeScreenOrientationPortraitAsyncWindows_addr =
+            get_method_addr(Screen, c"ChangeScreenOrientationPortraitAsync", 0);
         new_hook!(
             ChangeScreenOrientationPortraitAsyncWindows_addr,
             ChangeScreenOrientationPortraitAsyncWindows

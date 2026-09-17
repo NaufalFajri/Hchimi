@@ -1,6 +1,6 @@
 use crate::il2cpp::{
-    symbols::{get_method_addr, get_assembly_image, get_class, invoke_object_method},
-    types::*
+    symbols::{get_assembly_image, get_class, get_method_addr, invoke_object_method},
+    types::*,
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
@@ -11,7 +11,11 @@ pub fn class() -> *mut Il2CppClass {
 static mut GET_LOADER_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_Loader, GET_LOADER_ADDR, *mut Il2CppObject,);
 
-pub fn LoadAssetHandle(this: *mut Il2CppObject, path: *mut Il2CppString, flag: bool) -> *mut Il2CppObject {
+pub fn LoadAssetHandle(
+    this: *mut Il2CppObject,
+    path: *mut Il2CppString,
+    flag: bool,
+) -> *mut Il2CppObject {
     let mut params: [*mut std::ffi::c_void; 2] = [path as *mut _, &flag as *const _ as *mut _];
     invoke_object_method(this, c"LoadAssetHandle", 2, &mut params).unwrap_or(std::ptr::null_mut())
 }

@@ -6,7 +6,11 @@ pub fn class() -> *mut Il2CppClass {
 }
 
 pub fn init(umamusume: *const Il2CppImage) {
-    get_class_or_return!(umamusume, "Gallop.Live.Cutt", LiveTimelineKeyMultiCameraPositionData);
+    get_class_or_return!(
+        umamusume,
+        "Gallop.Live.Cutt",
+        LiveTimelineKeyMultiCameraPositionData
+    );
 
     unsafe {
         CLASS = LiveTimelineKeyMultiCameraPositionData;

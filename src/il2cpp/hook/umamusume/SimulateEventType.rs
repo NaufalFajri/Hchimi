@@ -16,7 +16,7 @@ pub enum SimulateEventType {
     RunAtFullSpeed = 12,
     LastSpurt = 13,
     Temptation = 14,
-    BadStart = 15
+    BadStart = 15,
 }
 
 impl_enum_eq!(SimulateEventType);

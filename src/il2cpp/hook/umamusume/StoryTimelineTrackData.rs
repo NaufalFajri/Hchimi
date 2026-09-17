@@ -1,6 +1,9 @@
 use std::ptr::null_mut;
 
-use crate::il2cpp::{symbols::{get_field_from_name, get_field_object_value}, types::*};
+use crate::il2cpp::{
+    symbols::{get_field_from_name, get_field_object_value},
+    types::*,
+};
 
 // List<StoryTimelineClipData>
 static mut CLIPLIST_FIELD: *mut FieldInfo = null_mut();

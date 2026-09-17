@@ -1,11 +1,8 @@
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use crate::{
+    il2cpp::{symbols::get_method_addr, types::*},
     windows::free_camera,
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*,
-    },
 };
 
 static GET_BUTTON_HOOK_ID: AtomicU8 = AtomicU8::new(1);
@@ -50,7 +47,8 @@ extern "C" fn GetAxis(this: *mut Il2CppObject, action_name: *mut Il2CppString) -
     }
 }
 
-type GetVector2Fn = extern "C" fn(this: *mut Il2CppObject, action_name: *mut Il2CppString) -> Vector2_t;
+type GetVector2Fn =
+    extern "C" fn(this: *mut Il2CppObject, action_name: *mut Il2CppString) -> Vector2_t;
 extern "C" fn GetVector2(this: *mut Il2CppObject, action_name: *mut Il2CppString) -> Vector2_t {
     preserve_hook_identity(&GET_VECTOR2_HOOK_ID);
     if free_camera::is_game_input_capture_active() {
@@ -66,7 +64,10 @@ extern "C" fn IsActionKeyTriggeredInKeyboard(this: *mut Il2CppObject) -> bool {
     if free_camera::is_game_input_capture_active() {
         false
     } else {
-        get_orig_fn!(IsActionKeyTriggeredInKeyboard, IsActionKeyTriggeredInKeyboardFn)(this)
+        get_orig_fn!(
+            IsActionKeyTriggeredInKeyboard,
+            IsActionKeyTriggeredInKeyboardFn
+        )(this)
     }
 }
 
@@ -76,7 +77,10 @@ extern "C" fn IsActionButtonTriggeredInGamepad(this: *mut Il2CppObject) -> bool 
     if free_camera::is_game_input_capture_active() {
         false
     } else {
-        get_orig_fn!(IsActionButtonTriggeredInGamepad, IsActionButtonTriggeredInGamepadFn)(this)
+        get_orig_fn!(
+            IsActionButtonTriggeredInGamepad,
+            IsActionButtonTriggeredInGamepadFn
+        )(this)
     }
 }
 
@@ -86,7 +90,10 @@ extern "C" fn get_IsAnyKeyTriggeredInKeyboard() -> bool {
     if free_camera::is_game_input_capture_active() {
         false
     } else {
-        get_orig_fn!(get_IsAnyKeyTriggeredInKeyboard, get_IsAnyKeyTriggeredInKeyboardFn)()
+        get_orig_fn!(
+            get_IsAnyKeyTriggeredInKeyboard,
+            get_IsAnyKeyTriggeredInKeyboardFn
+        )()
     }
 }
 

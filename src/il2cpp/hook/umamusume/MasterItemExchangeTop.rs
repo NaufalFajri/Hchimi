@@ -1,9 +1,4 @@
-use crate::{
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*
-    }
-};
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 // public bool get_IsInTermAnyAnnivShop() { }
 static mut GET_ISINTERMANYANNIVSHOP_ADDR: usize = 0;
@@ -13,6 +8,7 @@ pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, MasterItemExchangeTop);
 
     unsafe {
-        GET_ISINTERMANYANNIVSHOP_ADDR = get_method_addr(MasterItemExchangeTop, c"get_IsInTermAnyAnnivShop", 0);
+        GET_ISINTERMANYANNIVSHOP_ADDR =
+            get_method_addr(MasterItemExchangeTop, c"get_IsInTermAnyAnnivShop", 0);
     }
 }

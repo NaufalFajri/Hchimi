@@ -1,9 +1,14 @@
-use std::sync::Mutex;
+use crate::core::sugoi_client::{StringInfo, SugoiClient};
+use crate::il2cpp::symbols::GCHandle;
+use crate::il2cpp::{
+    ext::{Il2CppStringExt, StringExt},
+    hook::UnityEngine_TextRenderingModule::TextAnchor,
+    symbols::get_method_addr,
+    types::*,
+};
 use fnv::FnvHashMap;
 use once_cell::sync::Lazy;
-use crate::core::sugoi_client::{SugoiClient, StringInfo};
-use crate::il2cpp::symbols::GCHandle;
-use crate::il2cpp::{ext::{Il2CppStringExt, StringExt}, hook::UnityEngine_TextRenderingModule::TextAnchor, symbols::get_method_addr, types::*};
+use std::sync::Mutex;
 
 static mut GET_LINESPACING_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_lineSpacing, GET_LINESPACING_ADDR, f32, this: *mut Il2CppObject);
@@ -63,9 +68,8 @@ pub fn set_best_fit_downscale(this: *mut Il2CppObject) {
     set_best_fit(this, true);
 }
 
-pub static ACTIVE_TEXT_COMPONENTS: Lazy<Mutex<FnvHashMap<usize, StringInfo>>> = Lazy::new(|| {
-    Mutex::new(FnvHashMap::default())
-});
+pub static ACTIVE_TEXT_COMPONENTS: Lazy<Mutex<FnvHashMap<usize, StringInfo>>> =
+    Lazy::new(|| Mutex::new(FnvHashMap::default()));
 
 type SetTextFn = extern "C" fn(this: *mut Il2CppObject, value: *mut Il2CppString);
 pub extern "C" fn set_text_hook(this: *mut Il2CppObject, value: *mut Il2CppString) {
@@ -81,10 +85,13 @@ pub extern "C" fn set_text_hook(this: *mut Il2CppObject, value: *mut Il2CppStrin
     let orig_str = unsafe { (*value).as_utf16str().to_string() };
     let str_info = StringInfo {
         str_handle: GCHandle::new_weak_ref(this, false),
-        str: orig_str.clone()
+        str: orig_str.clone(),
     };
 
-    ACTIVE_TEXT_COMPONENTS.lock().unwrap().insert(this as usize, str_info);
+    ACTIVE_TEXT_COMPONENTS
+        .lock()
+        .unwrap()
+        .insert(this as usize, str_info);
 
     if let Some(trans) = SugoiClient::instance().get_cached(&orig_str) {
         return get_orig_fn!(set_text_hook, SetTextFn)(this, trans.to_il2cpp_string());

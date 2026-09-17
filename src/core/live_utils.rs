@@ -1,17 +1,23 @@
-use crate::{
-    il2cpp::{
-        api::il2cpp_runtime_invoke,
-        ext::Il2CppObjectExt,
-        hook::{
-            umamusume::{AudioManager, Director, LiveTimeController, LiveViewController, SceneManager},
-            Cute_Cri_Assembly::{AtomSourceEx, AudioPlayback::AudioPlayback_t, CuteAudioSource, CuteAudioSourcePool},
-            CriMw_CriWare_Runtime::CriAtomExPlayer,
+use crate::il2cpp::{
+    api::il2cpp_runtime_invoke,
+    ext::Il2CppObjectExt,
+    hook::{
+        umamusume::{AudioManager, Director, LiveTimeController, LiveViewController, SceneManager},
+        CriMw_CriWare_Runtime::CriAtomExPlayer,
+        Cute_Cri_Assembly::{
+            AtomSourceEx, AudioPlayback::AudioPlayback_t, CuteAudioSource, CuteAudioSourcePool,
         },
-        symbols::{Array, IList, get_field_from_name, get_field_object_value, get_method_cached}, types::*
-    }
+    },
+    symbols::{get_field_from_name, get_field_object_value, get_method_cached, Array, IList},
+    types::*,
 };
 
-use std::{ffi::c_void, ptr::null_mut, sync::atomic::{AtomicBool, AtomicU64, Ordering}, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    ffi::c_void,
+    ptr::null_mut,
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 static DRAG_WAS_PAUSED: AtomicBool = AtomicBool::new(false);
 static DRAG_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
@@ -30,13 +36,25 @@ fn now_millis() -> u64 {
 }
 
 pub fn should_loop_restart(current: f32, total: f32) -> bool {
-    if !Director::is_live_playing() { return false; }
-    if total < MIN_LOOP_TOTAL_TIME { return false; }
-    if current < MIN_LOOP_CURRENT_TIME { return false; }
+    if !Director::is_live_playing() {
+        return false;
+    }
+    if total < MIN_LOOP_TOTAL_TIME {
+        return false;
+    }
+    if current < MIN_LOOP_CURRENT_TIME {
+        return false;
+    }
     let now = now_millis();
     let last = LAST_LOOP_RESTART_MS.load(Ordering::Acquire);
-    let elapsed = if now >= last { now - last } else { LOOP_RESTART_COOLDOWN_MS };
-    if elapsed < LOOP_RESTART_COOLDOWN_MS { return false; }
+    let elapsed = if now >= last {
+        now - last
+    } else {
+        LOOP_RESTART_COOLDOWN_MS
+    };
+    if elapsed < LOOP_RESTART_COOLDOWN_MS {
+        return false;
+    }
 
     LAST_LOOP_RESTART_MS.store(now, Ordering::Release);
     true
@@ -44,10 +62,14 @@ pub fn should_loop_restart(current: f32, total: f32) -> bool {
 
 fn get_live_view_controller() -> Option<*mut Il2CppObject> {
     let scene_manager = SceneManager::instance();
-    if scene_manager.is_null() { return None; }
+    if scene_manager.is_null() {
+        return None;
+    }
 
     let vc = SceneManager::GetCurrentViewController(scene_manager);
-    if vc.is_null() { return None; }
+    if vc.is_null() {
+        return None;
+    }
 
     let name = unsafe { std::ffi::CStr::from_ptr((*(*vc).klass()).name) }.to_string_lossy();
     if name == "LiveViewController" {
@@ -116,32 +138,42 @@ pub fn reset_live_drag_state() {
 unsafe fn process_playback(
     playback: &mut AudioPlayback_t,
     audio_ctrl_dict: *mut Il2CppObject,
-    target_time: f32
+    target_time: f32,
 ) {
     let dict_class = (*audio_ctrl_dict).klass();
     let get_item_method = match get_method_cached(dict_class, c"get_Item", 1) {
         Ok(m) => m,
-        Err(_) => return
+        Err(_) => return,
     };
 
     let mut key = playback.soundGroup;
     let mut get_item_params: [*mut c_void; 1] = [&mut key as *mut _ as *mut c_void];
     let mut exc = null_mut();
     let audio_ctrl = il2cpp_runtime_invoke(
-        get_item_method, audio_ctrl_dict as *mut c_void,
-        get_item_params.as_mut_ptr(), &mut exc
+        get_item_method,
+        audio_ctrl_dict as *mut c_void,
+        get_item_params.as_mut_ptr(),
+        &mut exc,
     );
-    if !exc.is_null() || audio_ctrl.is_null() { return; }
+    if !exc.is_null() || audio_ctrl.is_null() {
+        return;
+    }
     let audio_ctrl = audio_ctrl as *mut Il2CppObject;
 
     let pool_field = get_field_from_name((*audio_ctrl).klass(), c"pool");
     let pool = get_field_object_value::<Il2CppObject>(audio_ctrl, pool_field);
-    if pool.is_null() { return; }
+    if pool.is_null() {
+        return;
+    }
 
     let source_list = CuteAudioSourcePool::get_sourceList(pool);
-    if source_list.is_null() { return; }
+    if source_list.is_null() {
+        return;
+    }
 
-    let Some(list) = IList::<*mut Il2CppObject>::new(source_list) else { return; };
+    let Some(list) = IList::<*mut Il2CppObject>::new(source_list) else {
+        return;
+    };
     let count = list.count();
     let mut cute_audio_source: *mut Il2CppObject = null_mut();
 
@@ -155,19 +187,29 @@ unsafe fn process_playback(
         }
     }
 
-    if cute_audio_source.is_null() { return; }
+    if cute_audio_source.is_null() {
+        return;
+    }
 
     let source_list2 = CuteAudioSource::get_sourceList(cute_audio_source);
-    if source_list2.is_null() { return; }
+    if source_list2.is_null() {
+        return;
+    }
 
     let using_index = CuteAudioSource::get_usingIndex(cute_audio_source);
 
-    let Some(list2) = IList::<*mut Il2CppObject>::new(source_list2) else { return; };
+    let Some(list2) = IList::<*mut Il2CppObject>::new(source_list2) else {
+        return;
+    };
     let atom_source = list2.get(using_index).unwrap_or(null_mut());
-    if atom_source.is_null() { return; }
+    if atom_source.is_null() {
+        return;
+    }
 
     let player = AtomSourceEx::get_player(atom_source);
-    if player.is_null() { return; }
+    if player.is_null() {
+        return;
+    }
 
     CriAtomExPlayer::StopWithoutReleaseTime(player);
     CriAtomExPlayer::SetStartTime(player, (target_time * 1000.0).round() as i64);
@@ -186,7 +228,9 @@ unsafe fn process_playback(
 
 pub fn move_live_playback(target_time: f32) {
     let director = Director::instance();
-    if director.is_null() { return; }
+    if director.is_null() {
+        return;
+    }
 
     let dragging = DRAG_IN_PROGRESS.load(Ordering::Acquire);
     let was_paused = if dragging {
@@ -214,21 +258,23 @@ pub fn move_live_playback(target_time: f32) {
         let cri_audio_manager = AudioManager::get_CriAudioManager();
 
         if !cri_audio_manager.is_null() {
-            let audio_ctrl_dict_field = get_field_from_name(
-                unsafe { (*cri_audio_manager).klass() }, c"audioCtrlDict"
-            );
+            let audio_ctrl_dict_field =
+                get_field_from_name(unsafe { (*cri_audio_manager).klass() }, c"audioCtrlDict");
 
             if audio_ctrl_dict_field.is_null() {
                 warn!("audioCtrlDict field not found! Skipping audio sync.");
             } else {
                 let audio_ctrl_dict = get_field_object_value::<Il2CppObject>(
-                    cri_audio_manager, audio_ctrl_dict_field
+                    cri_audio_manager,
+                    audio_ctrl_dict_field,
                 );
 
                 if !audio_ctrl_dict.is_null() {
                     let mut song_playback = AudioManager::get__songPlayback(audio_manager);
 
-                    unsafe { process_playback(&mut song_playback, audio_ctrl_dict, target_time); }
+                    unsafe {
+                        process_playback(&mut song_playback, audio_ctrl_dict, target_time);
+                    }
 
                     AudioManager::set__songPlayback(audio_manager, song_playback);
 

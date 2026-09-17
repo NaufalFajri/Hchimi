@@ -1,4 +1,4 @@
-use crate::il2cpp::{symbols::{get_field_from_name}, types::*};
+use crate::il2cpp::{symbols::get_field_from_name, types::*};
 
 def_field_value_accessors!(get_MusicId, set_MusicId, MUSICID_FIELD, i32);
 

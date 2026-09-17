@@ -67,7 +67,10 @@ impl BackupState {
         // Rasterizer parameters
         self.scissor_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
         self.viewport_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-        ctx.RSGetScissorRects(&mut self.scissor_count, Some(self.scissor_rects.as_mut_ptr()));
+        ctx.RSGetScissorRects(
+            &mut self.scissor_count,
+            Some(self.scissor_rects.as_mut_ptr()),
+        );
         ctx.RSGetViewports(&mut self.viewport_count, Some(self.viewports.as_mut_ptr()));
         self.raster_state = ctx.RSGetState().ok();
 
@@ -77,7 +80,10 @@ impl BackupState {
             Some(&mut self.blend_factor),
             Some(&mut self.blend_mask),
         );
-        ctx.OMGetDepthStencilState(Some(&mut self.depth_stencil_state), Some(&mut self.stencil_ref));
+        ctx.OMGetDepthStencilState(
+            Some(&mut self.depth_stencil_state),
+            Some(&mut self.stencil_ref),
+        );
 
         // Pixel Shader parameters
         let mut pixel_shader_resources = [None];
@@ -142,11 +148,7 @@ impl BackupState {
 
         // Output-Merger parameters
         if let Some(blend_state) = self.blend_state.take() {
-            ctx.OMSetBlendState(
-                &blend_state,
-                Some(&self.blend_factor),
-                self.blend_mask,
-            );
+            ctx.OMSetBlendState(&blend_state, Some(&self.blend_factor), self.blend_mask);
         }
         if let Some(depth_stencil_state) = self.depth_stencil_state.take() {
             ctx.OMSetDepthStencilState(&depth_stencil_state, self.stencil_ref);
@@ -160,7 +162,7 @@ impl BackupState {
         if let Some(pixel_shader) = self.pixel_shader.take() {
             ctx.PSSetShader(
                 &pixel_shader,
-                Some(&self.pixel_shader_instances.0[..self.pixel_shader_instances_count as usize])
+                Some(&self.pixel_shader_instances.0[..self.pixel_shader_instances_count as usize]),
             );
         }
         self.pixel_shader_instances.release();
@@ -168,7 +170,9 @@ impl BackupState {
         if let Some(vertex_shader) = self.vertex_shader.take() {
             ctx.VSSetShader(
                 &vertex_shader,
-                Some(&self.vertex_shader_instances.0[..self.vertex_shader_instances_count as usize])
+                Some(
+                    &self.vertex_shader_instances.0[..self.vertex_shader_instances_count as usize],
+                ),
             );
         }
         self.vertex_shader_instances.release();
@@ -176,7 +180,10 @@ impl BackupState {
         if let Some(geometry_shader) = self.geometry_shader.take() {
             ctx.GSSetShader(
                 &geometry_shader,
-                Some(&self.geometry_shader_instances.0[..self.geometry_shader_instances_count as usize])
+                Some(
+                    &self.geometry_shader_instances.0
+                        [..self.geometry_shader_instances_count as usize],
+                ),
             );
         }
         self.geometry_shader_instances.release();

@@ -1,17 +1,18 @@
-use std::{
-    ptr::null_mut,
-    sync::RwLock
-};
 use crate::il2cpp::{
     api::{il2cpp_class_get_type, il2cpp_type_get_object},
-    ext::StringExt, hook::mscorlib::Enum, symbols::IEnumerable, types::*
+    ext::StringExt,
+    hook::mscorlib::Enum,
+    symbols::IEnumerable,
+    types::*,
 };
-use once_cell::sync::Lazy;
 use fnv::FnvHashMap;
+use once_cell::sync::Lazy;
+use std::{ptr::null_mut, sync::RwLock};
 
 static mut TEXTID_TYPE_OBJECT: *mut Il2CppObject = null_mut();
 
-static TEXTID_NAME_ID_CACHE: Lazy<RwLock<FnvHashMap<String, i32>>> =  Lazy::new(|| RwLock::new(FnvHashMap::default()));
+static TEXTID_NAME_ID_CACHE: Lazy<RwLock<FnvHashMap<String, i32>>> =
+    Lazy::new(|| RwLock::new(FnvHashMap::default()));
 
 // Mandatory for using get_from_name()
 pub fn cache_name_id(name: &str) {
@@ -19,7 +20,10 @@ pub fn cache_name_id(name: &str) {
         return;
     }
     let id = from_name(name);
-    TEXTID_NAME_ID_CACHE.write().unwrap().insert(name.to_string(), id);
+    TEXTID_NAME_ID_CACHE
+        .write()
+        .unwrap()
+        .insert(name.to_string(), id);
 }
 
 // Thread-safe alternative to from_name()

@@ -6,7 +6,7 @@ impl_addr_wrapper_fn!(Blit2, BLIT2_ADDR, (), source: *mut Il2CppObject, dest: *m
 pub fn init(_UnityEngine_CoreModule: *const Il2CppImage) {
     unsafe {
         BLIT2_ADDR = il2cpp_resolve_icall(
-            c"UnityEngine.Graphics::Blit2(UnityEngine.Texture,UnityEngine.RenderTexture)".as_ptr()
+            c"UnityEngine.Graphics::Blit2(UnityEngine.Texture,UnityEngine.RenderTexture)".as_ptr(),
         );
     }
 }

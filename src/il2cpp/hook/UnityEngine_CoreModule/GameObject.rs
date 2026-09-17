@@ -1,22 +1,21 @@
 use widestring::Utf16Str;
 
 use crate::{
-    core::{Hachimi, ext::Utf16StringExt},
+    core::{ext::Utf16StringExt, Hachimi},
     il2cpp::{
         api::il2cpp_resolve_icall,
         ext::Il2CppObjectExt,
         hook::{
             umamusume::{
                 CameraData::{self, ShadowResolution},
-                FlashActionPlayer,
-                TweenAnimationTimelineComponent
+                FlashActionPlayer, TweenAnimationTimelineComponent,
             },
             Plugins::AnimateToUnity::AnRoot,
-            UnityEngine_AssetBundleModule::AssetBundle
+            UnityEngine_AssetBundleModule::AssetBundle,
         },
         symbols::{get_method_addr, get_type_object_for_class, Array},
-        types::*
-    }
+        types::*,
+    },
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
@@ -53,7 +52,9 @@ impl_addr_wrapper_fn!(
 
 // Optimized out in assembly
 pub fn GetComponentsInChildren(
-    this: *mut Il2CppObject, type_: *mut Il2CppObject, include_inactive: bool
+    this: *mut Il2CppObject,
+    type_: *mut Il2CppObject,
+    include_inactive: bool,
 ) -> Array<*mut Il2CppObject> {
     GetComponentsInternal(this, type_, true, true, include_inactive, false, 0 as _)
 }
@@ -91,15 +92,14 @@ pub fn on_LoadAsset(bundle: *mut Il2CppObject, this: *mut Il2CppObject, name: &U
         if !root.is_null() {
             AnRoot::on_LoadAsset(bundle, root, name);
         }
-    }
-    else if path.starts_with("uianimation/flashcombine/action") {
+    } else if path.starts_with("uianimation/flashcombine/action") {
         let player = GetComponentInChildren(this, FlashActionPlayer::type_object(), false);
         if !player.is_null() {
             FlashActionPlayer::on_LoadAsset(bundle, player, name);
         }
-    }
-    else if path.starts_with("uianimation/flashcombine/timeline") {
-        let component = GetComponentInChildren(this, TweenAnimationTimelineComponent::type_object(), false);
+    } else if path.starts_with("uianimation/flashcombine/timeline") {
+        let component =
+            GetComponentInChildren(this, TweenAnimationTimelineComponent::type_object(), false);
         if !component.is_null() {
             TweenAnimationTimelineComponent::on_LoadAsset(bundle, component, name);
         }
@@ -115,14 +115,21 @@ fn customize(component: *mut Il2CppObject) {
                 CameraData::set_IsOverrideShadowResolution(component, true);
                 CameraData::set_OverrideShadowResolution(component, shadow_resolution);
             }
-            _ => return
+            _ => return,
         }
     }
 }
 
-type Internal_AddComponentWithTypeFn = extern "C" fn(this: *mut Il2CppObject, componentType: *mut Il2CppType) -> *mut Il2CppObject;
-extern "C" fn Internal_AddComponentWithType(this: *mut Il2CppObject, componentType: *mut Il2CppType) -> *mut Il2CppObject {
-    let component = get_orig_fn!(Internal_AddComponentWithType, Internal_AddComponentWithTypeFn)(this, componentType);
+type Internal_AddComponentWithTypeFn =
+    extern "C" fn(this: *mut Il2CppObject, componentType: *mut Il2CppType) -> *mut Il2CppObject;
+extern "C" fn Internal_AddComponentWithType(
+    this: *mut Il2CppObject,
+    componentType: *mut Il2CppType,
+) -> *mut Il2CppObject {
+    let component = get_orig_fn!(
+        Internal_AddComponentWithType,
+        Internal_AddComponentWithTypeFn
+    )(this, componentType);
     if !component.is_null() {
         customize(component);
     }
@@ -135,10 +142,23 @@ struct FastPath {
     oneFurtherThanResultValue: usize,
 }
 
-type TryGetComponentFastPathFn = extern "C" fn(this: *mut Il2CppObject, type_: *mut Il2CppType, oneFurtherThanResultValue: usize);
-extern "C" fn TryGetComponentFastPath(this: *mut Il2CppObject, type_: *mut Il2CppType, oneFurtherThanResultValue: usize) {
-    get_orig_fn!(TryGetComponentFastPath, TryGetComponentFastPathFn)(this, type_, oneFurtherThanResultValue);
-    let fastPath = (oneFurtherThanResultValue - std::mem::size_of::<*mut Il2CppObject>()) as *mut FastPath;
+type TryGetComponentFastPathFn = extern "C" fn(
+    this: *mut Il2CppObject,
+    type_: *mut Il2CppType,
+    oneFurtherThanResultValue: usize,
+);
+extern "C" fn TryGetComponentFastPath(
+    this: *mut Il2CppObject,
+    type_: *mut Il2CppType,
+    oneFurtherThanResultValue: usize,
+) {
+    get_orig_fn!(TryGetComponentFastPath, TryGetComponentFastPathFn)(
+        this,
+        type_,
+        oneFurtherThanResultValue,
+    );
+    let fastPath =
+        (oneFurtherThanResultValue - std::mem::size_of::<*mut Il2CppObject>()) as *mut FastPath;
     let component = unsafe { (*fastPath).component };
     if !component.is_null() {
         customize(component);
@@ -149,10 +169,10 @@ pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
     get_class_or_return!(UnityEngine_CoreModule, UnityEngine, GameObject);
 
     let Internal_AddComponentWithType_addr = il2cpp_resolve_icall(
-        c"UnityEngine.GameObject::Internal_AddComponentWithType(System.Type)".as_ptr()
+        c"UnityEngine.GameObject::Internal_AddComponentWithType(System.Type)".as_ptr(),
     );
     let TryGetComponentFastPath_addr = il2cpp_resolve_icall(
-        c"UnityEngine.GameObject::TryGetComponentFastPath(System.Type,System.IntPtr)".as_ptr()
+        c"UnityEngine.GameObject::TryGetComponentFastPath(System.Type,System.IntPtr)".as_ptr(),
     );
 
     unsafe {
@@ -166,11 +186,16 @@ pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
             c"UnityEngine.GameObject::GetComponentsInternal(System.Type,System.Boolean,System.Boolean,\
             System.Boolean,System.Boolean,System.Object)".as_ptr()
         );
-        SETACTIVE_ADDR = il2cpp_resolve_icall(c"UnityEngine.GameObject::SetActive(System.Boolean)".as_ptr());
-        GET_ACTIVESELF_ADDR = il2cpp_resolve_icall(c"UnityEngine.GameObject::get_activeSelf()".as_ptr());
+        SETACTIVE_ADDR =
+            il2cpp_resolve_icall(c"UnityEngine.GameObject::SetActive(System.Boolean)".as_ptr());
+        GET_ACTIVESELF_ADDR =
+            il2cpp_resolve_icall(c"UnityEngine.GameObject::get_activeSelf()".as_ptr());
         GET_TRANSFORM_ADDR = get_method_addr(GameObject, c"get_transform", 0);
     }
 
-    new_hook!(Internal_AddComponentWithType_addr, Internal_AddComponentWithType);
+    new_hook!(
+        Internal_AddComponentWithType_addr,
+        Internal_AddComponentWithType
+    );
     new_hook!(TryGetComponentFastPath_addr, TryGetComponentFastPath);
 }

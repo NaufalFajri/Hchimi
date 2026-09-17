@@ -1,9 +1,6 @@
 use crate::{
-    core::{Hachimi, game::Region},
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*
-    }
+    core::{game::Region, Hachimi},
+    il2cpp::{symbols::get_method_addr, types::*},
 };
 
 def_method_wrapper_fn!(get_PhaseMiddleStartDistance, GET_PHASE_MIDDLE_START_DISTANCE_ADDR, f32, this: *mut Il2CppObject);
@@ -18,8 +15,11 @@ pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, RacePhaseCalculator);
 
     unsafe {
-        GET_PHASE_MIDDLE_START_DISTANCE_ADDR = get_method_addr(RacePhaseCalculator, c"get_PhaseMiddleStartDistance", 0);
-        GET_PHASE_END_START_DISTANCE_ADDR = get_method_addr(RacePhaseCalculator, c"get_PhaseEndStartDistance", 0);
-        GET_PHASE_LAST_START_DISTANCE_ADDR = get_method_addr(RacePhaseCalculator, c"get_PhaseLastStartDistance", 0);
+        GET_PHASE_MIDDLE_START_DISTANCE_ADDR =
+            get_method_addr(RacePhaseCalculator, c"get_PhaseMiddleStartDistance", 0);
+        GET_PHASE_END_START_DISTANCE_ADDR =
+            get_method_addr(RacePhaseCalculator, c"get_PhaseEndStartDistance", 0);
+        GET_PHASE_LAST_START_DISTANCE_ADDR =
+            get_method_addr(RacePhaseCalculator, c"get_PhaseLastStartDistance", 0);
     }
 }

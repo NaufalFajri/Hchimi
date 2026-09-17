@@ -1,9 +1,9 @@
 use crate::{
-    windows::free_camera,
     il2cpp::{
         symbols::{get_class, get_method_addr, SingletonLike},
         types::*,
     },
+    windows::free_camera,
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
@@ -53,7 +53,8 @@ pub fn init(umamusume: *const Il2CppImage) {
     unsafe {
         CLASS = class;
         UPDATE_INPUT_CONTROLS_ADDR = get_method_addr(class, c"UpdateInputControls", 0);
-        CREATE_RENDER_TEXTURE_FROM_SCREEN_ADDR = get_method_addr(class, c"CreateRenderTextureFromScreen", 0);
+        CREATE_RENDER_TEXTURE_FROM_SCREEN_ADDR =
+            get_method_addr(class, c"CreateRenderTextureFromScreen", 0);
     }
 
     let check_gamepad_input_addr = get_method_addr(class, c"CheckGamepadInput", 0);

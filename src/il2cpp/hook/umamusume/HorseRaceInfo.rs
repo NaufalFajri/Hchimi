@@ -1,27 +1,57 @@
 use crate::{
-    core::{Hachimi, game::Region},
+    core::{game::Region, Hachimi},
     il2cpp::{
         symbols::{get_field_from_name, get_method_addr, Array},
         types::*,
-    }
+    },
 };
 
-use super::{RaceDefine, RaceManager, RaceHorseManagerBase};
+use super::{RaceDefine, RaceHorseManagerBase, RaceManager};
 
 def_field_value_accessors!(get__position, set__position, POSITION_FIELD, Vector3_t);
-def_field_value_accessors!(get__rotationOnLane, set__rotationOnLane, ROTATION_ON_LANE_FIELD, Quaternion_t);
+def_field_value_accessors!(
+    get__rotationOnLane,
+    set__rotationOnLane,
+    ROTATION_ON_LANE_FIELD,
+    Quaternion_t
+);
 
 def_field_value_accessors!(get__lastSpeed, set__lastSpeed, LAST_SPEED_FIELD, f32);
 def_field_value_accessors!(get__hp, set__hp, HP_FIELD, f32);
 def_field_value_accessors!(get__maxHp, set__maxHp, MAX_HP_FIELD, f32);
-def_field_object_accessors!(get__skillManager, set__skillManager, SKILL_MANAGER_FIELD, Il2CppObject);
+def_field_object_accessors!(
+    get__skillManager,
+    set__skillManager,
+    SKILL_MANAGER_FIELD,
+    Il2CppObject
+);
 def_field_value_accessors!(get__phase, set__phase, PHASE_FIELD, RaceDefine::HorsePhase);
 def_field_value_accessors!(get__minSpeed, set__minSpeed, MIN_SPEED_FIELD, f32);
-def_field_value_accessors!(get__maxSpeedInRace, set__maxSpeedInRace, MAX_SPEED_IN_RACE_FIELD, f32);
-def_field_value_accessors!(get__lastSelfSpeed, set__lastSelfSpeed, LAST_SELF_SPEED_FIELD, f32);
-def_field_value_accessors!(get__laneDistance, set__laneDistance, LANE_DISTANCE_FIELD, f32);
+def_field_value_accessors!(
+    get__maxSpeedInRace,
+    set__maxSpeedInRace,
+    MAX_SPEED_IN_RACE_FIELD,
+    f32
+);
+def_field_value_accessors!(
+    get__lastSelfSpeed,
+    set__lastSelfSpeed,
+    LAST_SELF_SPEED_FIELD,
+    f32
+);
+def_field_value_accessors!(
+    get__laneDistance,
+    set__laneDistance,
+    LANE_DISTANCE_FIELD,
+    f32
+);
 def_field_value_accessors!(get__distance, set__distance, DISTANCE_FIELD, f32);
-def_field_object_accessors!(get__horseRaceAI, set__horseRaceAI, HORSE_RACE_AI_FIELD, Il2CppObject);
+def_field_object_accessors!(
+    get__horseRaceAI,
+    set__horseRaceAI,
+    HORSE_RACE_AI_FIELD,
+    Il2CppObject
+);
 
 def_method_wrapper_fn!(get_CharaName, GET_CHARA_NAME_ADDR, *mut Il2CppString, this: *mut Il2CppObject);
 def_method_wrapper_fn!(get_HorseData, GET_HORSE_DATA_ADDR, *mut Il2CppObject, this: *mut Il2CppObject);
@@ -84,10 +114,14 @@ pub fn is_start_dash() -> bool {
 }
 
 pub fn is_start_dash_instance(race_manager: *mut Il2CppObject) -> bool {
-    if race_manager.is_null() { return false; }
+    if race_manager.is_null() {
+        return false;
+    }
 
     let horse_manager = RaceManager::get__horseManager(race_manager);
-    if horse_manager.is_null() { return false; }
+    if horse_manager.is_null() {
+        return false;
+    }
 
     match player_horse_info(horse_manager) {
         Some(player_info) => get_IsStartDash(player_info),
@@ -97,10 +131,14 @@ pub fn is_start_dash_instance(race_manager: *mut Il2CppObject) -> bool {
 
 pub fn is_finished() -> bool {
     let race_manager = RaceManager::instance();
-    if race_manager.is_null() { return false; }
+    if race_manager.is_null() {
+        return false;
+    }
 
     let horse_manager = RaceManager::get__horseManager(race_manager);
-    if horse_manager.is_null() { return false; }
+    if horse_manager.is_null() {
+        return false;
+    }
 
     match player_horse_info(horse_manager) {
         Some(player_info) => IsFinished(player_info),
@@ -149,7 +187,8 @@ pub fn init(umamusume: *const Il2CppImage) {
         GET_COMPETEFIGHTCOUNT_ADDR = get_method_addr(HorseRaceInfo, c"get_CompeteFightCount", 0);
         GET_ISCOMPETETOP_ADDR = get_method_addr(HorseRaceInfo, c"get_IsCompeteTop", 0);
         GET_COMPETETOPCOUNT_ADDR = get_method_addr(HorseRaceInfo, c"get_CompeteTopCount", 0);
-        GET_COMPETETOPREMAINTIME_ADDR = get_method_addr(HorseRaceInfo, c"get_CompeteTopRemainTime", 0);
+        GET_COMPETETOPREMAINTIME_ADDR =
+            get_method_addr(HorseRaceInfo, c"get_CompeteTopRemainTime", 0);
         GET_CURORDER_ADDR = get_method_addr(HorseRaceInfo, c"get_CurOrder", 0);
         GET_PREVORDER_ADDR = get_method_addr(HorseRaceInfo, c"get_PrevOrder", 0);
         ISFINISHED_ADDR = get_method_addr(HorseRaceInfo, c"IsFinished", 0);

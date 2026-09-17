@@ -5,8 +5,11 @@ use widestring::Utf16Str;
 use crate::{
     core::{ext::Utf16StringExt, Hachimi},
     il2cpp::{
-        ext::{Il2CppObjectExt, StringExt}, hook::UnityEngine_AssetBundleModule::AssetBundle::ASSET_PATH_PREFIX, symbols::{get_field_from_name, get_field_object_value, set_field_object_value, Array}, types::*
-    }
+        ext::{Il2CppObjectExt, StringExt},
+        hook::UnityEngine_AssetBundleModule::AssetBundle::ASSET_PATH_PREFIX,
+        symbols::{get_field_from_name, get_field_object_value, set_field_object_value, Array},
+        types::*,
+    },
 };
 
 static mut CLASS: *mut Il2CppClass = null_mut();

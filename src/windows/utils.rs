@@ -6,13 +6,19 @@ use windows::{
     Win32::{
         Foundation::{CloseHandle, HMODULE, HWND, MAX_PATH},
         System::{
-            Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPALL},
+            Diagnostics::ToolHelp::{
+                CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32,
+                TH32CS_SNAPALL,
+            },
             LibraryLoader::{GetModuleFileNameW, GetProcAddress},
             SystemInformation::GetSystemDirectoryW,
-            Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE}
+            Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE},
         },
-        UI::WindowsAndMessaging::{MessageBoxW, SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, MB_ICONERROR, MB_OK, SWP_NOMOVE, SWP_NOSIZE}
-    }
+        UI::WindowsAndMessaging::{
+            MessageBoxW, SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, MB_ICONERROR, MB_OK,
+            SWP_NOMOVE, SWP_NOSIZE,
+        },
+    },
 };
 
 use crate::core::{utils::scale_to_aspect_ratio, Hachimi};
@@ -31,8 +37,7 @@ pub fn get_proc_address(hmodule: HMODULE, name: &CStr) -> usize {
     let res = unsafe { GetProcAddress(hmodule, PCSTR(name.as_ptr() as *const u8)) };
     if let Some(proc) = res {
         proc as usize
-    }
-    else {
+    } else {
         0
     }
 }
@@ -48,7 +53,8 @@ pub fn get_exec_path() -> PathBuf {
 pub fn get_module_file_name(hmodule: HMODULE) -> Utf16String {
     let mut slice = [0u16; MAX_PATH as usize];
     let length = unsafe { GetModuleFileNameW(Some(hmodule), &mut slice) } as usize;
-    let module_filename_str = unsafe { Utf16Str::from_slice_unchecked(&slice[..length]) }.to_owned();
+    let module_filename_str =
+        unsafe { Utf16Str::from_slice_unchecked(&slice[..length]) }.to_owned();
     module_filename_str
 }
 
@@ -98,30 +104,49 @@ pub fn get_tmp_installer_path() -> PathBuf {
 }
 
 pub fn get_scaling_res() -> Option<(i32, i32)> {
-    use crate::il2cpp::hook::UnityEngine_CoreModule::Screen as UnityScreen;
     use crate::il2cpp::hook::umamusume::Screen as GallopScreen;
+    use crate::il2cpp::hook::UnityEngine_CoreModule::Screen as UnityScreen;
 
     match Hachimi::instance().config.load().windows.resolution_scaling {
         ResolutionScaling::Default => None,
         ResolutionScaling::ScaleToScreenSize => {
             let res = UnityScreen::get_currentResolution(); // screen res, not game window res
-            let aspect_ratio = GallopScreen::get_Width_orig() as f32 / GallopScreen::get_Height_orig() as f32;
-            Some(scale_to_aspect_ratio((res.width, res.height), aspect_ratio, true))
-        },
+            let aspect_ratio =
+                GallopScreen::get_Width_orig() as f32 / GallopScreen::get_Height_orig() as f32;
+            Some(scale_to_aspect_ratio(
+                (res.width, res.height),
+                aspect_ratio,
+                true,
+            ))
+        }
         ResolutionScaling::ScaleToWindowSize => {
             let mut width = UnityScreen::get_width();
             let mut height = UnityScreen::get_height();
-            if (GallopScreen::get_Width_orig() > GallopScreen::get_Height_orig()) != (width > height) {
+            if (GallopScreen::get_Width_orig() > GallopScreen::get_Height_orig())
+                != (width > height)
+            {
                 std::mem::swap(&mut width, &mut height);
             }
             Some((width, height))
-        },
+        }
     }
 }
 
 pub unsafe fn set_window_topmost(hwnd: HWND, topmost: bool) -> Result<(), windows::core::Error> {
-    let insert_after = if topmost { HWND_TOPMOST } else { HWND_NOTOPMOST };
-    SetWindowPos(hwnd, Some(insert_after), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+    let insert_after = if topmost {
+        HWND_TOPMOST
+    } else {
+        HWND_NOTOPMOST
+    };
+    SetWindowPos(
+        hwnd,
+        Some(insert_after),
+        0,
+        0,
+        0,
+        0,
+        SWP_NOMOVE | SWP_NOSIZE,
+    )
 }
 
 pub fn show_error(e: impl AsRef<str>) {
@@ -129,14 +154,23 @@ pub fn show_error(e: impl AsRef<str>) {
     error!("{}", s);
 
     let cstr = U16CString::from_str(s).unwrap();
-    unsafe { MessageBoxW(None, PCWSTR(cstr.as_ptr()), w!("Hachimi Error"), MB_ICONERROR | MB_OK); }
+    unsafe {
+        MessageBoxW(
+            None,
+            PCWSTR(cstr.as_ptr()),
+            w!("Hachimi Error"),
+            MB_ICONERROR | MB_OK,
+        );
+    }
 }
 
 pub fn vk_to_display_label(vk: u16) -> String {
-    if (0x41..=0x5A).contains(&vk) { // A-Z
+    if (0x41..=0x5A).contains(&vk) {
+        // A-Z
         return (vk as u8 as char).to_string();
     }
-    if (0x30..=0x39).contains(&vk) { // 0-9
+    if (0x30..=0x39).contains(&vk) {
+        // 0-9
         return (vk as u8 as char).to_string();
     }
 

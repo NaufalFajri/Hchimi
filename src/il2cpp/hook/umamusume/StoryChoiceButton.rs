@@ -28,7 +28,16 @@ extern "C" fn Setup(
     canvasGroup: *mut *mut Il2CppObject,
 ) {
     // Called at the start of a story for each of the 6 possible buttons.
-    get_orig_fn!(Setup, SetupFn)(this, labelObject, textLabel, imageObjectName, anObject, anText, imageCommon, canvasGroup);
+    get_orig_fn!(Setup, SetupFn)(
+        this,
+        labelObject,
+        textLabel,
+        imageObjectName,
+        anObject,
+        anText,
+        imageCommon,
+        canvasGroup,
+    );
 
     if anText.is_null() {
         return;

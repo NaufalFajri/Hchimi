@@ -1,7 +1,4 @@
-use crate::il2cpp::{
-    symbols::get_method_addr,
-    types::*
-};
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 def_method_wrapper_fn!(get_startDistance, GET_STARTDISTANCE_ADDR, f32, this: *mut Il2CppObject);
 def_method_wrapper_fn!(get_finishDistance, GET_FINISHDISTANCE_ADDR, f32, this: *mut Il2CppObject);

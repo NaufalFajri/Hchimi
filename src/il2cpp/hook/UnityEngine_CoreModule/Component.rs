@@ -8,7 +8,9 @@ impl_addr_wrapper_fn!(get_transform, GET_TRANSFORM_ADDR, *mut Il2CppObject, this
 
 pub fn init(_UnityEngine_CoreModule: *const Il2CppImage) {
     unsafe {
-        GET_GAMEOBJECT_ADDR = il2cpp_resolve_icall(c"UnityEngine.Component::get_gameObject()".as_ptr());
-        GET_TRANSFORM_ADDR = il2cpp_resolve_icall(c"UnityEngine.Component::get_transform()".as_ptr());
+        GET_GAMEOBJECT_ADDR =
+            il2cpp_resolve_icall(c"UnityEngine.Component::get_gameObject()".as_ptr());
+        GET_TRANSFORM_ADDR =
+            il2cpp_resolve_icall(c"UnityEngine.Component::get_transform()".as_ptr());
     }
 }

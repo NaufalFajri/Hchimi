@@ -1,5 +1,5 @@
-pub mod TextGenerator;
 pub mod Font;
+pub mod TextGenerator;
 pub mod TextMesh;
 
 #[repr(i32)]
@@ -12,11 +12,11 @@ pub enum TextAnchor {
     MiddleRight,
     LowerLeft,
     LowerCenter,
-    LowerRight
+    LowerRight,
 }
 impl TryFrom<i32> for TextAnchor {
     type Error = ();
-    fn try_from(value: i32) -> Result<Self, Self::Error > {
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
         if value < 0 || value > 8 {
             return Err(());
         }

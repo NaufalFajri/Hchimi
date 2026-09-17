@@ -2,7 +2,10 @@ use std::{
     cell::Cell,
     collections::{HashMap, HashSet},
     ptr::null_mut,
-    sync::{Mutex, atomic::{AtomicBool, Ordering}},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
     time::Instant,
 };
 
@@ -11,21 +14,21 @@ use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::{gui, Hachimi}, il2cpp::{
+    core::{gui, Hachimi},
+    il2cpp::{
         ext::Il2CppStringExt,
         hook::{
+            umamusume::ModelController,
             UnityEngine_CoreModule::{Component, GameObject, Object, Transform},
             Unity_InputSystem::Gamepad::{
-                GamepadAxes, GamepadButton, current_gamepad_state,
-                DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT,
+                current_gamepad_state, GamepadAxes, GamepadButton, BUTTON_EAST, BUTTON_NORTH,
+                BUTTON_SOUTH, BUTTON_WEST, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT, DPAD_UP,
                 LEFT_SHOULDER, RIGHT_SHOULDER,
-                BUTTON_SOUTH, BUTTON_EAST, BUTTON_WEST, BUTTON_NORTH,
             },
-            umamusume::ModelController,
         },
         symbols::IEnumerable,
         types::*,
-    }
+    },
 };
 
 const LOOK_RADIUS: f32 = 5.0;
@@ -155,30 +158,30 @@ impl Default for FreeCameraKeybinds {
     fn default() -> Self {
         use windows::Win32::UI::Input::KeyboardAndMouse::*;
         Self {
-            move_forward: VK_W.0,      // W
-            move_back: VK_S.0,         // S
-            move_left: VK_A.0,         // A
-            move_right: VK_D.0,        // D
-            move_down: VK_LCONTROL.0,         // Left Ctrl
-            move_up: VK_SPACE.0,           // Space
-            look_up: VK_UP.0,           // Up
-            look_down: VK_DOWN.0,         // Down
-            look_left: VK_LEFT.0,         // Left
-            look_right: VK_RIGHT.0,        // Right
-            fov_increase: VK_Q.0,      // Q
-            fov_decrease: VK_E.0,      // E
-            follow_offset_up: VK_I.0,  // I
-            follow_offset_down: VK_K.0,// K
-            follow_offset_left: VK_J.0,// J
-            follow_offset_right: VK_L.0,// L
-            target_previous: VK_OEM_4.0,   // [
-            target_next: VK_OEM_6.0,       // ]
-            part_previous: VK_OEM_1.0,     // ;
-            part_next: VK_OEM_7.0,         // '
-            reset: VK_R.0,             // R
-            cycle_mode: VK_F.0,        // F
-            reverse: VK_B.0,           // B
-            toggle_free_camera: VK_V.0,// V
+            move_forward: VK_W.0,        // W
+            move_back: VK_S.0,           // S
+            move_left: VK_A.0,           // A
+            move_right: VK_D.0,          // D
+            move_down: VK_LCONTROL.0,    // Left Ctrl
+            move_up: VK_SPACE.0,         // Space
+            look_up: VK_UP.0,            // Up
+            look_down: VK_DOWN.0,        // Down
+            look_left: VK_LEFT.0,        // Left
+            look_right: VK_RIGHT.0,      // Right
+            fov_increase: VK_Q.0,        // Q
+            fov_decrease: VK_E.0,        // E
+            follow_offset_up: VK_I.0,    // I
+            follow_offset_down: VK_K.0,  // K
+            follow_offset_left: VK_J.0,  // J
+            follow_offset_right: VK_L.0, // L
+            target_previous: VK_OEM_4.0, // [
+            target_next: VK_OEM_6.0,     // ]
+            part_previous: VK_OEM_1.0,   // ;
+            part_next: VK_OEM_7.0,       // '
+            reset: VK_R.0,               // R
+            cycle_mode: VK_F.0,          // F
+            reverse: VK_B.0,             // B
+            toggle_free_camera: VK_V.0,  // V
         }
     }
 }
@@ -292,8 +295,7 @@ impl Vec3 {
         let len = self.len();
         if len <= f32::EPSILON {
             Self::default()
-        }
-        else {
+        } else {
             self * (1.0 / len)
         }
     }
@@ -303,7 +305,11 @@ impl Vec3 {
     }
 
     fn to_vector3(self) -> Vector3_t {
-        Vector3_t { x: self.x, y: self.y, z: self.z }
+        Vector3_t {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+        }
     }
 }
 
@@ -365,7 +371,12 @@ impl Quat {
     }
 
     fn conjugate(self) -> Self {
-        Self { w: self.w, x: -self.x, y: -self.y, z: -self.z }
+        Self {
+            w: self.w,
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+        }
     }
 
     fn dot(self, rhs: Self) -> f32 {
@@ -375,7 +386,12 @@ impl Quat {
     fn normalized(self) -> Self {
         let len = (self.dot(self)).sqrt();
         if len <= f32::EPSILON {
-            return Self { w: 1.0, x: 0.0, y: 0.0, z: 0.0 };
+            return Self {
+                w: 1.0,
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            };
         }
         Self {
             w: self.w / len,
@@ -398,7 +414,12 @@ impl Quat {
     }
 
     fn rotate_vec(self, vec: Vec3) -> Vec3 {
-        let p = Quat { w: 0.0, x: vec.x, y: vec.y, z: vec.z };
+        let p = Quat {
+            w: 0.0,
+            x: vec.x,
+            y: vec.y,
+            z: vec.z,
+        };
         let out = self * p * self.conjugate();
         Vec3::new(out.x, out.y, out.z)
     }
@@ -422,7 +443,8 @@ impl Quat {
                 x: self.x + t * (other.x - self.x),
                 y: self.y + t * (other.y - self.y),
                 z: self.z + t * (other.z - self.z),
-            }.normalized();
+            }
+            .normalized();
         }
 
         let angle = dot.clamp(-1.0, 1.0).acos();
@@ -437,7 +459,8 @@ impl Quat {
             x: self.x * sin_a + other.x * sin_b,
             y: self.y * sin_a + other.y * sin_b,
             z: self.z * sin_a + other.z * sin_b,
-        }.normalized()
+        }
+        .normalized()
     }
 }
 
@@ -567,7 +590,12 @@ impl FreeCameraState {
             race_first_person_lookat_offset: Vec3::default(),
             race_target_last: Vec3::default(),
             race_target: Vec3::default(),
-            race_target_rot: Quat { w: 1.0, x: 0.0, y: 0.0, z: 0.0 },
+            race_target_rot: Quat {
+                w: 1.0,
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
             race_target_seen: false,
             key_state: KeyState::default(),
             gamepad: GamepadState::default(),
@@ -587,10 +615,12 @@ impl FreeCameraState {
         self.last_config_mode = config.mode;
         self.last_overlay_mode = config.mode;
         self.live_fov = config.live_fov;
-        self.live_target_position_index =
-            config.live_target_position_index.clamp(0, LIVE_POSITION_CHOICES.len() as i32 - 1);
-        self.live_target_part_index =
-            config.live_target_part_index.clamp(0, LIVE_PART_CHOICES.len() as i32 - 1);
+        self.live_target_position_index = config
+            .live_target_position_index
+            .clamp(0, LIVE_POSITION_CHOICES.len() as i32 - 1);
+        self.live_target_part_index = config
+            .live_target_part_index
+            .clamp(0, LIVE_PART_CHOICES.len() as i32 - 1);
         self.live_follow_offset = Vec3::from_config(config.live_follow_offset);
         self.live_follow_lookat_offset = Vec3::from_config(config.live_follow_lookat_offset);
         self.live_first_person_offset = Vec3::from_config(config.live_first_person_offset);
@@ -608,7 +638,8 @@ impl FreeCameraState {
         self.race_target_index = config.race_target_index;
         self.race_follow_offset = Vec3::from_config(config.race_follow_offset);
         self.race_follow_distance = config.race_follow_distance;
-        self.race_first_person_lookat_offset = Vec3::from_config(config.race_first_person_lookat_offset);
+        self.race_first_person_lookat_offset =
+            Vec3::from_config(config.race_first_person_lookat_offset);
 
         if config.selfie_use_head_transform {
             self.live_follow_offset = Vec3::new(0.0, 0.0, -2.0);
@@ -626,8 +657,7 @@ impl FreeCameraState {
 
         if self.scene == CameraScene::Race {
             self.camera_pos = Vec3::new(-51.72, 7.91, 108.57);
-        }
-        else {
+        } else {
             self.camera_pos = Vec3::new(0.093706, 0.467159, 9.588791);
         }
         self.yaw = 0.0;
@@ -647,14 +677,13 @@ impl FreeCameraState {
             FreeCameraMode::Free => {
                 if self.scene == CameraScene::Race {
                     self.camera_pos = Vec3::new(-51.72, 7.91, 108.57);
-                }
-                else {
+                } else {
                     self.camera_pos = Vec3::new(0.093706, 0.467159, 9.588791);
                 }
                 self.yaw = 0.0;
                 self.pitch = 0.0;
                 self.update_look_from_angles();
-            },
+            }
             FreeCameraMode::SelfieStick => {
                 self.live_follow_target = None;
                 self.live_follow_position_target = None;
@@ -671,33 +700,31 @@ impl FreeCameraState {
                     if config.selfie_use_head_transform {
                         self.race_follow_offset = Vec3::new(0.0, 0.0, -2.0);
                         self.race_follow_distance = 0.0;
-                    }
-                    else {
+                    } else {
                         self.race_follow_offset = Vec3::from_config(config.race_follow_offset);
                         self.race_follow_distance = config.race_follow_distance;
                     }
                     self.race_first_person_lookat_offset =
                         Vec3::from_config(config.race_first_person_lookat_offset);
-                }
-                else {
+                } else {
                     self.live_follow_offset = if config.selfie_use_head_transform {
                         Vec3::new(0.0, 0.0, -2.0)
-                    }
-                    else {
+                    } else {
                         Vec3::from_config(config.live_follow_offset)
                     };
-                    self.live_follow_lookat_offset = Vec3::from_config(config.live_follow_lookat_offset);
+                    self.live_follow_lookat_offset =
+                        Vec3::from_config(config.live_follow_lookat_offset);
                 }
-            },
+            }
             FreeCameraMode::FirstPerson => {
                 if self.scene == CameraScene::Live {
-                    self.live_first_person_offset = Vec3::from_config(config.live_first_person_offset);
-                }
-                else {
+                    self.live_first_person_offset =
+                        Vec3::from_config(config.live_first_person_offset);
+                } else {
                     self.race_first_person_lookat_offset =
                         Vec3::from_config(config.race_first_person_lookat_offset);
                 }
-            },
+            }
         }
     }
 
@@ -781,8 +808,13 @@ pub fn toggle_from_windows_key(vk: u16, pressed: bool, repeat: bool) -> bool {
 }
 
 pub fn is_enabled() -> bool {
-    Hachimi::instance().config.load().windows.free_camera.enabled &&
-        !LIVE_UNSUPPORTED.load(Ordering::Acquire)
+    Hachimi::instance()
+        .config
+        .load()
+        .windows
+        .free_camera
+        .enabled
+        && !LIVE_UNSUPPORTED.load(Ordering::Acquire)
 }
 
 pub fn set_live_music_id(music_id: i32) {
@@ -814,7 +846,10 @@ pub fn is_game_input_capture_active() -> bool {
         return false;
     }
 
-    matches!(STATE.lock().unwrap().scene, CameraScene::Home | CameraScene::Live | CameraScene::Race)
+    matches!(
+        STATE.lock().unwrap().scene,
+        CameraScene::Home | CameraScene::Live | CameraScene::Race
+    )
 }
 
 pub fn overlay_message() -> Option<(String, f32)> {
@@ -834,11 +869,9 @@ pub fn overlay_message() -> Option<(String, f32)> {
 
     let alpha = if elapsed < OVERLAY_FADE_IN {
         elapsed / OVERLAY_FADE_IN
-    }
-    else if elapsed > OVERLAY_FADE_IN + OVERLAY_HOLD {
+    } else if elapsed > OVERLAY_FADE_IN + OVERLAY_HOLD {
         1.0 - ((elapsed - OVERLAY_FADE_IN - OVERLAY_HOLD) / OVERLAY_FADE_OUT)
-    }
-    else {
+    } else {
         1.0
     };
 
@@ -860,7 +893,13 @@ pub fn has_overlay_message() -> bool {
 }
 
 fn set_overlay_message(content: String) {
-    if !Hachimi::instance().config.load().windows.free_camera.show_overlay {
+    if !Hachimi::instance()
+        .config
+        .load()
+        .windows
+        .free_camera
+        .show_overlay
+    {
         return;
     }
 
@@ -887,8 +926,7 @@ fn live_part_label(index: i32) -> String {
 fn race_target_label(index: i32) -> String {
     if index < 0 {
         t!("free_camera.target_auto").into_owned()
-    }
-    else {
+    } else {
         t!("free_camera.target_gate", index = index + 1).into_owned()
     }
 }
@@ -907,9 +945,9 @@ pub fn scene() -> CameraScene {
 
 pub fn is_scene_enabled(scene: CameraScene) -> bool {
     let config = Hachimi::instance().config.load();
-    config.windows.free_camera.enabled &&
-    (scene != CameraScene::Live || !LIVE_UNSUPPORTED.load(Ordering::Acquire)) &&
-        STATE.lock().unwrap().scene == scene
+    config.windows.free_camera.enabled
+        && (scene != CameraScene::Live || !LIVE_UNSUPPORTED.load(Ordering::Acquire))
+        && STATE.lock().unwrap().scene == scene
 }
 
 pub fn mode() -> FreeCameraMode {
@@ -945,7 +983,8 @@ pub fn is_race_first_person() -> bool {
 
 pub fn is_live_head_selfie() -> bool {
     let config = Hachimi::instance().config.load();
-    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform {
+    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform
+    {
         return false;
     }
 
@@ -955,7 +994,8 @@ pub fn is_live_head_selfie() -> bool {
 
 pub fn is_race_head_selfie() -> bool {
     let config = Hachimi::instance().config.load();
-    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform {
+    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform
+    {
         return false;
     }
 
@@ -972,7 +1012,11 @@ pub fn camera_look_at() -> Vector3_t {
 }
 
 pub fn camera_rotation() -> Option<Quaternion_t> {
-    STATE.lock().unwrap().camera_rotation.map(|rot| rot.to_quaternion())
+    STATE
+        .lock()
+        .unwrap()
+        .camera_rotation
+        .map(|rot| rot.to_quaternion())
 }
 
 pub fn fov_for_scene(scene: CameraScene) -> Option<f32> {
@@ -996,31 +1040,31 @@ pub fn fov_for_scene(scene: CameraScene) -> Option<f32> {
 
 pub fn should_remove_camera_effects() -> bool {
     let config = Hachimi::instance().config.load();
-    config.windows.free_camera.enabled &&
-        config.windows.free_camera.remove_camera_effects &&
-        STATE.lock().unwrap().scene == CameraScene::Live
+    config.windows.free_camera.enabled
+        && config.windows.free_camera.remove_camera_effects
+        && STATE.lock().unwrap().scene == CameraScene::Live
 }
 
 pub fn should_remove_live_screen_effects() -> bool {
     let config = Hachimi::instance().config.load();
-    config.windows.free_camera.enabled &&
-        config.windows.free_camera.live_remove_screen_effects &&
-        !LIVE_UNSUPPORTED.load(Ordering::Acquire) &&
-        STATE.lock().unwrap().scene == CameraScene::Live
+    config.windows.free_camera.enabled
+        && config.windows.free_camera.live_remove_screen_effects
+        && !LIVE_UNSUPPORTED.load(Ordering::Acquire)
+        && STATE.lock().unwrap().scene == CameraScene::Live
 }
 
 pub fn should_disable_live_character_teleport() -> bool {
     let config = Hachimi::instance().config.load();
-    config.windows.free_camera.enabled &&
-        config.windows.free_camera.live_disable_character_teleport &&
-        STATE.lock().unwrap().scene == CameraScene::Live
+    config.windows.free_camera.enabled
+        && config.windows.free_camera.live_disable_character_teleport
+        && STATE.lock().unwrap().scene == CameraScene::Live
 }
 
 pub fn should_force_live_characters_visible() -> bool {
     let config = Hachimi::instance().config.load();
-    config.windows.free_camera.enabled &&
-        config.windows.free_camera.live_force_all_characters_visible &&
-        STATE.lock().unwrap().scene == CameraScene::Live
+    config.windows.free_camera.enabled
+        && config.windows.free_camera.live_force_all_characters_visible
+        && STATE.lock().unwrap().scene == CameraScene::Live
 }
 
 pub fn set_live_active() {
@@ -1029,7 +1073,10 @@ pub fn set_live_active() {
         return;
     }
 
-    STATE.lock().unwrap().set_scene(CameraScene::Live, &config.windows.free_camera);
+    STATE
+        .lock()
+        .unwrap()
+        .set_scene(CameraScene::Live, &config.windows.free_camera);
 }
 
 pub fn set_home_active() {
@@ -1038,7 +1085,10 @@ pub fn set_home_active() {
         return;
     }
 
-    STATE.lock().unwrap().set_scene(CameraScene::Home, &config.windows.free_camera);
+    STATE
+        .lock()
+        .unwrap()
+        .set_scene(CameraScene::Home, &config.windows.free_camera);
 }
 
 pub fn begin_live_director_update() {
@@ -1056,7 +1106,10 @@ pub fn set_race_active() {
         return;
     }
 
-    STATE.lock().unwrap().set_scene(CameraScene::Race, &config.windows.free_camera);
+    STATE
+        .lock()
+        .unwrap()
+        .set_scene(CameraScene::Race, &config.windows.free_camera);
 }
 
 pub fn end_scene(scene: CameraScene) {
@@ -1101,8 +1154,7 @@ pub fn live_character_position_index() -> i32 {
             if flag.count_ones() == 1 {
                 let index = flag.trailing_zeros() as i32;
                 Some(if index >= 18 { index + 2 } else { index })
-            }
-            else {
+            } else {
                 None
             }
         })
@@ -1119,7 +1171,11 @@ pub fn live_part() -> i32 {
 
 pub fn race_model_index() -> i32 {
     let index = STATE.lock().unwrap().race_target_index;
-    if index < 0 { 0 } else { index }
+    if index < 0 {
+        0
+    } else {
+        index
+    }
 }
 
 pub fn update_live_follow_position_target(target: Vector3_t) {
@@ -1150,8 +1206,10 @@ fn update_live_follow_camera_locked(
     let had_target = state.live_follow_target.is_some();
     if config.live_follow_smooth && had_target {
         let old_pos_target = state.live_follow_target.unwrap();
-        position_target =
-            old_pos_target.lerp(position_target, config.live_follow_smooth_pos_step.clamp(0.02, 1.0));
+        position_target = old_pos_target.lerp(
+            position_target,
+            config.live_follow_smooth_pos_step.clamp(0.02, 1.0),
+        );
     }
     state.live_follow_target = Some(position_target);
 
@@ -1164,9 +1222,11 @@ fn update_live_follow_camera_locked(
         look_at.z - angle.cos() * distance,
     );
     let camera_look_at = if config.live_follow_smooth && had_target {
-        state.camera_look_at.lerp(look_at, config.live_follow_smooth_lookat_step.clamp(0.02, 1.0))
-    }
-    else {
+        state.camera_look_at.lerp(
+            look_at,
+            config.live_follow_smooth_lookat_step.clamp(0.02, 1.0),
+        )
+    } else {
         look_at
     };
     state.camera_pos = camera_pos;
@@ -1207,9 +1267,9 @@ fn apply_live_selfie_dead_zone_locked(
 ) -> Vec3 {
     let horizontal_dead_zone = config.live_selfie_horizontal_stabilization.max(0.0);
     let vertical_dead_zone = config.live_selfie_vertical_stabilization.max(0.0);
-    if config.selfie_use_head_transform ||
-        (horizontal_dead_zone <= f32::EPSILON && vertical_dead_zone <= f32::EPSILON) ||
-        has_selfie_manual_input(state)
+    if config.selfie_use_head_transform
+        || (horizontal_dead_zone <= f32::EPSILON && vertical_dead_zone <= f32::EPSILON)
+        || has_selfie_manual_input(state)
     {
         state.live_selfie_stabilized_target = Some(position_target);
         return position_target;
@@ -1224,8 +1284,7 @@ fn apply_live_selfie_dead_zone_locked(
         if horizontal_dead_zone <= f32::EPSILON {
             next_target.x = position_target.x;
             next_target.z = position_target.z;
-        }
-        else if horizontal_len > horizontal_dead_zone {
+        } else if horizontal_len > horizontal_dead_zone {
             let amount = (horizontal_len - horizontal_dead_zone) / horizontal_len;
             next_target.x += delta.x * amount;
             next_target.z += delta.z * amount;
@@ -1233,8 +1292,7 @@ fn apply_live_selfie_dead_zone_locked(
 
         if vertical_dead_zone <= f32::EPSILON {
             next_target.y = position_target.y;
-        }
-        else if vertical_len > vertical_dead_zone {
+        } else if vertical_len > vertical_dead_zone {
             next_target.y += delta.y.signum() * (vertical_len - vertical_dead_zone);
         }
 
@@ -1251,31 +1309,32 @@ fn apply_live_selfie_dead_zone_locked(
 }
 
 fn has_selfie_manual_input(state: &FreeCameraState) -> bool {
-    state.key_state.forward ||
-        state.key_state.back ||
-        state.key_state.left ||
-        state.key_state.right ||
-        state.key_state.down ||
-        state.key_state.up ||
-        state.key_state.look_up ||
-        state.key_state.look_down ||
-        state.key_state.look_left ||
-        state.key_state.look_right ||
-        state.key_state.follow_offset_up ||
-        state.key_state.follow_offset_down ||
-        state.key_state.follow_offset_left ||
-        state.key_state.follow_offset_right ||
-        state.gamepad.axes.left_x.abs() > 0.01 ||
-        state.gamepad.axes.left_y.abs() > 0.01 ||
-        state.gamepad.axes.right_x.abs() > 0.01 ||
-        state.gamepad.axes.right_y.abs() > 0.01 ||
-        state.gamepad.axes.left_trigger.abs() > 0.01 ||
-        state.gamepad.axes.right_trigger.abs() > 0.01
+    state.key_state.forward
+        || state.key_state.back
+        || state.key_state.left
+        || state.key_state.right
+        || state.key_state.down
+        || state.key_state.up
+        || state.key_state.look_up
+        || state.key_state.look_down
+        || state.key_state.look_left
+        || state.key_state.look_right
+        || state.key_state.follow_offset_up
+        || state.key_state.follow_offset_down
+        || state.key_state.follow_offset_left
+        || state.key_state.follow_offset_right
+        || state.gamepad.axes.left_x.abs() > 0.01
+        || state.gamepad.axes.left_y.abs() > 0.01
+        || state.gamepad.axes.right_x.abs() > 0.01
+        || state.gamepad.axes.right_y.abs() > 0.01
+        || state.gamepad.axes.left_trigger.abs() > 0.01
+        || state.gamepad.axes.right_trigger.abs() > 0.01
 }
 
 pub fn update_live_head_part_target(target: Vector3_t) {
     let config = Hachimi::instance().config.load();
-    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform {
+    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform
+    {
         return;
     }
 
@@ -1320,7 +1379,8 @@ pub fn update_live_director_follow_target(
     }
 
     let rot = Quat::from_quaternion(rot);
-    let forward = forward.map(Vec3::from)
+    let forward = forward
+        .map(Vec3::from)
         .filter(|value| value.len() > f32::EPSILON)
         .map(|value| value.normalized())
         .unwrap_or_else(|| rot.rotate_vec(Vec3::new(0.0, 0.0, 1.0)).normalized());
@@ -1344,8 +1404,7 @@ pub fn update_live_director_follow_target(
             .unwrap_or(0xf);
         if matches!(part, 0xf | 0x10) {
             Vec3::from(root_pos)
-        }
-        else {
+        } else {
             live_part_anchor_from_head(&state, head_pos, rot)
         }
     };
@@ -1368,7 +1427,8 @@ pub fn update_live_director_follow_target(
 
 pub fn update_live_head_follow(pos: Vector3_t, rot: Quaternion_t, forward: Option<Vector3_t>) {
     let config = Hachimi::instance().config.load();
-    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform {
+    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform
+    {
         return;
     }
 
@@ -1384,7 +1444,8 @@ pub fn update_live_head_follow(pos: Vector3_t, rot: Quaternion_t, forward: Optio
     let base = state.live_head_part_target.unwrap_or(fallback);
     let right = rot.rotate_vec(Vec3::new(1.0, 0.0, 0.0));
     let up = rot.rotate_vec(Vec3::new(0.0, 1.0, 0.0));
-    let forward = forward.map(Vec3::from)
+    let forward = forward
+        .map(Vec3::from)
         .filter(|value| value.len() > f32::EPSILON)
         .map(|value| value.normalized())
         .unwrap_or_else(|| rot.rotate_vec(Vec3::new(0.0, 0.0, 1.0)));
@@ -1394,10 +1455,7 @@ pub fn update_live_head_follow(pos: Vector3_t, rot: Quaternion_t, forward: Optio
 
     state.camera_pos = base + right * offset.x + up * offset.y + forward * distance;
     state.camera_look_at =
-        base +
-        right * look_offset.x +
-        up * look_offset.y +
-        forward * look_offset.z;
+        base + right * look_offset.x + up * look_offset.y + forward * look_offset.z;
     state.camera_rotation = None;
 }
 
@@ -1422,18 +1480,24 @@ pub fn update_first_person(
     let mut rot = Quat::from_quaternion(rot);
     if scene == CameraScene::Race {
         rot = rot
-            .rotate_axis(state.race_first_person_lookat_offset.y, Vec3::new(1.0, 0.0, 0.0))
-            .rotate_axis(state.race_first_person_lookat_offset.x, Vec3::new(0.0, 1.0, 0.0));
+            .rotate_axis(
+                state.race_first_person_lookat_offset.y,
+                Vec3::new(1.0, 0.0, 0.0),
+            )
+            .rotate_axis(
+                state.race_first_person_lookat_offset.x,
+                Vec3::new(0.0, 1.0, 0.0),
+            );
     }
 
     let offset = if scene == CameraScene::Live {
         state.live_first_person_offset
-    }
-    else {
+    } else {
         Vec3::default()
     };
     let right = rot.rotate_vec(Vec3::new(1.0, 0.0, 0.0));
-    let forward = forward.map(Vec3::from)
+    let forward = forward
+        .map(Vec3::from)
         .filter(|value| value.len() > f32::EPSILON)
         .map(|value| value.normalized())
         .unwrap_or_else(|| rot.rotate_vec(Vec3::new(0.0, 0.0, 1.0)));
@@ -1447,7 +1511,8 @@ pub fn update_first_person(
 
 pub fn update_race_head_follow(pos: Vector3_t, rot: Quaternion_t) {
     let config = Hachimi::instance().config.load();
-    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform {
+    if !config.windows.free_camera.enabled || !config.windows.free_camera.selfie_use_head_transform
+    {
         return;
     }
 
@@ -1466,15 +1531,8 @@ pub fn update_race_head_follow(pos: Vector3_t, rot: Quaternion_t) {
     let look_offset = state.race_first_person_lookat_offset;
     let distance = (offset.z + state.race_follow_distance).abs().max(0.05);
 
-    state.camera_pos =
-        base +
-        right * offset.x +
-        up * offset.y +
-        forward * distance;
-    state.camera_look_at =
-        base +
-        right * look_offset.x +
-        up * look_offset.y;
+    state.camera_pos = base + right * offset.x + up * offset.y + forward * distance;
+    state.camera_look_at = base + right * look_offset.x + up * look_offset.y;
     state.camera_rotation = None;
 }
 
@@ -1490,13 +1548,12 @@ pub fn update_race_target(index: i32, pos: Vector3_t, rot: Quaternion_t) {
     }
 
     let new_target = Vec3::from(pos) + Vec3::new(0.0, 1.0, 0.0);
-    if state.race_target_seen &&
-        ((new_target.x - state.race_target.x).abs() > f32::EPSILON ||
-         (new_target.z - state.race_target.z).abs() > f32::EPSILON)
+    if state.race_target_seen
+        && ((new_target.x - state.race_target.x).abs() > f32::EPSILON
+            || (new_target.z - state.race_target.z).abs() > f32::EPSILON)
     {
         state.race_target_last = state.race_target;
-    }
-    else if !state.race_target_seen {
+    } else if !state.race_target_seen {
         state.race_target_last = new_target;
     }
 
@@ -1504,7 +1561,9 @@ pub fn update_race_target(index: i32, pos: Vector3_t, rot: Quaternion_t) {
     state.race_target_rot = Quat::from_quaternion(rot);
     state.race_target_seen = true;
 
-    if state.mode == FreeCameraMode::SelfieStick && !config.windows.free_camera.selfie_use_head_transform {
+    if state.mode == FreeCameraMode::SelfieStick
+        && !config.windows.free_camera.selfie_use_head_transform
+    {
         update_race_follow_locked(&mut state);
     }
 }
@@ -1512,10 +1571,11 @@ pub fn update_race_target(index: i32, pos: Vector3_t, rot: Quaternion_t) {
 pub fn race_camera_pos(current: Vector3_t) -> Vector3_t {
     let config = Hachimi::instance().config.load();
     let mut state = STATE.lock().unwrap();
-    if state.mode == FreeCameraMode::SelfieStick && !config.windows.free_camera.selfie_use_head_transform {
+    if state.mode == FreeCameraMode::SelfieStick
+        && !config.windows.free_camera.selfie_use_head_transform
+    {
         update_race_follow_locked(&mut state);
-    }
-    else if state.mode == FreeCameraMode::Free {
+    } else if state.mode == FreeCameraMode::Free {
         let _ = current;
     }
     state.camera_pos.to_vector3()
@@ -1531,28 +1591,24 @@ fn update_race_follow_locked(state: &mut FreeCameraState) {
     forward.y = 0.0;
     forward = if forward.len() > f32::EPSILON {
         forward.normalized()
-    }
-    else {
+    } else {
         let mut move_dir = state.race_target - state.race_target_last;
         move_dir.y = 0.0;
         if move_dir.len() > f32::EPSILON {
             move_dir.normalized()
-        }
-        else {
+        } else {
             Vec3::new(0.0, 0.0, 1.0)
         }
     };
     let right = Vec3::new(forward.z, 0.0, -forward.x).normalized();
     let offset = state.race_follow_offset;
-    state.camera_pos =
-        state.race_target +
-        right * offset.x +
-        Vec3::new(0.0, offset.y, 0.0) +
-        forward * (offset.z + state.race_follow_distance);
-    state.camera_look_at =
-        state.race_target +
-        right * state.race_first_person_lookat_offset.x +
-        Vec3::new(0.0, state.race_first_person_lookat_offset.y, 0.0);
+    state.camera_pos = state.race_target
+        + right * offset.x
+        + Vec3::new(0.0, offset.y, 0.0)
+        + forward * (offset.z + state.race_follow_distance);
+    state.camera_look_at = state.race_target
+        + right * state.race_first_person_lookat_offset.x
+        + Vec3::new(0.0, state.race_first_person_lookat_offset.y, 0.0);
     state.camera_rotation = None;
 }
 
@@ -1578,23 +1634,17 @@ pub fn on_windows_key(vk: u16, pressed: bool, repeat: bool) {
 
     if vk == kb.reset {
         state.reset_current_mode_camera(&config.windows.free_camera);
-    }
-    else if vk == kb.cycle_mode {
+    } else if vk == kb.cycle_mode {
         cycle_mode_locked(&mut state);
-    }
-    else if vk == kb.reverse {
+    } else if vk == kb.reverse {
         reverse_locked(&mut state);
-    }
-    else if vk == kb.target_previous {
+    } else if vk == kb.target_previous {
         previous_target_locked(&mut state);
-    }
-    else if vk == kb.target_next {
+    } else if vk == kb.target_next {
         next_target_locked(&mut state);
-    }
-    else if vk == kb.part_previous {
+    } else if vk == kb.part_previous {
         previous_live_part_locked(&mut state);
-    }
-    else if vk == kb.part_next {
+    } else if vk == kb.part_next {
         next_live_part_locked(&mut state);
     }
 }
@@ -1606,49 +1656,81 @@ pub fn is_windows_key_bound(vk: u16) -> bool {
 
     let config = Hachimi::instance().config.load();
     let kb = &config.windows.free_camera.keybinds;
-    vk == kb.move_forward ||
-        vk == kb.move_back ||
-        vk == kb.move_left ||
-        vk == kb.move_right ||
-        vk == kb.move_down ||
-        vk == kb.move_up ||
-        vk == kb.look_up ||
-        vk == kb.look_down ||
-        vk == kb.look_left ||
-        vk == kb.look_right ||
-        vk == kb.fov_increase ||
-        vk == kb.fov_decrease ||
-        vk == kb.follow_offset_up ||
-        vk == kb.follow_offset_down ||
-        vk == kb.follow_offset_left ||
-        vk == kb.follow_offset_right ||
-        vk == kb.target_previous ||
-        vk == kb.target_next ||
-        vk == kb.part_previous ||
-        vk == kb.part_next ||
-        vk == kb.reset ||
-        vk == kb.cycle_mode ||
-        vk == kb.reverse ||
-        vk == kb.toggle_free_camera
+    vk == kb.move_forward
+        || vk == kb.move_back
+        || vk == kb.move_left
+        || vk == kb.move_right
+        || vk == kb.move_down
+        || vk == kb.move_up
+        || vk == kb.look_up
+        || vk == kb.look_down
+        || vk == kb.look_left
+        || vk == kb.look_right
+        || vk == kb.fov_increase
+        || vk == kb.fov_decrease
+        || vk == kb.follow_offset_up
+        || vk == kb.follow_offset_down
+        || vk == kb.follow_offset_left
+        || vk == kb.follow_offset_right
+        || vk == kb.target_previous
+        || vk == kb.target_next
+        || vk == kb.part_previous
+        || vk == kb.part_next
+        || vk == kb.reset
+        || vk == kb.cycle_mode
+        || vk == kb.reverse
+        || vk == kb.toggle_free_camera
 }
 
 fn set_key_flag(state: &mut KeyState, vk: u16, pressed: bool, kb: &FreeCameraKeybinds) {
-    if vk == kb.move_forward { state.forward = pressed; }
-    if vk == kb.move_back { state.back = pressed; }
-    if vk == kb.move_left { state.left = pressed; }
-    if vk == kb.move_right { state.right = pressed; }
-    if vk == kb.move_down { state.down = pressed; }
-    if vk == kb.move_up { state.up = pressed; }
-    if vk == kb.look_up { state.look_up = pressed; }
-    if vk == kb.look_down { state.look_down = pressed; }
-    if vk == kb.look_left { state.look_left = pressed; }
-    if vk == kb.look_right { state.look_right = pressed; }
-    if vk == kb.fov_increase { state.fov_increase = pressed; }
-    if vk == kb.fov_decrease { state.fov_decrease = pressed; }
-    if vk == kb.follow_offset_up { state.follow_offset_up = pressed; }
-    if vk == kb.follow_offset_down { state.follow_offset_down = pressed; }
-    if vk == kb.follow_offset_left { state.follow_offset_left = pressed; }
-    if vk == kb.follow_offset_right { state.follow_offset_right = pressed; }
+    if vk == kb.move_forward {
+        state.forward = pressed;
+    }
+    if vk == kb.move_back {
+        state.back = pressed;
+    }
+    if vk == kb.move_left {
+        state.left = pressed;
+    }
+    if vk == kb.move_right {
+        state.right = pressed;
+    }
+    if vk == kb.move_down {
+        state.down = pressed;
+    }
+    if vk == kb.move_up {
+        state.up = pressed;
+    }
+    if vk == kb.look_up {
+        state.look_up = pressed;
+    }
+    if vk == kb.look_down {
+        state.look_down = pressed;
+    }
+    if vk == kb.look_left {
+        state.look_left = pressed;
+    }
+    if vk == kb.look_right {
+        state.look_right = pressed;
+    }
+    if vk == kb.fov_increase {
+        state.fov_increase = pressed;
+    }
+    if vk == kb.fov_decrease {
+        state.fov_decrease = pressed;
+    }
+    if vk == kb.follow_offset_up {
+        state.follow_offset_up = pressed;
+    }
+    if vk == kb.follow_offset_down {
+        state.follow_offset_down = pressed;
+    }
+    if vk == kb.follow_offset_left {
+        state.follow_offset_left = pressed;
+    }
+    if vk == kb.follow_offset_right {
+        state.follow_offset_right = pressed;
+    }
 }
 
 pub fn wants_windows_input_capture() -> bool {
@@ -1658,23 +1740,23 @@ pub fn wants_windows_input_capture() -> bool {
     }
 
     let state = STATE.lock().unwrap();
-    state.right_mouse_down ||
-        state.key_state.forward ||
-        state.key_state.back ||
-        state.key_state.left ||
-        state.key_state.right ||
-        state.key_state.down ||
-        state.key_state.up ||
-        state.key_state.look_up ||
-        state.key_state.look_down ||
-        state.key_state.look_left ||
-        state.key_state.look_right ||
-        state.key_state.fov_increase ||
-        state.key_state.fov_decrease ||
-        state.key_state.follow_offset_up ||
-        state.key_state.follow_offset_down ||
-        state.key_state.follow_offset_left ||
-        state.key_state.follow_offset_right
+    state.right_mouse_down
+        || state.key_state.forward
+        || state.key_state.back
+        || state.key_state.left
+        || state.key_state.right
+        || state.key_state.down
+        || state.key_state.up
+        || state.key_state.look_up
+        || state.key_state.look_down
+        || state.key_state.look_left
+        || state.key_state.look_right
+        || state.key_state.fov_increase
+        || state.key_state.fov_decrease
+        || state.key_state.follow_offset_up
+        || state.key_state.follow_offset_down
+        || state.key_state.follow_offset_left
+        || state.key_state.follow_offset_right
 }
 
 pub fn on_mouse_button(right_down: bool) {
@@ -1725,9 +1807,9 @@ pub fn tick() {
     let config = &config.windows.free_camera;
     let mut state = STATE.lock().unwrap();
 
-    if RELOAD_CONFIG_REQUESTED.swap(false, Ordering::AcqRel) ||
-        (config.enabled && !state.last_enabled) ||
-        config.mode != state.last_config_mode
+    if RELOAD_CONFIG_REQUESTED.swap(false, Ordering::AcqRel)
+        || (config.enabled && !state.last_enabled)
+        || config.mode != state.last_config_mode
     {
         state.reset_with_config(config);
     }
@@ -1735,16 +1817,18 @@ pub fn tick() {
     if !config.enabled {
         return;
     }
-    if !matches!(state.scene, CameraScene::Home | CameraScene::Live | CameraScene::Race) {
+    if !matches!(
+        state.scene,
+        CameraScene::Home | CameraScene::Live | CameraScene::Race
+    ) {
         state.last_tick = Instant::now();
         return;
     }
     if state.scene == CameraScene::Race && state.mode != state.last_overlay_mode {
         state.last_overlay_mode = state.mode;
-        set_overlay_message(t!(
-            "free_camera.overlay_mode",
-            mode = mode_label(state.mode)
-        ).into_owned());
+        set_overlay_message(
+            t!("free_camera.overlay_mode", mode = mode_label(state.mode)).into_owned(),
+        );
     }
 
     poll_unity_gamepad_locked(&mut state, config);
@@ -1828,8 +1912,7 @@ fn bool_axis(positive: bool, negative: bool) -> f32 {
 fn deadzone(value: f32, deadzone: f32) -> f32 {
     if value.abs() < deadzone {
         0.0
-    }
-    else {
+    } else {
         value
     }
 }
@@ -1846,26 +1929,29 @@ fn move_forward_locked(state: &mut FreeCameraState, amount: f32) {
             );
             state.camera_pos = state.camera_pos + dir * amount;
             state.camera_look_at = state.camera_look_at + dir * amount;
-        },
+        }
         FreeCameraMode::SelfieStick => {
-            let head_selfie = Hachimi::instance().config.load().windows.free_camera.selfie_use_head_transform;
+            let head_selfie = Hachimi::instance()
+                .config
+                .load()
+                .windows
+                .free_camera
+                .selfie_use_head_transform;
             if state.scene == CameraScene::Live {
                 state.live_follow_offset.z -= amount / 2.0;
-            }
-            else if head_selfie {
+            } else if head_selfie {
                 state.race_follow_offset.z -= amount / 2.0;
-            }
-            else {
+            } else {
                 state.race_follow_offset.z += amount / 2.0;
                 state.race_follow_distance += amount / 2.0;
             }
-        },
+        }
         FreeCameraMode::FirstPerson => {
             if state.scene == CameraScene::Live {
                 state.live_first_person_offset.z =
                     (state.live_first_person_offset.z + amount * 0.025).clamp(-1.0, 1.0);
             }
-        },
+        }
     }
 }
 
@@ -1876,16 +1962,20 @@ fn move_side_locked(state: &mut FreeCameraState, amount: f32) {
             let dir = Vec3::new(yaw.cos(), 0.0, yaw.sin());
             state.camera_pos = state.camera_pos + dir * amount;
             state.camera_look_at = state.camera_look_at + dir * amount;
-        },
+        }
         FreeCameraMode::SelfieStick => {
-            let head_selfie = Hachimi::instance().config.load().windows.free_camera.selfie_use_head_transform;
+            let head_selfie = Hachimi::instance()
+                .config
+                .load()
+                .windows
+                .free_camera
+                .selfie_use_head_transform;
             if state.scene == CameraScene::Live && !head_selfie {
                 state.live_follow_lookat_offset.x += amount;
-            }
-            else {
+            } else {
                 adjust_follow_offset_x_locked(state, amount);
             }
-        },
+        }
         FreeCameraMode::FirstPerson => (),
     }
 }
@@ -1895,26 +1985,35 @@ fn move_vertical_locked(state: &mut FreeCameraState, amount: f32) {
         FreeCameraMode::Free => {
             state.camera_pos.y += amount;
             state.camera_look_at.y += amount;
-        },
+        }
         FreeCameraMode::SelfieStick => {
-            let head_selfie = Hachimi::instance().config.load().windows.free_camera.selfie_use_head_transform;
+            let head_selfie = Hachimi::instance()
+                .config
+                .load()
+                .windows
+                .free_camera
+                .selfie_use_head_transform;
             if state.scene == CameraScene::Live && !head_selfie {
                 state.live_follow_lookat_offset.y += amount / 2.0;
-            }
-            else {
+            } else {
                 adjust_follow_offset_y_locked(state, amount / 2.0);
             }
-        },
+        }
         FreeCameraMode::FirstPerson => {
             if state.scene == CameraScene::Live {
                 state.live_first_person_offset.y =
                     (state.live_first_person_offset.y + amount * 0.025).clamp(-1.0, 1.0);
             }
-        },
+        }
     }
 }
 
-fn apply_look_delta_locked(state: &mut FreeCameraState, yaw_delta: f32, pitch_delta: f32, mouse: bool) {
+fn apply_look_delta_locked(
+    state: &mut FreeCameraState,
+    yaw_delta: f32,
+    pitch_delta: f32,
+    mouse: bool,
+) {
     match state.mode {
         FreeCameraMode::Free => {
             state.yaw += yaw_delta;
@@ -1926,31 +2025,33 @@ fn apply_look_delta_locked(state: &mut FreeCameraState, yaw_delta: f32, pitch_de
             }
             state.pitch = (state.pitch + pitch_delta).clamp(-89.99, 89.99);
             state.update_look_from_angles();
-        },
+        }
         FreeCameraMode::SelfieStick => {
             if state.scene == CameraScene::Live {
                 state.live_follow_offset.x += yaw_delta * 2.0;
                 state.live_follow_offset.y += pitch_delta;
-            }
-            else {
+            } else {
                 state.race_first_person_lookat_offset.x -= yaw_delta;
-                state.race_first_person_lookat_offset.y += if mouse { pitch_delta / 2.0 } else { pitch_delta };
+                state.race_first_person_lookat_offset.y += if mouse {
+                    pitch_delta / 2.0
+                } else {
+                    pitch_delta
+                };
             }
-        },
+        }
         FreeCameraMode::FirstPerson => {
             if state.scene == CameraScene::Race {
                 state.race_first_person_lookat_offset.x -= yaw_delta;
                 state.race_first_person_lookat_offset.y += pitch_delta;
             }
-        },
+        }
     }
 }
 
 fn adjust_follow_offset_x_locked(state: &mut FreeCameraState, value: f32) {
     if state.scene == CameraScene::Live && state.mode == FreeCameraMode::SelfieStick {
         state.live_follow_offset.x += value * 2.0;
-    }
-    else if state.scene == CameraScene::Race && state.mode == FreeCameraMode::SelfieStick {
+    } else if state.scene == CameraScene::Race && state.mode == FreeCameraMode::SelfieStick {
         state.race_first_person_lookat_offset.x -= value;
         state.race_follow_offset.x += value / 4.0;
     }
@@ -1959,8 +2060,7 @@ fn adjust_follow_offset_x_locked(state: &mut FreeCameraState, value: f32) {
 fn adjust_follow_offset_y_locked(state: &mut FreeCameraState, value: f32) {
     if state.scene == CameraScene::Live && state.mode == FreeCameraMode::SelfieStick {
         state.live_follow_offset.y += value;
-    }
-    else if state.scene == CameraScene::Race && state.mode == FreeCameraMode::SelfieStick {
+    } else if state.scene == CameraScene::Race && state.mode == FreeCameraMode::SelfieStick {
         state.race_follow_offset.y += value / 2.0;
     }
 }
@@ -1990,18 +2090,14 @@ fn cycle_mode_locked(state: &mut FreeCameraState) {
     state.live_selfie_last_head_pos = None;
     state.live_selfie_stabilized_target = None;
     state.last_overlay_mode = state.mode;
-    set_overlay_message(t!(
-        "free_camera.overlay_mode",
-        mode = mode_label(state.mode)
-    ).into_owned());
+    set_overlay_message(t!("free_camera.overlay_mode", mode = mode_label(state.mode)).into_owned());
 }
 
 fn reverse_locked(state: &mut FreeCameraState) {
     if state.scene == CameraScene::Race {
         state.race_follow_offset.z = -state.race_follow_offset.z;
         state.race_follow_distance = -state.race_follow_distance;
-    }
-    else if state.scene == CameraScene::Live && state.mode == FreeCameraMode::SelfieStick {
+    } else if state.scene == CameraScene::Live && state.mode == FreeCameraMode::SelfieStick {
         state.live_follow_offset.z = -state.live_follow_offset.z;
     }
 }
@@ -2016,14 +2112,16 @@ fn previous_target_locked(state: &mut FreeCameraState) {
             state.race_target_index = -1;
         }
         if state.race_target_index != old_race_index {
-            set_overlay_message(t!(
-                "free_camera.overlay_target",
-                target = race_target_label(state.race_target_index)
-            ).into_owned());
+            set_overlay_message(
+                t!(
+                    "free_camera.overlay_target",
+                    target = race_target_label(state.race_target_index)
+                )
+                .into_owned(),
+            );
         }
-    }
-    else if state.scene == CameraScene::Live &&
-        (state.mode == FreeCameraMode::SelfieStick || state.mode == FreeCameraMode::FirstPerson)
+    } else if state.scene == CameraScene::Live
+        && (state.mode == FreeCameraMode::SelfieStick || state.mode == FreeCameraMode::FirstPerson)
     {
         state.live_target_position_index =
             (state.live_target_position_index - 1).rem_euclid(LIVE_POSITION_CHOICES.len() as i32);
@@ -2036,10 +2134,13 @@ fn previous_target_locked(state: &mut FreeCameraState) {
             state.live_selfie_look_offset = None;
             state.live_selfie_last_head_pos = None;
             state.live_selfie_stabilized_target = None;
-            set_overlay_message(t!(
-                "free_camera.overlay_target",
-                target = live_target_label(state.live_target_position_index)
-            ).into_owned());
+            set_overlay_message(
+                t!(
+                    "free_camera.overlay_target",
+                    target = live_target_label(state.live_target_position_index)
+                )
+                .into_owned(),
+            );
         }
     }
 }
@@ -2054,14 +2155,16 @@ fn next_target_locked(state: &mut FreeCameraState) {
             state.race_target_index = -1;
         }
         if state.race_target_index != old_race_index {
-            set_overlay_message(t!(
-                "free_camera.overlay_target",
-                target = race_target_label(state.race_target_index)
-            ).into_owned());
+            set_overlay_message(
+                t!(
+                    "free_camera.overlay_target",
+                    target = race_target_label(state.race_target_index)
+                )
+                .into_owned(),
+            );
         }
-    }
-    else if state.scene == CameraScene::Live &&
-        (state.mode == FreeCameraMode::SelfieStick || state.mode == FreeCameraMode::FirstPerson)
+    } else if state.scene == CameraScene::Live
+        && (state.mode == FreeCameraMode::SelfieStick || state.mode == FreeCameraMode::FirstPerson)
     {
         state.live_target_position_index =
             (state.live_target_position_index + 1).rem_euclid(LIVE_POSITION_CHOICES.len() as i32);
@@ -2074,10 +2177,13 @@ fn next_target_locked(state: &mut FreeCameraState) {
             state.live_selfie_look_offset = None;
             state.live_selfie_last_head_pos = None;
             state.live_selfie_stabilized_target = None;
-            set_overlay_message(t!(
-                "free_camera.overlay_target",
-                target = live_target_label(state.live_target_position_index)
-            ).into_owned());
+            set_overlay_message(
+                t!(
+                    "free_camera.overlay_target",
+                    target = live_target_label(state.live_target_position_index)
+                )
+                .into_owned(),
+            );
         }
     }
 }
@@ -2093,10 +2199,13 @@ fn previous_live_part_locked(state: &mut FreeCameraState) {
             state.live_follow_precise_target = false;
             state.live_follow_timeline_updated = false;
             state.live_selfie_stabilized_target = None;
-            set_overlay_message(t!(
-                "free_camera.overlay_part",
-                part = live_part_label(state.live_target_part_index)
-            ).into_owned());
+            set_overlay_message(
+                t!(
+                    "free_camera.overlay_part",
+                    part = live_part_label(state.live_target_part_index)
+                )
+                .into_owned(),
+            );
         }
     }
 }
@@ -2112,10 +2221,13 @@ fn next_live_part_locked(state: &mut FreeCameraState) {
             state.live_follow_precise_target = false;
             state.live_follow_timeline_updated = false;
             state.live_selfie_stabilized_target = None;
-            set_overlay_message(t!(
-                "free_camera.overlay_part",
-                part = live_part_label(state.live_target_part_index)
-            ).into_owned());
+            set_overlay_message(
+                t!(
+                    "free_camera.overlay_part",
+                    part = live_part_label(state.live_target_part_index)
+                )
+                .into_owned(),
+            );
         }
     }
 }
@@ -2184,11 +2296,7 @@ pub fn first_enumerable_item(value: *mut Il2CppObject) -> *mut Il2CppObject {
     iter.find(|item| !item.is_null()).unwrap_or(null_mut())
 }
 
-pub fn hide_head_parts(
-    store: &DisabledHeadStore,
-    model_controller: *mut Il2CppObject,
-    index: i32,
-) {
+pub fn hide_head_parts(store: &DisabledHeadStore, model_controller: *mut Il2CppObject, index: i32) {
     let owner = ModelController::get_OwnerObject(model_controller);
     if owner.is_null() {
         return;
@@ -2215,17 +2323,18 @@ pub fn hide_head_parts(
         }
         let name = unsafe { (*name).as_utf16str().to_string() };
         if name == "M_Hair" || name == "M_Face" {
-            store.lock().unwrap().entry(index).or_default().insert(game_object as usize);
+            store
+                .lock()
+                .unwrap()
+                .entry(index)
+                .or_default()
+                .insert(game_object as usize);
             GameObject::SetActive(game_object, false);
         }
     }
 }
 
-pub fn restore_disabled_heads(
-    store: &DisabledHeadStore,
-    current_index: i32,
-    force_all: bool,
-) {
+pub fn restore_disabled_heads(store: &DisabledHeadStore, current_index: i32, force_all: bool) {
     let mut store = store.lock().unwrap();
     let mut restored = Vec::new();
 

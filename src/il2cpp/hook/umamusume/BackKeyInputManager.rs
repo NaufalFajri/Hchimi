@@ -1,9 +1,6 @@
 use crate::{
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*,
-    },
-    windows::free_camera
+    il2cpp::{symbols::get_method_addr, types::*},
+    windows::free_camera,
 };
 use std::sync::atomic::{AtomicU8, Ordering};
 

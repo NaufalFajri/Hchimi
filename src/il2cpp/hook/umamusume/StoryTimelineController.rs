@@ -1,6 +1,15 @@
-use std::sync::{atomic::{self, AtomicI32}, Mutex};
+use std::sync::{
+    atomic::{self, AtomicI32},
+    Mutex,
+};
 
-use crate::{core::Hachimi, il2cpp::{symbols::{get_method_addr, GCHandle}, types::*}};
+use crate::{
+    core::Hachimi,
+    il2cpp::{
+        symbols::{get_method_addr, GCHandle},
+        types::*,
+    },
+};
 
 static mut GET_ISFINISHED_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_IsFinished, GET_ISFINISHED_ADDR, bool, this: *mut Il2CppObject);
@@ -15,8 +24,20 @@ pub fn last_block_id() -> i32 {
     LAST_BLOCK_ID.load(atomic::Ordering::Relaxed)
 }
 
-type GotoBlockFn = extern "C" fn(this: *mut Il2CppObject, block_id: i32, weaken_cy_spring: bool, is_update: bool, is_choice: bool);
-pub extern "C" fn GotoBlock(this: *mut Il2CppObject, block_id: i32, weaken_cy_spring: bool, is_update: bool, is_choice: bool) {
+type GotoBlockFn = extern "C" fn(
+    this: *mut Il2CppObject,
+    block_id: i32,
+    weaken_cy_spring: bool,
+    is_update: bool,
+    is_choice: bool,
+);
+pub extern "C" fn GotoBlock(
+    this: *mut Il2CppObject,
+    block_id: i32,
+    weaken_cy_spring: bool,
+    is_update: bool,
+    is_choice: bool,
+) {
     if Hachimi::instance().config.load().enable_ipc {
         let mut guard = CURRENT.lock().unwrap();
 

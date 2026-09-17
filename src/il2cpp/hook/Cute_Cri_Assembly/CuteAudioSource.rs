@@ -1,10 +1,8 @@
-use crate::{
-    il2cpp::{
-        symbols::{get_method_addr, get_field_from_name},
-        types::*
-    }
-};
 use super::AudioPlayback::AudioPlayback_t;
+use crate::il2cpp::{
+    symbols::{get_field_from_name, get_method_addr},
+    types::*,
+};
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
 
@@ -12,7 +10,12 @@ pub fn class() -> *mut Il2CppClass {
     unsafe { CLASS }
 }
 
-def_field_object_accessors!(get_sourceList, set_sourceList, _SOURCELIST_FIELD, Il2CppObject);
+def_field_object_accessors!(
+    get_sourceList,
+    set_sourceList,
+    _SOURCELIST_FIELD,
+    Il2CppObject
+);
 
 def_field_value_accessors!(get_usingIndex, set_usingIndex, _USINGINDEX_FIELD, i32);
 

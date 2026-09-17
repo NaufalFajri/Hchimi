@@ -1,138 +1,138 @@
-pub mod Localize;
-pub mod TextId;
-pub mod StoryRaceTextAsset;
-mod LyricsController;
-pub mod StoryTimelineData;
-pub mod StoryTimelineBlockData;
-pub mod StoryTimelineTrackData;
-pub mod StoryTimelineTextClipData;
-pub mod GallopUtil;
-pub mod UIManager;
-pub mod GraphicSettings;
-mod CameraController;
-pub mod SingleModeStartResultCharaViewer;
-pub mod WebViewManager;
-pub mod DialogCommon;
-mod PartsSingleModeSkillLearningListItem;
-mod TrainingParamChangeA2U;
-mod SingleModeMainTrainingCuttController;
-pub mod WebViewDefine;
-pub mod TextFrame;
-pub mod PartsSingleModeSkillListItem;
-pub mod FlashActionPlayer;
-pub mod TextRubyData;
-pub mod TextDotData;
-pub mod GameSystem;
-pub mod StoryViewTextControllerBase;
-mod StoryViewTextControllerLandscape;
-mod StoryViewTextControllerSingleMode;
-mod JikkyoDisplay;
-pub mod Screen;
-#[cfg(target_os = "windows")]
-pub mod LandscapeUIManager;
-#[cfg(target_os = "windows")]
-pub mod StandaloneWindowResize;
-#[cfg(target_os = "windows")]
-mod GallopInput;
-#[cfg(target_os = "windows")]
-mod InputSystemManager;
+mod ApplicationSettingSaveLoader;
+pub mod AudioManager;
 #[cfg(target_os = "windows")]
 mod BackKeyInputManager;
-#[cfg(target_os = "windows")]
-pub mod WindowsGamepadControl;
-pub mod TapEffectController;
-mod TrainingParamChangePlate;
-mod SingleModeUtils;
-mod MasterSingleModeTurn;
-mod TextFontManager;
-mod TextFormat;
-pub mod TextCommon;
-mod TextMeshProUguiCommon;
-mod StoryChoiceController;
-mod StoryViewController;
-mod StoryTimelineClipData;
-mod StoryTimelineCharaTrackData;
+mod ButtonCommon;
+mod CameraController;
+pub mod CameraData;
 mod CharacterNoteTopView;
 mod CharacterNoteTopViewController;
-mod ViewControllerBase;
-mod ButtonCommon;
-mod NowLoading;
-pub mod StoryTimelineController;
+pub mod CySpringController;
+pub mod DialogCommon;
+pub mod DialogCommonBase;
+pub mod DialogManager;
+pub mod DialogObject;
 mod DialogRaceOrientation;
+pub mod FlashActionPlayer;
+#[cfg(target_os = "windows")]
+mod GallopInput;
+pub mod GallopUtil;
+pub mod GameSystem;
+pub mod GraphicSettings;
+pub mod ImageCommon;
+#[cfg(target_os = "windows")]
+mod InputSystemManager;
+mod JikkyoDisplay;
+#[cfg(target_os = "windows")]
+pub mod LandscapeUIManager;
+mod LiveTheaterCharaSelect;
+mod LiveTheaterViewController;
+mod LiveUtil;
+pub mod Localize;
+mod LowResolutionCamera;
+mod LyricsController;
+pub mod MasterCharacterSystemText;
+pub mod MasterDataUtil;
+mod MasterSingleModeTurn;
+pub mod Notification;
+mod NowLoading;
+pub mod PartsCharaMessageBase;
+mod PartsSingleModeSkillLearningListItem;
+pub mod PartsSingleModeSkillListItem;
 pub mod RaceDefine;
 pub mod RaceInfo;
 pub mod RacePhaseCalculator;
 mod RaceUtil;
 mod SaveDataManager;
-mod ApplicationSettingSaveLoader;
-mod LiveTheaterCharaSelect;
-mod LiveTheaterViewController;
-pub mod CySpringController;
-mod LiveUtil;
-pub mod MasterDataUtil;
-pub mod DialogCommonBase;
-pub mod DialogObject;
-pub mod AudioManager;
-pub mod MasterCharacterSystemText;
-pub mod ImageCommon;
-pub mod Notification;
-mod TimeUtil;
-pub mod CameraData;
-pub mod DialogManager;
-pub mod PartsCharaMessageBase;
 pub mod SceneManager;
-mod LowResolutionCamera;
+pub mod Screen;
+mod SingleModeMainTrainingCuttController;
+pub mod SingleModeStartResultCharaViewer;
+mod SingleModeUtils;
+#[cfg(target_os = "windows")]
+pub mod StandaloneWindowResize;
+mod StoryChoiceController;
+pub mod StoryRaceTextAsset;
+pub mod StoryTimelineBlockData;
+mod StoryTimelineCharaTrackData;
+mod StoryTimelineClipData;
+pub mod StoryTimelineController;
+pub mod StoryTimelineData;
+pub mod StoryTimelineTextClipData;
+pub mod StoryTimelineTrackData;
+mod StoryViewController;
+pub mod StoryViewTextControllerBase;
+mod StoryViewTextControllerLandscape;
+mod StoryViewTextControllerSingleMode;
+pub mod TapEffectController;
+pub mod TextCommon;
+pub mod TextDotData;
+mod TextFontManager;
+mod TextFormat;
+pub mod TextFrame;
+pub mod TextId;
+mod TextMeshProUguiCommon;
+pub mod TextRubyData;
+mod TimeUtil;
+mod TrainingParamChangeA2U;
+mod TrainingParamChangePlate;
+pub mod UIManager;
+mod ViewControllerBase;
+pub mod WebViewDefine;
+pub mod WebViewManager;
+#[cfg(target_os = "windows")]
+pub mod WindowsGamepadControl;
 
 #[cfg(target_os = "windows")]
-mod PaymentUtility;
-#[cfg(target_os = "windows")]
-mod LiveTimelineControl;
-#[cfg(target_os = "windows")]
-pub mod LiveTimelineWorkSheet;
-#[cfg(target_os = "windows")]
-pub mod LiveTimelineKeyPostFilmDataList;
-#[cfg(target_os = "windows")]
-pub mod LiveTimelineKeyCameraPositionData;
-#[cfg(target_os = "windows")]
-mod LiveTimelineKeyCameraLookAtData;
-#[cfg(target_os = "windows")]
-mod LiveTimelineKeyMultiCameraPositionData;
-#[cfg(target_os = "windows")]
 mod CharacterObject;
+pub mod HorseData;
+pub mod HorseRaceInfo;
+pub mod Jikkyo;
+pub mod JikkyoControllerBase;
 #[cfg(target_os = "windows")]
 mod LiveModelController;
 #[cfg(target_os = "windows")]
+mod LiveTimelineControl;
+#[cfg(target_os = "windows")]
+mod LiveTimelineKeyCameraLookAtData;
+#[cfg(target_os = "windows")]
+pub mod LiveTimelineKeyCameraPositionData;
+#[cfg(target_os = "windows")]
+mod LiveTimelineKeyMultiCameraPositionData;
+#[cfg(target_os = "windows")]
+pub mod LiveTimelineKeyPostFilmDataList;
+#[cfg(target_os = "windows")]
+pub mod LiveTimelineWorkSheet;
+#[cfg(target_os = "windows")]
 pub mod ModelController;
 #[cfg(target_os = "windows")]
-mod RaceCameraManager;
+mod PaymentUtility;
+pub mod RaceBGMController;
 #[cfg(target_os = "windows")]
 mod RaceCameraEventBase;
 #[cfg(target_os = "windows")]
-mod RaceModelController;
-#[cfg(target_os = "windows")]
-pub mod RaceViewBase;
+mod RaceCameraManager;
 #[cfg(target_os = "windows")]
 mod RaceEffectManager;
-pub mod HorseData;
-pub mod HorseRaceInfo;
-pub mod JikkyoControllerBase;
-pub mod Jikkyo;
-pub mod RaceBGMController;
+pub mod RaceEventPlayer;
+pub mod RaceHorseManagerBase;
+pub mod RaceHorseManagerReplay;
 pub mod RaceMainViewController;
 pub mod RaceManager;
 pub mod RaceManagerReplayBase;
-pub mod RaceEventPlayer;
-pub mod RaceHorseManagerBase;
+#[cfg(target_os = "windows")]
+mod RaceModelController;
+pub mod RaceSimulateData;
+pub mod RaceSimulateEventData;
+pub mod RaceSimulateFrameData;
+pub mod RaceSimulateHorseFrameData;
+pub mod RaceSimulateReader;
 pub mod RaceSoundReplay;
 pub mod RaceUI;
 pub mod RaceUIMiniMap;
+#[cfg(target_os = "windows")]
+pub mod RaceViewBase;
 pub mod RaceViewReplay;
-pub mod RaceSimulateData;
-pub mod RaceSimulateEventData;
-pub mod RaceSimulateReader;
-pub mod RaceHorseManagerReplay;
-pub mod RaceSimulateFrameData;
-pub mod RaceSimulateHorseFrameData;
 
 #[path = "SimulateEventType.rs"]
 mod simulate_event_type;
@@ -141,58 +141,59 @@ pub use simulate_event_type::SimulateEventType;
 mod temptation_mode;
 pub use temptation_mode::TemptationMode;
 
-pub mod SkillManager;
-pub mod SkillBase;
-pub mod HorseRaceInfoReplay;
-#[cfg(target_os = "windows")]
-mod PartsScheduleBookAutoPlayScreen;
-pub mod TweenAnimationTimelineComponent;
-pub mod TweenAnimationTimelineData;
-pub mod TweenAnimationTimelineSheetData;
-mod PartsSingleModeChoiceRewardTextElementViewModel;
-mod PartsCommonHeaderTitle;
-pub mod StoryParamChangeEffect;
-mod PartsRaceAnalyzeRaceEventListItem;
-pub mod PartsNickNameRibbon;
-mod PartsNickNameListItem;
-mod PartsGetSkillPlate;
-mod StoryChoiceButton;
-mod DialogMissionListItem;
-mod PartsNamePlateBase;
-mod PartsSupportCardImproveDetail;
+pub mod AssetManager;
 #[cfg(target_os = "windows")]
 mod Connecting;
-#[cfg(target_os = "windows")]
-mod DownloadManager;
-#[cfg(target_os = "windows")]
-mod DownloadView;
+mod CySpringNative;
+mod DialogMissionListItem;
+pub mod Director;
 #[cfg(target_os = "windows")]
 mod DownloadErrorProcessor;
 #[cfg(target_os = "windows")]
-mod TitleViewController;
+mod DownloadManager;
+pub mod DownloadPathRegister;
 #[cfg(target_os = "windows")]
-pub mod MainGameInitializer;
-pub mod Director;
-mod CySpringNative;
-pub mod LiveViewController;
-pub mod LiveTimeController;
-pub mod HomeViewController;
+mod DownloadView;
+pub mod GameDefine;
 #[cfg(target_os = "windows")]
 mod HomeCameraController;
-pub mod WorkDataManager;
-pub mod AssetManager;
-pub mod WorkJukeboxData;
+pub mod HomeViewController;
+pub mod HorseRaceInfoReplay;
+pub mod HubViewControllerBase;
 pub mod JukeboxBgmSelector;
 pub mod JukeboxHomeTopUI;
-pub mod TempData;
-pub mod MasterJukeboxSetlistMusicData;
-pub mod HubViewControllerBase;
 mod LiveTheaterInfo;
-pub mod DownloadPathRegister;
-pub mod SceneDefine;
-pub mod GameDefine;
+pub mod LiveTimeController;
+pub mod LiveViewController;
+#[cfg(target_os = "windows")]
+pub mod MainGameInitializer;
 pub mod MasterDataManager;
 pub mod MasterItemExchangeTop;
+pub mod MasterJukeboxSetlistMusicData;
+mod PartsCommonHeaderTitle;
+mod PartsGetSkillPlate;
+mod PartsHomeCharaMessage;
+mod PartsNamePlateBase;
+mod PartsNickNameListItem;
+pub mod PartsNickNameRibbon;
+mod PartsRaceAnalyzeRaceEventListItem;
+#[cfg(target_os = "windows")]
+mod PartsScheduleBookAutoPlayScreen;
+mod PartsSingleModeChoiceRewardTextElementViewModel;
+mod PartsSupportCardImproveDetail;
+pub mod SceneDefine;
+pub mod SkillBase;
+pub mod SkillManager;
+mod StoryChoiceButton;
+pub mod StoryParamChangeEffect;
+pub mod TempData;
+#[cfg(target_os = "windows")]
+mod TitleViewController;
+pub mod TweenAnimationTimelineComponent;
+pub mod TweenAnimationTimelineData;
+pub mod TweenAnimationTimelineSheetData;
+pub mod WorkDataManager;
+pub mod WorkJukeboxData;
 
 pub fn init() {
     get_assembly_image_or_return!(image, "umamusume.dll");
@@ -338,6 +339,7 @@ pub fn init() {
     PartsSupportCardImproveDetail::init(image);
     Director::init(image);
     CySpringNative::init(image);
+    PartsHomeCharaMessage::init(image);
     LiveViewController::init(image);
     LiveTimeController::init(image);
     HomeViewController::init(image);

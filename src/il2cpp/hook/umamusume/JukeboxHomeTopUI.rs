@@ -1,7 +1,4 @@
-use crate::il2cpp::{
-    symbols::get_method_addr,
-    types::*
-};
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 static mut CLASS: *mut Il2CppClass = 0 as _;
 pub fn class() -> *mut Il2CppClass {
@@ -28,10 +25,12 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     unsafe {
         CLASS = JukeboxHomeTopUI;
-        GET_TEMPSETLISTPLAYINGDATA_ADDR = get_method_addr(JukeboxHomeTopUI, c"get_TempSetListPlayingData", 0);
+        GET_TEMPSETLISTPLAYINGDATA_ADDR =
+            get_method_addr(JukeboxHomeTopUI, c"get_TempSetListPlayingData", 0);
         SETPLAYMUSICFLAG_ADDR = get_method_addr(JukeboxHomeTopUI, c"SetPlayMusicFlag", 1);
         PLAYREQUESTSONG_ADDR = get_method_addr(JukeboxHomeTopUI, c"PlayRequestSong", 0);
         ONCLICKSETLISTARROW_ADDR = get_method_addr(JukeboxHomeTopUI, c"OnClickSetListArrow", 1);
-        GET_JUKEBOXBGMSELECTOR_ADDR = get_method_addr(JukeboxHomeTopUI, c"get_JukeboxBgmSelector", 0);
+        GET_JUKEBOXBGMSELECTOR_ADDR =
+            get_method_addr(JukeboxHomeTopUI, c"get_JukeboxBgmSelector", 0);
     }
 }

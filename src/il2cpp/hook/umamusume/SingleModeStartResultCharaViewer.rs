@@ -17,7 +17,8 @@ extern "C" fn SetupImageEffect(this: *mut Il2CppObject) {
 pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, SingleModeStartResultCharaViewer);
 
-    let SetupImageEffect_addr = get_method_addr(SingleModeStartResultCharaViewer, c"SetupImageEffect", 0);
+    let SetupImageEffect_addr =
+        get_method_addr(SingleModeStartResultCharaViewer, c"SetupImageEffect", 0);
 
     new_hook!(SetupImageEffect_addr, SetupImageEffect);
 }

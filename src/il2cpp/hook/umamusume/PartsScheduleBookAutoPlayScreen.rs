@@ -1,7 +1,8 @@
 use crate::{
-    core::taskbar::{self, TBPF_NORMAL, TBPF_NOPROGRESS},
+    core::taskbar::{self, TBPF_NOPROGRESS, TBPF_NORMAL},
     il2cpp::{
-        symbols::{get_field_from_name, get_field_value, get_method_addr}, types::{FieldInfo, Il2CppImage, Il2CppObject},
+        symbols::{get_field_from_name, get_field_value, get_method_addr},
+        types::{FieldInfo, Il2CppImage, Il2CppObject},
     },
 };
 
@@ -32,7 +33,7 @@ extern "C" fn IncrementProgressGauge(this: *mut Il2CppObject) {
     get_orig_fn!(IncrementProgressGauge, IncrementProgressGaugeFn)(this);
     taskbar::update_schedule_value(
         get__progressGaugeCount(this) as u64,
-        get__progressGaugeMax(this) as u64
+        get__progressGaugeMax(this) as u64,
     );
 }
 
@@ -41,14 +42,20 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     let show_addr = get_method_addr(PartsScheduleBookAutoPlayScreen, c"ShowScreen", 2);
     let hide_addr = get_method_addr(PartsScheduleBookAutoPlayScreen, c"HideScreen", 0);
-    let increment_addr = get_method_addr(PartsScheduleBookAutoPlayScreen, c"IncrementProgressGauge", 0);
+    let increment_addr = get_method_addr(
+        PartsScheduleBookAutoPlayScreen,
+        c"IncrementProgressGauge",
+        0,
+    );
 
     new_hook!(show_addr, ShowScreen);
     new_hook!(hide_addr, HideScreen);
     new_hook!(increment_addr, IncrementProgressGauge);
 
     unsafe {
-        GAUGE_COUNT_FIELD = get_field_from_name(PartsScheduleBookAutoPlayScreen, c"_progressGaugeCount");
-        GAUGE_MAX_FIELD = get_field_from_name(PartsScheduleBookAutoPlayScreen, c"_progressGaugeMax");
+        GAUGE_COUNT_FIELD =
+            get_field_from_name(PartsScheduleBookAutoPlayScreen, c"_progressGaugeCount");
+        GAUGE_MAX_FIELD =
+            get_field_from_name(PartsScheduleBookAutoPlayScreen, c"_progressGaugeMax");
     }
 }

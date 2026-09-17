@@ -1,21 +1,29 @@
-use std::{cell::LazyCell, collections::{hash_map::Entry, BTreeMap}};
+use std::{
+    cell::LazyCell,
+    collections::{hash_map::Entry, BTreeMap},
+};
 
 use fnv::FnvHashMap;
 
 use crate::{
-    core::{utils, Hachimi, SugoiClient, game::Region},
-    il2cpp::{ext::{Il2CppStringExt, StringExt}, symbols::{get_method_overload_addr, unbox}, types::*}
+    core::{game::Region, utils, Hachimi, SugoiClient},
+    il2cpp::{
+        ext::{Il2CppStringExt, StringExt},
+        symbols::{get_method_overload_addr, unbox},
+        types::*,
+    },
 };
 
 use super::TextId;
 
 // SAFETY: Localize::Get is only called from the Unity main thread.
-static mut TEXTID_NAME_CACHE: LazyCell<FnvHashMap<i32, String>> = LazyCell::new(|| FnvHashMap::default());
+static mut TEXTID_NAME_CACHE: LazyCell<FnvHashMap<i32, String>> =
+    LazyCell::new(|| FnvHashMap::default());
 
 /**
  * Gallop::Localize::Get
  * Used by the game to get localized strings for builtin text (mostly UI).
- * 
+ *
  * id is a value of the TextId enum
  * cy devs likes to insert stuff at arbitrary locations within the enum, changing their values
  * so we'll just map them to their actual name instead
@@ -34,19 +42,21 @@ pub extern "C" fn Get(id: i32) -> *mut Il2CppString {
             let name = TextId::get_name(id);
             let name_str = unsafe { (*name).as_utf16str().to_string() };
             e.insert(name_str)
-        },
+        }
     };
 
     if let Some(text) = localized_data.localize_dict.get(name) {
         text.to_il2cpp_string()
-    }
-    else {
+    } else {
         let str = get_orig_fn!(Get, GetFn)(id);
         if Hachimi::instance().config.load().translator_mode && id != 1109 && id != 1032 {
             // 1109 and 1032 seems to be debugging strings (they're annoying)
             utils::print_json_entry(name, unsafe { &(*str).as_utf16str().to_string() });
         }
-        if hachimi.config.load().auto_translate_localize && !str.is_null() && unsafe { (*str).length > 0 } {
+        if hachimi.config.load().auto_translate_localize
+            && !str.is_null()
+            && unsafe { (*str).length > 0 }
+        {
             let s = unsafe { (*str).as_utf16str().to_string() };
 
             let sugoi = SugoiClient::instance();
@@ -63,7 +73,12 @@ pub extern "C" fn Get(id: i32) -> *mut Il2CppString {
 pub fn dump_strings() -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
 
-    for obj in TextId::get_values().enumerator().map(|e| e.iter()).unwrap_or_default().expect("enum values enumerator") {
+    for obj in TextId::get_values()
+        .enumerator()
+        .map(|e| e.iter())
+        .unwrap_or_default()
+        .expect("enum values enumerator")
+    {
         let value: i32 = unsafe { unbox(obj) };
         let name = TextId::get_name(value);
         let name_str = unsafe { (*name).as_utf16str() };

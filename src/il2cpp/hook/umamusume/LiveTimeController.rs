@@ -1,8 +1,6 @@
-use crate::{
-    il2cpp::{
-        symbols::{get_method_addr, get_field_from_name, get_class},
-        types::*
-    }
+use crate::il2cpp::{
+    symbols::{get_class, get_field_from_name, get_method_addr},
+    types::*,
 };
 
 static mut PAUSELIVE_TC_ADDR: usize = 0;

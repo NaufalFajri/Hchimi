@@ -1,17 +1,31 @@
-use std::{io::Write, path::{Path, PathBuf}};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
-use crate::{core::utils::{get_file_modified_time, load_rgba_png_file}, il2cpp::{ext::{Il2CppObjectExt, Il2CppStringExt}, hook::UnityEngine_CoreModule::{Component, RectTransform}, types::*}};
+use crate::{
+    core::utils::{get_file_modified_time, load_rgba_png_file},
+    il2cpp::{
+        ext::{Il2CppObjectExt, Il2CppStringExt},
+        hook::UnityEngine_CoreModule::{Component, RectTransform},
+        types::*,
+    },
+};
 
 use super::{
-    hook::{mscorlib, UnityEngine_CoreModule::{Texture, Texture2D},
-    UnityEngine_ImageConversionModule::ImageConversion},
-    symbols::{get_assembly_image, get_class, get_method_addr_cached, Array}
+    hook::{
+        mscorlib,
+        UnityEngine_CoreModule::{Texture, Texture2D},
+        UnityEngine_ImageConversionModule::ImageConversion,
+    },
+    symbols::{get_assembly_image, get_class, get_method_addr_cached, Array},
 };
 
 #[allow(dead_code)]
 pub fn print_stack_trace() {
     let mscorlib = get_assembly_image(c"mscorlib.dll").expect("mscorlib");
-    let environment_class = get_class(mscorlib, c"System", c"Environment").expect("System.Environment");
+    let environment_class =
+        get_class(mscorlib, c"System", c"Environment").expect("System.Environment");
     let get_fn_addr = get_method_addr_cached(environment_class, c"get_StackTrace", 0);
     let get_fn: extern "C" fn() -> *mut Il2CppString = unsafe { std::mem::transmute(get_fn_addr) };
     debug!("{}", unsafe { (*get_fn()).as_utf16str() });
@@ -23,21 +37,34 @@ pub fn get_texture_diff_path<P: AsRef<Path>>(path: P) -> PathBuf {
     diff_path
 }
 
-pub fn replace_texture_with_diff<P: AsRef<Path>>(texture: *mut Il2CppObject, path: P, mark_non_readable: bool) -> bool {
-    replace_texture_with_diff_ex(texture, &path, get_texture_diff_path(&path), mark_non_readable, true)
+pub fn replace_texture_with_diff<P: AsRef<Path>>(
+    texture: *mut Il2CppObject,
+    path: P,
+    mark_non_readable: bool,
+) -> bool {
+    replace_texture_with_diff_ex(
+        texture,
+        &path,
+        get_texture_diff_path(&path),
+        mark_non_readable,
+        true,
+    )
 }
 
 pub fn replace_texture_with_diff_ex<P1: AsRef<Path>, P2: AsRef<Path>>(
-    texture: *mut Il2CppObject, path: P1, diff_path: P2, mark_non_readable: bool, allow_fallback: bool
+    texture: *mut Il2CppObject,
+    path: P1,
+    diff_path: P2,
+    mark_non_readable: bool,
+    allow_fallback: bool,
 ) -> bool {
     let Some(diff_mtime) = get_file_modified_time(&diff_path) else {
         // No diff, try to load image directly
         return if allow_fallback {
             Texture2D::load_image_file(texture, &path, mark_non_readable)
-        }
-        else {
+        } else {
             false
-        }
+        };
     };
 
     if let Some(image_mtime) = get_file_modified_time(&path) {
@@ -51,7 +78,10 @@ pub fn replace_texture_with_diff_ex<P1: AsRef<Path>, P2: AsRef<Path>>(
     }
 
     let Some((mut pixels, diff_info)) = load_rgba_png_file(&diff_path) else {
-        error!("Failed to load texture diff: {}", diff_path.as_ref().display());
+        error!(
+            "Failed to load texture diff: {}",
+            diff_path.as_ref().display()
+        );
         return false;
     };
 
@@ -61,7 +91,11 @@ pub fn replace_texture_with_diff_ex<P1: AsRef<Path>, P2: AsRef<Path>>(
     if width as u32 != diff_info.width || height as u32 != diff_info.height {
         error!(
             "Texture diff size mismatch (expected {}x{}, got {}x{}): {}",
-            width, height, diff_info.width, diff_info.height, diff_path.as_ref().display()
+            width,
+            height,
+            diff_info.width,
+            diff_info.height,
+            diff_path.as_ref().display()
         );
         return false;
     }
@@ -81,8 +115,7 @@ pub fn replace_texture_with_diff_ex<P1: AsRef<Path>, P2: AsRef<Path>>(
                 // Original image is flipped
                 let orig_pixel = &orig_pixels[(height - y - 1) * width + x];
                 pixel.copy_from_slice(orig_pixel.as_slice());
-            }
-            else if pixel == [255, 0, 255, 255] {
+            } else if pixel == [255, 0, 255, 255] {
                 // Make pixel transparent if it's #FF00FF
                 pixel.fill(0);
             }
@@ -97,7 +130,8 @@ pub fn replace_texture_with_diff_ex<P1: AsRef<Path>, P2: AsRef<Path>>(
     encoder.set_depth(png::BitDepth::Eight);
     encoder.set_compression(png::Compression::Fast);
 
-    { // Scope to drop writer and release borrow to png buffer
+    {
+        // Scope to drop writer and release borrow to png buffer
         let mut writer = match encoder.write_header() {
             Ok(v) => v,
             Err(e) => {
@@ -143,7 +177,9 @@ pub fn replace_texture_with_diff_ex<P1: AsRef<Path>, P2: AsRef<Path>>(
 
     // And finally load image to texture
     let png_array = Array::<u8>::new(mscorlib::Byte::class(), png_buffer.len());
-    unsafe { png_array.as_slice().copy_from_slice(&png_buffer); }
+    unsafe {
+        png_array.as_slice().copy_from_slice(&png_buffer);
+    }
     ImageConversion::LoadImage(texture, png_array.this, mark_non_readable);
 
     true
@@ -155,10 +191,18 @@ pub fn adjust_transform_size(component: *mut Il2CppObject, width: f32, height: f
     let transform = Component::get_transform(component);
     if unsafe { (*transform).klass() } == RectTransform::class() {
         if width > 0.0 {
-            RectTransform::SetSizeWithCurrentAnchors(transform, RectTransform::Axis::Horizontal, width);
+            RectTransform::SetSizeWithCurrentAnchors(
+                transform,
+                RectTransform::Axis::Horizontal,
+                width,
+            );
         }
         if height > 0.0 {
-            RectTransform::SetSizeWithCurrentAnchors(transform, RectTransform::Axis::Vertical, height);
+            RectTransform::SetSizeWithCurrentAnchors(
+                transform,
+                RectTransform::Axis::Vertical,
+                height,
+            );
         }
     }
 }

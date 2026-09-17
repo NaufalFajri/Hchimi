@@ -31,12 +31,16 @@ pub fn init(LiveLoadSettings: *mut Il2CppClass) {
 
     unsafe {
         CLASS = RaceInfo;
-        GET_CHAMPIONSMEETINGRESOURCEID_ADDR = get_method_addr(RaceInfo, c"get_ChampionsMeetingResourceId", 0);
-        SET_CHAMPIONSMEETINGRESOURCEID_ADDR = get_method_addr(RaceInfo, c"set_ChampionsMeetingResourceId", 1);
+        GET_CHAMPIONSMEETINGRESOURCEID_ADDR =
+            get_method_addr(RaceInfo, c"get_ChampionsMeetingResourceId", 0);
+        SET_CHAMPIONSMEETINGRESOURCEID_ADDR =
+            get_method_addr(RaceInfo, c"set_ChampionsMeetingResourceId", 1);
         SET_DATEYEAR_ADDR = get_method_addr(RaceInfo, c"set_DateYear", 1);
         SET_CHARACTERNAMEARRAY_ADDR = get_method_addr(RaceInfo, c"set_CharacterNameArray", 1);
         SET_TRAINERNAMEARRAY_ADDR = get_method_addr(RaceInfo, c"set_TrainerNameArray", 1);
-        SET_CHARACTERNAMEARRAYFORCHAMPIONSTEXT_ADDR = get_method_addr(RaceInfo, c"set_CharacterNameArrayForChampionsText", 1);
-        SET_TRAINERNAMEARRAYFORCHAMPIONSTEXT_ADDR = get_method_addr(RaceInfo, c"set_TrainerNameArrayForChampionsText", 1);
+        SET_CHARACTERNAMEARRAYFORCHAMPIONSTEXT_ADDR =
+            get_method_addr(RaceInfo, c"set_CharacterNameArrayForChampionsText", 1);
+        SET_TRAINERNAMEARRAYFORCHAMPIONSTEXT_ADDR =
+            get_method_addr(RaceInfo, c"set_TrainerNameArrayForChampionsText", 1);
     }
 }

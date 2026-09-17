@@ -1,6 +1,6 @@
-use std::{ffi::CStr, os::raw::c_void};
 use jni::{sys::jint, JavaVM};
 use once_cell::sync::OnceCell;
+use std::{ffi::CStr, os::raw::c_void};
 
 use crate::core::Hachimi;
 

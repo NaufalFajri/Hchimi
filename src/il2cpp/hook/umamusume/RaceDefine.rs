@@ -6,7 +6,7 @@ pub enum Motivation {
     Low = 2,
     Middle = 3,
     High = 4,
-    Max = 5
+    Max = 5,
 }
 
 #[repr(i32)]
@@ -15,7 +15,7 @@ pub enum LaneType {
     Uti = 0,
     Naka = 1,
     Soto = 2,
-    Oosoto = 3
+    Oosoto = 3,
 }
 
 #[repr(i32)]
@@ -26,7 +26,7 @@ pub enum HorsePhase {
     MiddleRun = 1,
     End = 2,
     Last = 3,
-    Finished = 4
+    Finished = 4,
 }
 
 impl_enum_eq!(Motivation);

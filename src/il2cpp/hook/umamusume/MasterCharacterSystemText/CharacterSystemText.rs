@@ -1,9 +1,4 @@
-use crate::{
-    il2cpp::{
-        symbols::get_field_from_name,
-        types::*
-    }
-};
+use crate::il2cpp::{symbols::get_field_from_name, types::*};
 
 def_field_value_accessors!(get_CueId, set_CueId, _CUEID_FIELD, i32);
 def_field_object_accessors!(get_CueSheet, set_CueSheet, _CUESHEET_FIELD, Il2CppString);

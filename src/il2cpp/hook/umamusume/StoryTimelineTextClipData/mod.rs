@@ -3,7 +3,12 @@ pub mod ColorTextInfo;
 
 use std::ptr::null_mut;
 
-use crate::il2cpp::{symbols::{get_field_from_name, get_field_object_value, get_field_value, set_field_object_value}, types::*};
+use crate::il2cpp::{
+    symbols::{
+        get_field_from_name, get_field_object_value, get_field_value, set_field_object_value,
+    },
+    types::*,
+};
 
 pub const FontSize_Default: i32 = 0;
 pub const FontSize_Large: i32 = 1;
@@ -68,7 +73,8 @@ pub fn init(umamusume: *const Il2CppImage) {
         TEXT_FIELD = get_field_from_name(StoryTimelineTextClipData, c"Text");
         SIZE_FIELD = get_field_from_name(StoryTimelineTextClipData, c"Size");
         CHOICEDDATALIST_FIELD = get_field_from_name(StoryTimelineTextClipData, c"ChoiceDataList");
-        COLORTEXTINFOLIST_FIELD = get_field_from_name(StoryTimelineTextClipData, c"ColorTextInfoList");
+        COLORTEXTINFOLIST_FIELD =
+            get_field_from_name(StoryTimelineTextClipData, c"ColorTextInfoList");
         WAITFRAME_FIELD = get_field_from_name(StoryTimelineTextClipData, c"WaitFrame");
         VOICELENGTH_FIELD = get_field_from_name(StoryTimelineTextClipData, c"VoiceLength");
     }

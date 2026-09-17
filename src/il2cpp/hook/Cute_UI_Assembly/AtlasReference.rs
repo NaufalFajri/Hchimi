@@ -2,14 +2,15 @@ use std::ptr::null_mut;
 
 use widestring::Utf16Str;
 
-use crate::{core::{ext::Utf16StringExt, Hachimi}, il2cpp::{
-    hook::{
-        UnityEngine_AssetBundleModule::AssetBundle,
-        UnityEngine_CoreModule::Sprite
+use crate::{
+    core::{ext::Utf16StringExt, Hachimi},
+    il2cpp::{
+        hook::{UnityEngine_AssetBundleModule::AssetBundle, UnityEngine_CoreModule::Sprite},
+        symbols::{get_field_from_name, get_field_object_value, Array},
+        types::*,
+        utils::replace_texture_with_diff,
     },
-    symbols::{get_field_from_name, get_field_object_value, Array},
-    types::*, utils::replace_texture_with_diff
-}};
+};
 
 static mut CLASS: *mut Il2CppClass = null_mut();
 pub fn class() -> *mut Il2CppClass {

@@ -1,15 +1,16 @@
 use crate::{
-    core::{Hachimi, game::Region},
-    il2cpp::{
-        hook::umamusume::SimulateEventType,
-        symbols::get_field_from_name,
-        types::*
-    }
+    core::{game::Region, Hachimi},
+    il2cpp::{hook::umamusume::SimulateEventType, symbols::get_field_from_name, types::*},
 };
 
 pub mod DistanceData;
 
-def_field_object_accessors!(get_distanceData, set_distanceData, DISTANCE_DATA_FIELD, Il2CppObject);
+def_field_object_accessors!(
+    get_distanceData,
+    set_distanceData,
+    DISTANCE_DATA_FIELD,
+    Il2CppObject
+);
 def_field_value_accessors!(get_type, set_type, TYPE_FIELD, SimulateEventType);
 def_field_object_accessors!(get_param, set_param, PARAM_FIELD, Il2CppArray);
 def_field_value_accessors!(get_frameTime, set_frameTime, FRAME_TIME_FIELD, f32);

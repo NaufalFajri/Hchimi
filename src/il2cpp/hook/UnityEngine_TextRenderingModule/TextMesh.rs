@@ -1,12 +1,15 @@
-use std::sync::Mutex;
+use crate::core::sugoi_client::{StringInfo, SugoiClient};
+use crate::il2cpp::{
+    ext::{Il2CppStringExt, StringExt},
+    symbols::{get_method_addr, GCHandle},
+    types::*,
+};
 use fnv::FnvHashMap;
 use once_cell::sync::Lazy;
-use crate::core::sugoi_client::{SugoiClient, StringInfo};
-use crate::il2cpp::{ext::{Il2CppStringExt, StringExt}, symbols::{get_method_addr, GCHandle}, types::*};
+use std::sync::Mutex;
 
-pub static ACTIVE_TEXT_MESH_COMPONENTS: Lazy<Mutex<FnvHashMap<usize, StringInfo>>> = Lazy::new(|| {
-    Mutex::new(FnvHashMap::default())
-});
+pub static ACTIVE_TEXT_MESH_COMPONENTS: Lazy<Mutex<FnvHashMap<usize, StringInfo>>> =
+    Lazy::new(|| Mutex::new(FnvHashMap::default()));
 
 type SetTextFn = extern "C" fn(this: *mut Il2CppObject, value: *mut Il2CppString);
 pub extern "C" fn set_text_hook(this: *mut Il2CppObject, value: *mut Il2CppString) {
@@ -22,10 +25,13 @@ pub extern "C" fn set_text_hook(this: *mut Il2CppObject, value: *mut Il2CppStrin
     let orig_str = unsafe { (*value).as_utf16str().to_string() };
     let str_info = StringInfo {
         str_handle: GCHandle::new_weak_ref(this, false),
-        str: orig_str.clone()
+        str: orig_str.clone(),
     };
 
-    ACTIVE_TEXT_MESH_COMPONENTS.lock().unwrap().insert(this as usize, str_info);
+    ACTIVE_TEXT_MESH_COMPONENTS
+        .lock()
+        .unwrap()
+        .insert(this as usize, str_info);
 
     if let Some(trans) = SugoiClient::instance().get_cached(&orig_str) {
         return get_orig_fn!(set_text_hook, SetTextFn)(this, trans.to_il2cpp_string());

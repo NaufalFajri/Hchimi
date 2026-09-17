@@ -1,5 +1,5 @@
-use crate::il2cpp::{symbols::get_method_addr, types::*};
 use crate::il2cpp::symbols::IEnumerator;
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 const TRAINING_RESULT_FAILURE: i32 = 1;
 
@@ -18,14 +18,11 @@ extern "C" fn OnSuccessSendCommand(
 ) -> IEnumerator {
     let result_type = if result_type == TRAINING_RESULT_FAILURE {
         result_type
-    }
-    else {
+    } else {
         TRAINING_RESULT_FAILURE
     };
 
-    get_orig_fn!(OnSuccessSendCommand, OnSuccessSendCommandFn)(
-        this, turn_info, sub_id, result_type
-    )
+    get_orig_fn!(OnSuccessSendCommand, OnSuccessSendCommandFn)(this, turn_info, sub_id, result_type)
 }
 
 pub fn init(umamusume: *const Il2CppImage) {

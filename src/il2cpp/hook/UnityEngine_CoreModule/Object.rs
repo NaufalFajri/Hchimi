@@ -1,4 +1,8 @@
-use crate::il2cpp::{api::il2cpp_resolve_icall, symbols::{get_method_addr, Array}, types::*};
+use crate::il2cpp::{
+    api::il2cpp_resolve_icall,
+    symbols::{get_method_addr, Array},
+    types::*,
+};
 
 static mut DESTROY_ADDR: usize = 0;
 impl_addr_wrapper_fn!(Destroy, DESTROY_ADDR, (), obj: *mut Il2CppObject);
@@ -37,11 +41,10 @@ pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
         GET_NAME_ADDR = get_method_addr(Object, c"get_name", 0);
         SET_NAME_ADDR = get_method_addr(Object, c"set_name", 1);
         FINDOBJECTSOFTYPE_ADDR = il2cpp_resolve_icall(
-            c"UnityEngine.Object::FindObjectsOfType(System.Type,System.Boolean)".as_ptr()
+            c"UnityEngine.Object::FindObjectsOfType(System.Type,System.Boolean)".as_ptr(),
         );
         OP_IMPLICIT_ADDR = get_method_addr(Object, c"op_Implicit", 1);
-        CLONE_WITH_PARENT_ADDR = il2cpp_resolve_icall(
-            c"UnityEngine.Object::Internal_CloneSingleWithParent()".as_ptr()
-        );
+        CLONE_WITH_PARENT_ADDR =
+            il2cpp_resolve_icall(c"UnityEngine.Object::Internal_CloneSingleWithParent()".as_ptr());
     }
 }

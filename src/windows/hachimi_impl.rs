@@ -6,10 +6,12 @@ use crate::{
     core::Hachimi,
     il2cpp::{
         hook::UnityEngine_CoreModule::{
-            FullScreenMode_ExclusiveFullScreen, FullScreenMode_FullScreenWindow,
-            QualitySettings, Screen
-        }, symbols::Thread, types::Resolution
-    }
+            FullScreenMode_ExclusiveFullScreen, FullScreenMode_FullScreenWindow, QualitySettings,
+            Screen,
+        },
+        symbols::Thread,
+        types::Resolution,
+    },
 };
 
 use super::{utils, wnd_hook};
@@ -38,8 +40,8 @@ pub fn on_hooking_finished(hachimi: &Hachimi) {
     }
 
     // Apply auto full screen
-    if hachimi.config.load().windows.auto_full_screen &&
-        !hachimi.config.load().windows.freeform_window
+    if hachimi.config.load().windows.auto_full_screen
+        && !hachimi.config.load().windows.freeform_window
     {
         std::thread::spawn(|| {
             std::thread::sleep(std::time::Duration::from_secs(2));
@@ -75,7 +77,10 @@ pub struct Config {
     pub freeform_window: bool,
     #[serde(default = "Config::default_true", alias = "freeFormUiScaleAuto")]
     pub freeform_ui_scale_auto: bool,
-    #[serde(default = "Config::default_freeform_ui_scale_auto_ratio", alias = "freeFormUiScaleAutoRatio")]
+    #[serde(
+        default = "Config::default_freeform_ui_scale_auto_ratio",
+        alias = "freeFormUiScaleAutoRatio"
+    )]
     pub freeform_ui_scale_auto_ratio: f32,
     #[serde(default)]
     pub full_screen_mode: FullScreenMode,
@@ -134,30 +139,50 @@ impl Default for BouncyUmaConfig {
 }
 
 impl Config {
-    fn default_vsync_count() -> i32 { -1 }
-    fn default_menu_open_key() -> u16 { windows::Win32::UI::Input::KeyboardAndMouse::VK_RIGHT.0 }
-    fn default_hide_ingame_ui_hotkey_bind() -> u16 { windows::Win32::UI::Input::KeyboardAndMouse::VK_INSERT.0 }
-    fn default_race_stat_hud_toggle_key() -> u16 { windows::Win32::UI::Input::KeyboardAndMouse::VK_H.0 }
-    fn default_race_playback_key() -> u16 { windows::Win32::UI::Input::KeyboardAndMouse::VK_P.0 }
-    fn default_true() -> bool { true }
-    fn default_gui_landscape_ratio() -> f32 { 1.0 }
-    fn default_freeform_ui_scale_auto_ratio() -> f32 { 0.55 }
+    fn default_vsync_count() -> i32 {
+        -1
+    }
+    fn default_menu_open_key() -> u16 {
+        windows::Win32::UI::Input::KeyboardAndMouse::VK_RIGHT.0
+    }
+    fn default_hide_ingame_ui_hotkey_bind() -> u16 {
+        windows::Win32::UI::Input::KeyboardAndMouse::VK_INSERT.0
+    }
+    fn default_race_stat_hud_toggle_key() -> u16 {
+        windows::Win32::UI::Input::KeyboardAndMouse::VK_H.0
+    }
+    fn default_race_playback_key() -> u16 {
+        windows::Win32::UI::Input::KeyboardAndMouse::VK_P.0
+    }
+    fn default_true() -> bool {
+        true
+    }
+    fn default_gui_landscape_ratio() -> f32 {
+        1.0
+    }
+    fn default_freeform_ui_scale_auto_ratio() -> f32 {
+        0.55
+    }
 }
 
 #[derive(Deserialize, Serialize, Copy, Clone, Default, Eq, PartialEq)]
 #[repr(i32)]
 pub enum FullScreenMode {
-    #[default] ExclusiveFullScreen = FullScreenMode_ExclusiveFullScreen,
-    FullScreenWindow = FullScreenMode_FullScreenWindow
+    #[default]
+    ExclusiveFullScreen = FullScreenMode_ExclusiveFullScreen,
+    FullScreenWindow = FullScreenMode_FullScreenWindow,
 }
 
 #[derive(Deserialize, Serialize, Copy, Clone, Default, Eq, PartialEq)]
 pub enum ResolutionScaling {
-    #[default] Default,
+    #[default]
+    Default,
     ScaleToScreenSize,
-    ScaleToWindowSize
+    ScaleToWindowSize,
 }
 
 impl ResolutionScaling {
-    pub fn is_not_default(&self) -> bool { *self != Self::Default }
+    pub fn is_not_default(&self) -> bool {
+        *self != Self::Default
+    }
 }

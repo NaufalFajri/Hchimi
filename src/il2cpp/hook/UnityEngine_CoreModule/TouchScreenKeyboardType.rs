@@ -14,5 +14,5 @@ pub enum TouchScreenKeyboardType {
     Social,
     Search,
     DecimalPad,
-    OneTimeCode
+    OneTimeCode,
 }

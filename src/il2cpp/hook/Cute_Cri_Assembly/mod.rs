@@ -1,10 +1,10 @@
-mod MovieManager;
 pub mod AtomSourceEx;
 pub mod AudioControllerBase;
-pub mod AudioPlayback;
 pub mod AudioManager;
+pub mod AudioPlayback;
 pub mod CuteAudioSource;
 pub mod CuteAudioSourcePool;
+mod MovieManager;
 
 pub fn init() {
     get_assembly_image_or_return!(image, "Cute.Cri.Assembly.dll");

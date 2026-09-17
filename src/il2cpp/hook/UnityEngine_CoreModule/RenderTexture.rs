@@ -18,13 +18,11 @@ pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
     unsafe {
         GETTEMPORARY_ADDR = get_method_addr(RenderTexture, c"GetTemporary", 2);
         RELEASETEMPORARY_ADDR = il2cpp_resolve_icall(
-            c"UnityEngine.RenderTexture::ReleaseTemporary(UnityEngine.RenderTexture)".as_ptr()
+            c"UnityEngine.RenderTexture::ReleaseTemporary(UnityEngine.RenderTexture)".as_ptr(),
         );
-        GETACTIVE_ADDR = il2cpp_resolve_icall(
-            c"UnityEngine.RenderTexture::GetActive()".as_ptr()
-        );
+        GETACTIVE_ADDR = il2cpp_resolve_icall(c"UnityEngine.RenderTexture::GetActive()".as_ptr());
         SETACTIVE_ADDR = il2cpp_resolve_icall(
-            c"UnityEngine.RenderTexture::SetActive(UnityEngine.RenderTexture)".as_ptr()
+            c"UnityEngine.RenderTexture::SetActive(UnityEngine.RenderTexture)".as_ptr(),
         )
     }
 }

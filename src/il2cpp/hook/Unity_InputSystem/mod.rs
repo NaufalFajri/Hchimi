@@ -1,9 +1,9 @@
-pub mod Gamepad;
 pub mod AxisControl;
+pub mod ButtonControl;
+pub mod DpadControl;
+pub mod Gamepad;
 pub mod InputControl;
 pub mod Vector2Control;
-pub mod DpadControl;
-pub mod ButtonControl;
 
 pub fn init() {
     get_assembly_image_or_return!(image, "Unity.InputSystem.dll");

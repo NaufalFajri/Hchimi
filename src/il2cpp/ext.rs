@@ -11,10 +11,11 @@ use super::{
     hook::{
         UnityEngine_AssetBundleModule::AssetBundle,
         UnityEngine_CoreModule::{HideFlags_DontUnloadUnusedAsset, Object},
-        UnityEngine_TextRenderingModule::Font, Unity_TextMeshPro::TMP_FontAsset
+        UnityEngine_TextRenderingModule::Font,
+        Unity_TextMeshPro::TMP_FontAsset,
     },
     symbols::GCHandle,
-    types::*
+    types::*,
 };
 
 pub trait StringExt {
@@ -51,7 +52,13 @@ impl LocalizedDataExt for LocalizedData {
             return handle.target();
         }
 
-        let Some(path) = self.config.extra_asset_bundle.as_ref().map(|p| self.get_data_path(p)).unwrap_or_default() else {
+        let Some(path) = self
+            .config
+            .extra_asset_bundle
+            .as_ref()
+            .map(|p| self.get_data_path(p))
+            .unwrap_or_default()
+        else {
             return 0 as _;
         };
 
@@ -76,8 +83,7 @@ impl LocalizedDataExt for LocalizedData {
             let font = handle.target();
             if Object::IsNativeObjectAlive(font) {
                 return font;
-            }
-            else {
+            } else {
                 debug!("Font destroyed!");
                 *handle_opt = None;
             }
@@ -92,7 +98,11 @@ impl LocalizedDataExt for LocalizedData {
             return 0 as _;
         }
 
-        let font = AssetBundle::LoadAsset_Internal_orig(bundle, name.to_il2cpp_string(), Font::type_object());
+        let font = AssetBundle::LoadAsset_Internal_orig(
+            bundle,
+            name.to_il2cpp_string(),
+            Font::type_object(),
+        );
         if font.is_null() {
             error!("Failed to load replacement font");
             return 0 as _;
@@ -109,8 +119,7 @@ impl LocalizedDataExt for LocalizedData {
             let tmp_font = handle.target();
             if Object::IsNativeObjectAlive(tmp_font) {
                 return tmp_font;
-            }
-            else {
+            } else {
                 debug!("TMP font destroyed!");
                 *handle_opt = None;
             }
@@ -145,13 +154,18 @@ impl Il2CppStringExt for Il2CppString {
     }
 
     fn as_utf16str(&self) -> &Utf16Str {
-        unsafe { Utf16Str::from_slice_unchecked(std::slice::from_raw_parts(self.chars.as_ptr(), self.length as usize)) }
+        unsafe {
+            Utf16Str::from_slice_unchecked(std::slice::from_raw_parts(
+                self.chars.as_ptr(),
+                self.length as usize,
+            ))
+        }
     }
 
     fn hash(&self) -> u64 {
         let data = self.chars_ptr() as *const u8;
         let len = self.length as usize * std::mem::size_of::<Il2CppChar>();
-        
+
         let mut hasher = FnvHasher::default();
         hasher.write(unsafe { std::slice::from_raw_parts(data, len) });
         hasher.finish()

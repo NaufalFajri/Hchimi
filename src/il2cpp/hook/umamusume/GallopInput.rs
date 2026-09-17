@@ -1,10 +1,6 @@
 use crate::{
     core::Hachimi,
-    il2cpp::{
-        hook::UnityEngine_InputLegacyModule::Input,
-        symbols::get_method_addr,
-        types::*,
-    },
+    il2cpp::{hook::UnityEngine_InputLegacyModule::Input, symbols::get_method_addr, types::*},
 };
 
 use super::WindowsGamepadControl;

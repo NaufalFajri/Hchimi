@@ -1,7 +1,4 @@
-use crate::il2cpp::{
-    symbols::get_method_addr,
-    types::*,
-};
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 static mut GET_GATE_NO_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_GateNo, GET_GATE_NO_ADDR, i32, this: *mut Il2CppObject);

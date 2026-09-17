@@ -3,7 +3,14 @@ use std::{collections::hash_map, sync::Mutex};
 use fnv::FnvHashMap;
 use once_cell::sync::Lazy;
 
-use crate::{core::Hachimi, il2cpp::{hook::UnityEngine_UI::Text, symbols::{get_method_addr, GCHandle}, types::*}};
+use crate::{
+    core::Hachimi,
+    il2cpp::{
+        hook::UnityEngine_UI::Text,
+        symbols::{get_method_addr, GCHandle},
+        types::*,
+    },
+};
 
 static mut GET_TEXTLABEL_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_TextLabel, GET_TEXTLABEL_ADDR, *mut Il2CppObject, this: *mut Il2CppObject);
@@ -19,8 +26,7 @@ extern "C" fn Initialize(this: *mut Il2CppObject) {
 
     if let hash_map::Entry::Vacant(e) = PROCESSED.lock().unwrap().entry(this as usize) {
         e.insert(GCHandle::new_weak_ref(this, false));
-    }
-    else {
+    } else {
         return;
     }
 

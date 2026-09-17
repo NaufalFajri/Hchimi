@@ -1,10 +1,13 @@
-use std::sync::{Arc, Mutex, mpsc::{self, Receiver, Sender}};
+use std::sync::{
+    mpsc::{self, Receiver, Sender},
+    Arc, Mutex,
+};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 
-use crate::il2cpp::{symbols::GCHandle,types::Il2CppString};
+use crate::il2cpp::{symbols::GCHandle, types::Il2CppString};
 
 use super::{Error, Hachimi};
 
@@ -16,7 +19,7 @@ pub struct SugoiClient {
 
 pub struct StringInfo {
     pub str_handle: GCHandle,
-    pub str: String
+    pub str: String,
 }
 impl StringInfo {
     pub fn object(&self) -> *mut Il2CppString {
@@ -27,25 +30,28 @@ impl StringInfo {
 static INSTANCE: Lazy<Arc<SugoiClient>> = Lazy::new(|| {
     Arc::new(SugoiClient {
         agent: ureq::Agent::new_with_defaults(),
-        url: Hachimi::instance().config.load().sugoi_url.as_ref()
+        url: Hachimi::instance()
+            .config
+            .load()
+            .sugoi_url
+            .as_ref()
             .map(|s| s.clone())
             .unwrap_or_else(|| "http://127.0.0.1:14366".to_owned()),
         request_lock: Mutex::new(()),
     })
 });
 
-pub static TRANSLATION_QUEUE: Lazy<(Sender<(String, String)>, Mutex<Receiver<(String, String)>>)> = Lazy::new(|| {
-    let (tx, rx) = mpsc::channel();
-    (tx, Mutex::new(rx))
-});
+pub static TRANSLATION_QUEUE: Lazy<(Sender<(String, String)>, Mutex<Receiver<(String, String)>>)> =
+    Lazy::new(|| {
+        let (tx, rx) = mpsc::channel();
+        (tx, Mutex::new(rx))
+    });
 
-pub static TRANSLATION_CACHE: Lazy<Mutex<FnvHashMap<String, String>>> = Lazy::new(|| {
-    Mutex::new(FnvHashMap::default())
-});
+pub static TRANSLATION_CACHE: Lazy<Mutex<FnvHashMap<String, String>>> =
+    Lazy::new(|| Mutex::new(FnvHashMap::default()));
 
-pub static PENDING_TRANSLATIONS: Lazy<Mutex<FnvHashSet<String>>> = Lazy::new(|| {
-    Mutex::new(FnvHashSet::default())
-});
+pub static PENDING_TRANSLATIONS: Lazy<Mutex<FnvHashSet<String>>> =
+    Lazy::new(|| Mutex::new(FnvHashSet::default()));
 
 pub static REQUEST_QUEUE: Lazy<Sender<String>> = Lazy::new(|| {
     let (tx, rx) = mpsc::channel::<String>();
@@ -69,14 +75,18 @@ pub static REQUEST_QUEUE: Lazy<Sender<String>> = Lazy::new(|| {
 
                 match client.translate(&batch) {
                     Ok(translated) => {
-                        let mut pending = PENDING_TRANSLATIONS.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut pending = PENDING_TRANSLATIONS
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner());
                         for (orig, trans) in batch.into_iter().zip(translated.into_iter()) {
                             let _ = translation_tx.send((orig.clone(), trans));
                             pending.remove(&orig);
                         }
                     }
                     Err(_) => {
-                        let mut pending = PENDING_TRANSLATIONS.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut pending = PENDING_TRANSLATIONS
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner());
                         for orig in batch {
                             pending.remove(&orig);
                         }
@@ -95,7 +105,11 @@ impl SugoiClient {
     }
 
     pub fn get_cached(&self, original: &str) -> Option<String> {
-        TRANSLATION_CACHE.lock().unwrap_or_else(|e| e.into_inner()).get(original).cloned()
+        TRANSLATION_CACHE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(original)
+            .cloned()
     }
 
     pub fn translate_async(&self, original: String) {
@@ -103,7 +117,9 @@ impl SugoiClient {
             return;
         }
 
-        let mut pending = PENDING_TRANSLATIONS.lock().unwrap_or_else(|e| e.into_inner());
+        let mut pending = PENDING_TRANSLATIONS
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if pending.insert(original.clone()) {
             let _ = REQUEST_QUEUE.send(original);
         }
@@ -112,19 +128,23 @@ impl SugoiClient {
     pub fn translate(&self, content: &[String]) -> Result<Vec<String>, Error> {
         let _guard = self.request_lock.lock().unwrap();
 
-        let res = self.agent.post(&self.url)
+        let res = self
+            .agent
+            .post(&self.url)
             .header("Content-Type", "application/json")
             .header("Connection", "close")
             .send_json(Message::TranslateSentences { content })?;
 
-        let body_str = res.into_body().read_to_string()?; 
+        let body_str = res.into_body().read_to_string()?;
         Ok(serde_json::from_str(&body_str)?)
     }
 
     pub fn translate_one(&self, content: String) -> Result<String, Error> {
         let mut res = self.translate(&[content])?;
         if res.len() != 1 {
-            return Err(Error::RuntimeError("Server returned invalid amount of translated content".to_owned()));
+            return Err(Error::RuntimeError(
+                "Server returned invalid amount of translated content".to_owned(),
+            ));
         }
         Ok(res.pop().unwrap())
     }
@@ -134,7 +154,5 @@ impl SugoiClient {
 #[serde(tag = "message")]
 enum Message<'a> {
     #[serde(rename = "translate sentences")]
-    TranslateSentences {
-        content: &'a [String]
-    }
+    TranslateSentences { content: &'a [String] },
 }

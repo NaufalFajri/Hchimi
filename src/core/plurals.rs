@@ -26,8 +26,8 @@
     SOFTWARE.
 */
 
-use super::Error;
 use self::Resolver::*;
+use super::Error;
 
 #[derive(Clone, Debug)]
 pub enum Resolver {
@@ -107,7 +107,7 @@ pub enum Operator {
     Minus,
     Divide,
     Multiply,
-    Modulo
+    Modulo,
 }
 
 impl Ast {

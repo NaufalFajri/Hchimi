@@ -1,9 +1,9 @@
-use std::sync::Mutex;
 use once_cell::sync::Lazy;
+use std::sync::Mutex;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::UI::Shell::{
-    ITaskbarList3, TaskbarList, TBPFLAG, TBPF_NOPROGRESS, TBPF_NORMAL
+    ITaskbarList3, TaskbarList, TBPFLAG, TBPF_NOPROGRESS, TBPF_NORMAL,
 };
 
 struct TaskbarWrapper(ITaskbarList3);
@@ -18,7 +18,9 @@ static mut CURRENT_VALUE: u64 = 0;
 pub fn init(hwnd: HWND) {
     unsafe {
         TASKBAR_HWND = hwnd;
-        if let Ok(taskbar) = CoCreateInstance::<_, ITaskbarList3>(&TaskbarList, None, CLSCTX_INPROC_SERVER) {
+        if let Ok(taskbar) =
+            CoCreateInstance::<_, ITaskbarList3>(&TaskbarList, None, CLSCTX_INPROC_SERVER)
+        {
             let _ = taskbar.SetProgressState(hwnd, TBPF_NOPROGRESS);
             *TASKBAR_LIST.lock().unwrap() = Some(TaskbarWrapper(taskbar));
         }
@@ -27,7 +29,9 @@ pub fn init(hwnd: HWND) {
 
 pub fn set_progress_state(state: TBPFLAG) {
     unsafe {
-        if CURRENT_STATE == state { return; }
+        if CURRENT_STATE == state {
+            return;
+        }
         CURRENT_STATE = state;
         if let Some(wrapper) = TASKBAR_LIST.lock().unwrap().as_ref() {
             let _ = wrapper.0.SetProgressState(TASKBAR_HWND, state);
@@ -37,7 +41,9 @@ pub fn set_progress_state(state: TBPFLAG) {
 
 pub fn set_progress_value(completed: u64, total: u64) {
     unsafe {
-        if CURRENT_VALUE == completed && CURRENT_STATE == TBPF_NORMAL { return; }
+        if CURRENT_VALUE == completed && CURRENT_STATE == TBPF_NORMAL {
+            return;
+        }
         CURRENT_VALUE = completed;
         CURRENT_STATE = TBPF_NORMAL;
         if let Some(wrapper) = TASKBAR_LIST.lock().unwrap().as_ref() {

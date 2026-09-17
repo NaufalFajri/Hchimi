@@ -11,6 +11,7 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     unsafe {
         GET_BUTTONGALLERY_ADDR = get_method_addr(CharacterNoteTopView, c"get_ButtonGallery", 0);
-        GET_BUTTONTALKGALLERY_ADDR = get_method_addr(CharacterNoteTopView, c"get_ButtonTalkGallery", 0);
+        GET_BUTTONTALKGALLERY_ADDR =
+            get_method_addr(CharacterNoteTopView, c"get_ButtonTalkGallery", 0);
     }
 }

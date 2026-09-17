@@ -5,7 +5,9 @@ use super::Connection::SELECT_QUERIES;
 type GetTextFn = extern "C" fn(this: *mut Il2CppObject, idx: i32) -> *mut Il2CppString;
 pub extern "C" fn GetText(this: *mut Il2CppObject, idx: i32) -> *mut Il2CppString {
     if let Some(query) = SELECT_QUERIES.lock().unwrap().get(&(this as usize)) {
-        return query.get_text(this, idx).unwrap_or_else(|| get_orig_fn!(GetText, GetTextFn)(this, idx));
+        return query
+            .get_text(this, idx)
+            .unwrap_or_else(|| get_orig_fn!(GetText, GetTextFn)(this, idx));
     }
     get_orig_fn!(GetText, GetTextFn)(this, idx)
 }

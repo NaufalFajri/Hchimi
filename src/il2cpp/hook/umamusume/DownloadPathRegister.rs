@@ -14,6 +14,10 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     unsafe {
         CLASS = DownloadPathRegister;
-        REGISTER_PATH_ARRAY_ADDR = get_method_overload_addr(DownloadPathRegister, "RegisterPath", &[Il2CppTypeEnum_IL2CPP_TYPE_SZARRAY]);
+        REGISTER_PATH_ARRAY_ADDR = get_method_overload_addr(
+            DownloadPathRegister,
+            "RegisterPath",
+            &[Il2CppTypeEnum_IL2CPP_TYPE_SZARRAY],
+        );
     }
 }

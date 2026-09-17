@@ -1,7 +1,4 @@
-use crate::il2cpp::{
-    symbols::get_method_addr,
-    types::*,
-};
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 static mut GET_OWNER_OBJECT_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_OwnerObject, GET_OWNER_OBJECT_ADDR, *mut Il2CppObject, this: *mut Il2CppObject);

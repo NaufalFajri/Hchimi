@@ -68,11 +68,15 @@ fn try_load_library(name_or_path: &str) -> Option<Plugin> {
     let init_enum = {
         let v3_addr = unsafe { libc::dlsym(handle, c"hachimi_init_v3".as_ptr()) };
         if !v3_addr.is_null() {
-            Some(crate::core::plugin_api::PluginInit::V3(unsafe { std::mem::transmute(v3_addr) }))
+            Some(crate::core::plugin_api::PluginInit::V3(unsafe {
+                std::mem::transmute(v3_addr)
+            }))
         } else {
             let v2_addr = unsafe { libc::dlsym(handle, c"hachimi_init".as_ptr()) };
             if !v2_addr.is_null() {
-                Some(crate::core::plugin_api::PluginInit::V2(unsafe { std::mem::transmute(v2_addr) }))
+                Some(crate::core::plugin_api::PluginInit::V2(unsafe {
+                    std::mem::transmute(v2_addr)
+                }))
             } else {
                 None
             }

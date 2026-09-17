@@ -1,6 +1,6 @@
 pub mod CriAtomExAcb;
-pub mod CriAtomExPlayer;
 pub mod CriAtomExPlayback;
+pub mod CriAtomExPlayer;
 pub mod CriAtomSourceBase;
 
 pub fn init() {

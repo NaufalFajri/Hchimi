@@ -24,6 +24,7 @@ pub fn init(Plugins: *const Il2CppImage) {
     unsafe {
         _POSITIONOFFSET_FIELD = get_field_from_name(AnObjectParameterBase, c"_positionOffset");
         _SCALE_FIELD = get_field_from_name(AnObjectParameterBase, c"_scale");
-        _POSITIONOFFSET_KEYPARAM_LIST_FIELD = get_field_from_name(AnObjectParameterBase, c"_positionOffsetKeyParamList");
+        _POSITIONOFFSET_KEYPARAM_LIST_FIELD =
+            get_field_from_name(AnObjectParameterBase, c"_positionOffsetKeyParamList");
     }
 }

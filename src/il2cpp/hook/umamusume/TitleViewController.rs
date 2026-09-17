@@ -1,4 +1,7 @@
-use crate::{core::taskbar::{self, TBPF_NOPROGRESS}, il2cpp::{symbols::get_method_addr, types::*}};
+use crate::{
+    core::taskbar::{self, TBPF_NOPROGRESS},
+    il2cpp::{symbols::get_method_addr, types::*},
+};
 
 use super::MainGameInitializer;
 
@@ -16,7 +19,6 @@ extern "C" fn UpdateView(this: *mut Il2CppObject) {
         }
     }
 }
-
 
 pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, TitleViewController);

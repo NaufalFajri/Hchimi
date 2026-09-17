@@ -1,4 +1,7 @@
-use crate::{core::taskbar::{self, TBPF_NORMAL, TBPF_NOPROGRESS}, il2cpp::{symbols::get_method_addr, types::*}};
+use crate::{
+    core::taskbar::{self, TBPF_NOPROGRESS, TBPF_NORMAL},
+    il2cpp::{symbols::get_method_addr, types::*},
+};
 
 type ShowFn = extern "C" fn(this: *mut Il2CppObject);
 extern "C" fn Show(this: *mut Il2CppObject) {

@@ -224,7 +224,7 @@ pub enum ViewId {
     CampaignsValentineSpStory = 8401,
     TrainingReport = 8450,
     MapEvent = 8500,
-    Max = 9999
+    Max = 9999,
 }
 
 impl_enum_eq!(ViewId);

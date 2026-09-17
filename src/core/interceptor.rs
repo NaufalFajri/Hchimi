@@ -8,27 +8,27 @@ use super::Error;
 
 #[derive(Default)]
 pub struct Interceptor {
-    hook_map: Mutex<FnvHashMap<usize, HookHandle>>
+    hook_map: Mutex<FnvHashMap<usize, HookHandle>>,
 }
 
 pub struct HookHandle {
     pub orig_addr: usize,
     pub trampoline_addr: usize,
-    pub hook_type: HookType
+    pub hook_type: HookType,
 }
 
 impl HookHandle {
     unsafe fn unhook(&self) -> Result<(), Error> {
         match self.hook_type {
             HookType::Function => interceptor_impl::unhook(self),
-            HookType::Vtable => interceptor_impl::unhook_vtable(self)
+            HookType::Vtable => interceptor_impl::unhook_vtable(self),
         }
     }
 }
 
 pub enum HookType {
     Function,
-    Vtable
+    Vtable,
 }
 
 impl Interceptor {
@@ -37,23 +37,27 @@ impl Interceptor {
             hash_map::Entry::Occupied(e) => Ok(e.get().trampoline_addr),
             hash_map::Entry::Vacant(e) => {
                 let trampoline_addr = unsafe { interceptor_impl::hook(orig_addr, hook_addr)? };
-                e.insert(
-                    HookHandle {
-                        orig_addr,
-                        trampoline_addr,
-                        hook_type: HookType::Function
-                    }
-                );
+                e.insert(HookHandle {
+                    orig_addr,
+                    trampoline_addr,
+                    hook_type: HookType::Function,
+                });
                 Ok(trampoline_addr)
-            },
+            }
         }
     }
 
-    pub fn hook_vtable(&self, vtable: *mut usize, vtable_index: usize, hook_addr: usize) -> Result<usize, Error> {
+    pub fn hook_vtable(
+        &self,
+        vtable: *mut usize,
+        vtable_index: usize,
+        hook_addr: usize,
+    ) -> Result<usize, Error> {
         match self.hook_map.lock().unwrap().entry(hook_addr) {
             hash_map::Entry::Occupied(e) => Ok(e.get().trampoline_addr),
             hash_map::Entry::Vacant(e) => {
-                let hook_handle = unsafe { interceptor_impl::hook_vtable(vtable, vtable_index, hook_addr)? };
+                let hook_handle =
+                    unsafe { interceptor_impl::hook_vtable(vtable, vtable_index, hook_addr)? };
                 let trampoline_addr = hook_handle.trampoline_addr;
                 e.insert(hook_handle);
                 Ok(trampoline_addr)
@@ -64,8 +68,7 @@ impl Interceptor {
     pub fn get_trampoline_addr(&self, hook_addr: usize) -> usize {
         if let Some(hook) = self.hook_map.lock().unwrap().get(&hook_addr) {
             hook.trampoline_addr
-        }
-        else {
+        } else {
             warn!("Attempted to get invalid hook: {}", hook_addr);
             0
         }
@@ -98,7 +101,13 @@ impl Interceptor {
 }
 
 macro_rules! get_orig_fn {
-    ($hook:ident, $type:tt) => (
-        unsafe { std::mem::transmute::<usize, $type>(crate::core::Hachimi::instance().interceptor.get_trampoline_addr($hook as *const () as usize)) }
-    )
+    ($hook:ident, $type:tt) => {
+        unsafe {
+            std::mem::transmute::<usize, $type>(
+                crate::core::Hachimi::instance()
+                    .interceptor
+                    .get_trampoline_addr($hook as *const () as usize),
+            )
+        }
+    };
 }

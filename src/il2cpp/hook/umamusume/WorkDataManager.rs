@@ -1,6 +1,6 @@
 use crate::il2cpp::{
     symbols::{get_method_addr, SingletonLike},
-    types::*
+    types::*,
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;

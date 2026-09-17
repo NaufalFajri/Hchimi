@@ -1,9 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::il2cpp::{
-    symbols::get_method_addr,
-    types::*
-};
+use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 static RACE_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub fn is_race_active() -> bool {
@@ -13,7 +10,8 @@ pub fn is_race_active() -> bool {
 def_method_wrapper_fn!(GetHorseRaceInfos, GET_HORSE_RACE_INFOS_ADDR, *mut Il2CppArray, this: *mut Il2CppObject);
 def_method_wrapper_fn!(GetPlayerHorseIndex, GET_PLAYER_HORSE_INDEX_ADDR, i32, this: *mut Il2CppObject);
 
-type RaceHorseManagerBase_InitFn = extern "C" fn(this: *mut Il2CppObject, raceInfo: *mut Il2CppObject);
+type RaceHorseManagerBase_InitFn =
+    extern "C" fn(this: *mut Il2CppObject, raceInfo: *mut Il2CppObject);
 extern "C" fn RaceHorseManagerBase_Init(this: *mut Il2CppObject, raceInfo: *mut Il2CppObject) {
     RACE_ACTIVE.store(true, Ordering::Release);
     get_orig_fn!(RaceHorseManagerBase_Init, RaceHorseManagerBase_InitFn)(this, raceInfo);
@@ -30,7 +28,8 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     unsafe {
         GET_HORSE_RACE_INFOS_ADDR = get_method_addr(RaceHorseManagerBase, c"GetHorseRaceInfos", 0);
-        GET_PLAYER_HORSE_INDEX_ADDR = get_method_addr(RaceHorseManagerBase, c"GetPlayerHorseIndex", 0);
+        GET_PLAYER_HORSE_INDEX_ADDR =
+            get_method_addr(RaceHorseManagerBase, c"GetPlayerHorseIndex", 0);
     }
 
     let Init_addr = get_method_addr(RaceHorseManagerBase, c"Init", 1);

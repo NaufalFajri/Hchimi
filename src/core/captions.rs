@@ -1,22 +1,23 @@
-use std::{
-    ptr::null_mut,
-    sync::Mutex
-};
 use crate::{
     core::Hachimi,
     il2cpp::{
         ext::{Il2CppStringExt, StringExt},
         hook::{
+            umamusume::{
+                AudioManager, GallopUtil, ImageCommon,
+                MasterCharacterSystemText::{self, CharacterSystemText},
+                Notification, PartsCharaMessageBase, SceneManager, TextCommon, UIManager,
+            },
             UnityEngine_CoreModule::{Component, GameObject, Object, Resources, Transform},
             UnityEngine_UI::Text,
             UnityEngine_UIModule::CanvasGroup,
-            umamusume::{AudioManager, GallopUtil, ImageCommon, MasterCharacterSystemText::{self, CharacterSystemText}, Notification, PartsCharaMessageBase, SceneManager, TextCommon, UIManager}
         },
         symbols::{self, GCHandle, Thread},
-        types::*
-    }
+        types::*,
+    },
 };
 use once_cell::sync::Lazy;
+use std::{ptr::null_mut, sync::Mutex};
 
 #[repr(C)]
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -39,37 +40,58 @@ pub static CAPTION_REQUEST: Lazy<Mutex<Option<CaptionData>>> = Lazy::new(|| Mute
 
 fn lookup_caption(chara_id: i32, cue_id: i32, cue_name: &str) -> Option<CaptionData> {
     let list = MasterCharacterSystemText::GetByCharaId(chara_id);
-    if list.is_null() { return None; }
+    if list.is_null() {
+        return None;
+    }
 
     if let Some(ilist) = symbols::IList::<*mut Il2CppObject>::new(list) {
         for item in ilist.iter() {
-            if item.is_null() { continue; }
+            if item.is_null() {
+                continue;
+            }
 
             let item_cue_id = CharacterSystemText::get_CueId(item);
             let item_cue_sheet_ptr = CharacterSystemText::get_CueSheet(item);
-            if item_cue_sheet_ptr.is_null() { continue; }
+            if item_cue_sheet_ptr.is_null() {
+                continue;
+            }
 
             if item_cue_id == cue_id {
                 let item_cue_sheet = unsafe { (*item_cue_sheet_ptr).as_utf16str().to_string() };
                 if cue_name.starts_with(&item_cue_sheet) {
                     let text_ptr = CharacterSystemText::get_Text(item);
-                    if text_ptr.is_null() { break; }
+                    if text_ptr.is_null() {
+                        break;
+                    }
                     let voice_id = CharacterSystemText::get_VoiceId(item);
 
                     let orig_text = unsafe { (*text_ptr).as_utf16str().to_string() };
                     let clean_text = orig_text.replace("\n\n", " ").replace("\n", " ");
 
-                    if !cue_name.contains("_home_") && !cue_name.contains("_tc_") &&
-                        !cue_name.contains("_title_") && !cue_name.contains("_kakao_") &&
-                        !cue_name.contains("_gacha_") && voice_id != 95001 &&
-                        (chara_id < 9000 || voice_id == 95005 || voice_id == 95006 || voice_id == 70000)
+                    if !cue_name.contains("_home_")
+                        && !cue_name.contains("_tc_")
+                        && !cue_name.contains("_title_")
+                        && !cue_name.contains("_kakao_")
+                        && !cue_name.contains("_gacha_")
+                        && voice_id != 95001
+                        && (chara_id < 9000
+                            || voice_id == 95005
+                            || voice_id == 95006
+                            || voice_id == 70000)
                     {
                         let mut valid = true;
-                        if cue_name.contains("_training_") && (item_cue_id < 29 || item_cue_id == 39) {
-                            if !((voice_id >= 2030 && voice_id <= 2037) || voice_id >= 93000 || [8, 9, 12, 13].contains(&item_cue_id)) {
+                        if cue_name.contains("_training_")
+                            && (item_cue_id < 29 || item_cue_id == 39)
+                        {
+                            if !((voice_id >= 2030 && voice_id <= 2037)
+                                || voice_id >= 93000
+                                || [8, 9, 12, 13].contains(&item_cue_id))
+                            {
                             } else if voice_id == 20025 {
                                 let scene_manager = SceneManager::instance();
-                                if scene_manager.is_null() { break; }
+                                if scene_manager.is_null() {
+                                    break;
+                                }
                                 if SceneManager::GetCurrentViewId(scene_manager) != 5901 {
                                     valid = false;
                                 }
@@ -104,17 +126,29 @@ pub fn process_caption_request() {
             poisoned.into_inner().take()
         }
     };
-    let Some(caption_data) = request else { return; };
+    let Some(caption_data) = request else {
+        return;
+    };
 
-    let final_data = match lookup_caption(caption_data.character_id, caption_data.cue_id, &caption_data.cue_sheet) {
+    let final_data = match lookup_caption(
+        caption_data.character_id,
+        caption_data.cue_id,
+        &caption_data.cue_sheet,
+    ) {
         Some(c) => c,
         None => return,
     };
 
     let am = AudioManager::instance();
     let length = if !am.is_null() {
-        AudioManager::GetCueLength(am, final_data.cue_sheet.to_il2cpp_string(), final_data.cue_id)
-    } else { 0.0 };
+        AudioManager::GetCueLength(
+            am,
+            final_data.cue_sheet.to_il2cpp_string(),
+            final_data.cue_id,
+        )
+    } else {
+        0.0
+    };
     let length = if length <= 0.0 { 3.0 } else { length };
 
     let mut caption_is_redundant = false;
@@ -146,7 +180,9 @@ pub fn process_caption_request() {
         return;
     }
 
-    let localized_text = Hachimi::instance().localized_data.load()
+    let localized_text = Hachimi::instance()
+        .localized_data
+        .load()
         .character_system_text_dict
         .get(&final_data.character_id)
         .and_then(|dict| dict.get(&final_data.voice_id))
@@ -210,7 +246,9 @@ static STATE: Lazy<Mutex<CaptionState>> = Lazy::new(|| {
 });
 
 fn is_native_alive(obj: *mut Il2CppObject) -> bool {
-    if obj.is_null() { return false; }
+    if obj.is_null() {
+        return false;
+    }
     Object::IsNativeObjectAlive(obj)
 }
 
@@ -218,12 +256,16 @@ fn is_native_alive(obj: *mut Il2CppObject) -> bool {
 fn seh_guard<F: FnMut()>(mut f: F) {
     if microseh::try_seh(|| f()).is_err() {
         warn!("[captions] SEH exception caught, resetting state");
-        if let Ok(mut st) = STATE.lock() { st.clear(); }
+        if let Ok(mut st) = STATE.lock() {
+            st.clear();
+        }
     }
 }
 
 #[cfg(not(target_os = "windows"))]
-fn seh_guard<F: FnOnce()>(f: F) { f(); }
+fn seh_guard<F: FnOnce()>(f: F) {
+    f();
+}
 
 // Drop the mutex lock BEFORE making IL2CPP calls to prevent deadlock.
 // Rust's Mutex is not re-entrant, if an IL2CPP callback tries to acquire
@@ -236,14 +278,18 @@ fn init_impl() {
         let skip = st.inited && !notif.is_null() && is_native_alive(notif);
         (!skip, if skip { notif } else { null_mut() })
     };
-    if !needs_init { return; }
+    if !needs_init {
+        return;
+    }
 
     // Phase 2: All IL2CPP calls happen WITHOUT the lock held
     let mut st = STATE.lock().unwrap();
     st.clear();
 
     let ui_manager = UIManager::instance();
-    if ui_manager.is_null() { return; }
+    if ui_manager.is_null() {
+        return;
+    }
 
     let mut canvas = UIManager::get_noticeCanvas(ui_manager);
     if canvas.is_null() {
@@ -252,27 +298,41 @@ fn init_impl() {
     if canvas.is_null() {
         canvas = UIManager::get_mainCanvas(ui_manager);
     }
-    if canvas.is_null() { return; }
+    if canvas.is_null() {
+        return;
+    }
 
     let transform = Component::get_transform(canvas);
-    if transform.is_null() { return; }
+    if transform.is_null() {
+        return;
+    }
 
     let path = "UI/Parts/Notification".to_il2cpp_string();
 
     let go_type = GameObject::type_object();
-    if go_type.is_null() { return; }
+    if go_type.is_null() {
+        return;
+    }
 
     let prefab = Resources::Load(path, go_type);
-    if prefab.is_null() { return; }
+    if prefab.is_null() {
+        return;
+    }
 
     let inst = Object::Internal_CloneSingleWithParent(prefab, transform, false);
-    if inst.is_null() { return; }
+    if inst.is_null() {
+        return;
+    }
 
     let notif_type = Notification::type_object();
-    if notif_type.is_null() { return; }
+    if notif_type.is_null() {
+        return;
+    }
 
     let new_notif = GameObject::GetComponentInChildren(inst, notif_type, true);
-    if new_notif.is_null() { return; }
+    if new_notif.is_null() {
+        return;
+    }
 
     st.set_notification(new_notif);
 
@@ -281,7 +341,9 @@ fn init_impl() {
         GameObject::SetActive(go, false);
         st.inited = true;
     }
-    if !st.inited { st.clear(); }
+    if !st.inited {
+        st.clear();
+    }
 }
 
 fn show_impl(text: &str, line_char_count: i32) {
@@ -296,12 +358,16 @@ fn show_impl(text: &str, line_char_count: i32) {
     drop(st);
 
     let label = Notification::get__Label(notif);
-    if label.is_null() { return; }
+    if label.is_null() {
+        return;
+    }
 
     let mut il2_text = text.to_il2cpp_string();
     if line_char_count > 0 {
         let wrapped = GallopUtil::LineHeadWrap(il2_text, line_char_count);
-        if !wrapped.is_null() { il2_text = wrapped; }
+        if !wrapped.is_null() {
+            il2_text = wrapped;
+        }
     }
 
     Text::set_text(label, il2_text);
@@ -331,7 +397,9 @@ fn show_impl(text: &str, line_char_count: i32) {
 fn fade_tick_global() {
     let st = STATE.lock().unwrap();
     let notif = st.notification();
-    if notif.is_null() || !is_native_alive(notif) { return; }
+    if notif.is_null() || !is_native_alive(notif) {
+        return;
+    }
 
     let current_fade_id = st.fade_id;
     let start_time = match st.fade_start_time {
@@ -344,7 +412,9 @@ fn fade_tick_global() {
 
     {
         let st = STATE.lock().unwrap();
-        if st.fade_id != current_fade_id { return; }
+        if st.fade_id != current_fade_id {
+            return;
+        }
     }
 
     let elapsed = start_time.elapsed().as_secs_f32();
@@ -382,7 +452,9 @@ fn fade_tick_global() {
 fn set_display_time_impl(time: f32) {
     let st = STATE.lock().unwrap();
     let notif = st.notification();
-    if notif.is_null() || !is_native_alive(notif) { return; }
+    if notif.is_null() || !is_native_alive(notif) {
+        return;
+    }
     drop(st);
 
     Notification::set__displayTime(notif, time);
@@ -399,11 +471,15 @@ fn set_format_impl(
 ) {
     let st = STATE.lock().unwrap();
     let notif = st.notification();
-    if notif.is_null() || !is_native_alive(notif) { return; }
+    if notif.is_null() || !is_native_alive(notif) {
+        return;
+    }
     drop(st);
 
     let label = Notification::get__Label(notif);
-    if label.is_null() { return; }
+    if label.is_null() {
+        return;
+    }
 
     Text::set_fontSize(label, font_size);
     Text::set_best_fit_max_size(label, font_size);
@@ -411,7 +487,7 @@ fn set_format_impl(
     if !font_color.is_empty() {
         if let Some(e) = symbols::parse_enum(
             symbols::get_runtime_type(c"umamusume.dll", c"Gallop", c"FontColorType"),
-            font_color
+            font_color,
         ) {
             let v = symbols::get_enum_int(e);
             TextCommon::set_FontColor(label, v);
@@ -421,7 +497,7 @@ fn set_format_impl(
     if !outline_size.is_empty() {
         if let Some(e) = symbols::parse_enum(
             symbols::get_runtime_type(c"umamusume.dll", c"Gallop", c"OutlineSizeType"),
-            outline_size
+            outline_size,
         ) {
             let v = symbols::get_enum_int(e);
             TextCommon::set_OutlineSize(label, v);
@@ -432,7 +508,7 @@ fn set_format_impl(
     if !outline_color.is_empty() {
         if let Some(e) = symbols::parse_enum(
             symbols::get_runtime_type(c"umamusume.dll", c"Gallop", c"OutlineColorType"),
-            outline_color
+            outline_color,
         ) {
             let v = symbols::get_enum_int(e);
             TextCommon::set_OutlineColor(label, v);
@@ -452,10 +528,14 @@ fn set_format_impl(
     }
 
     let cg = Notification::get_canvasGroup(notif);
-    if cg.is_null() || !is_native_alive(cg) { return; }
+    if cg.is_null() || !is_native_alive(cg) {
+        return;
+    }
 
     let cg_tr = Component::get_transform(cg);
-    if cg_tr.is_null() { return; }
+    if cg_tr.is_null() {
+        return;
+    }
 
     let mut pos = Transform::get_position(cg_tr);
     pos.x = pos_x;
@@ -466,7 +546,9 @@ fn set_format_impl(
 fn cleanup_impl() {
     let mut st = STATE.lock().unwrap();
     let notif = st.notification();
-    if notif.is_null() || !is_native_alive(notif) { return; }
+    if notif.is_null() || !is_native_alive(notif) {
+        return;
+    }
 
     st.fade_id = st.fade_id.wrapping_add(1);
     drop(st);
@@ -518,6 +600,8 @@ impl Captions {
     }
 
     pub fn reset() {
-        if let Ok(mut st) = STATE.lock() { st.clear(); }
+        if let Ok(mut st) = STATE.lock() {
+            st.clear();
+        }
     }
 }

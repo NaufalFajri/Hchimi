@@ -180,6 +180,7 @@ config_editor:
   enable_ipc: "Enable IPC"
   ipc_listen_all: "IPC listen all"
   auto_translate_stories: "Auto translate stories"
+  chara_speak_home_idle: "Let chara speak in home screen when idling"
   auto_tl_warning: >-
     Note: This feature will not work on its own; requires external setup.
     Enabling this option requires a compatible translation server to be

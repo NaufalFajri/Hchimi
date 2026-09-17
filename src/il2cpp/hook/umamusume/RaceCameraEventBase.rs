@@ -1,9 +1,6 @@
 use crate::{
+    il2cpp::{symbols::get_method_addr, types::*},
     windows::free_camera::{self, CameraScene},
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*,
-    },
 };
 
 type CameraGetFloatFn = extern "C" fn(this: *mut Il2CppObject) -> f32;

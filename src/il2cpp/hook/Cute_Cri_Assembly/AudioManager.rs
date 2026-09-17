@@ -1,6 +1,6 @@
 use crate::il2cpp::{
     symbols::{get_field_from_name, get_method_addr, Dictionary, Il2CppDictionary},
-    types::*
+    types::*,
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;

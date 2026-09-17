@@ -1,16 +1,17 @@
-use std::ptr::null_mut;
-use serde::{Serialize, Deserialize};
 use crate::il2cpp::{symbols::get_method_addr, types::*};
+use serde::{Deserialize, Serialize};
+use std::ptr::null_mut;
 
 #[derive(Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[repr(i32)]
 pub enum ShadowResolution {
-    #[default] Default,
+    #[default]
+    Default,
     _256 = 0x100,
     _512 = 0x200,
     _1024 = 0x400,
     _2048 = 0x800,
-    _4096 = 0x1000
+    _4096 = 0x1000,
 }
 
 static mut CLASS: *mut Il2CppClass = null_mut();
@@ -28,7 +29,9 @@ pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, "Gallop.RenderPipeline", CameraData);
     unsafe {
         CLASS = CameraData;
-        SET_ISOVERRIDESHADOWRESOLUTION_ADDR = get_method_addr(CameraData, c"set_IsOverrideShadowResolution", 1);
-        SET_OVERRIDESHADOWRESOLUTION_ADDR = get_method_addr(CameraData, c"set_OverrideShadowResolution", 1);
+        SET_ISOVERRIDESHADOWRESOLUTION_ADDR =
+            get_method_addr(CameraData, c"set_IsOverrideShadowResolution", 1);
+        SET_OVERRIDESHADOWRESOLUTION_ADDR =
+            get_method_addr(CameraData, c"set_OverrideShadowResolution", 1);
     }
 }

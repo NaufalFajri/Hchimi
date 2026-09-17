@@ -1,4 +1,7 @@
-use crate::il2cpp::{api::{il2cpp_class_get_type, il2cpp_type_get_object}, types::*};
+use crate::il2cpp::{
+    api::{il2cpp_class_get_type, il2cpp_type_get_object},
+    types::*,
+};
 
 static mut TYPE_OBJECT: *mut Il2CppObject = 0 as _;
 pub fn type_object() -> *mut Il2CppObject {

@@ -1,9 +1,6 @@
 use crate::{
     core::captions,
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*
-    }
+    il2cpp::{symbols::get_method_addr, types::*},
 };
 
 type DisposeFn = extern "C" fn(this: *mut Il2CppObject);

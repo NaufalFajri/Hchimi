@@ -29,7 +29,11 @@ pub unsafe fn get_vtable_from_instance(_instance_addr: usize) -> *mut usize {
     unimplemented!();
 }
 
-pub unsafe fn hook_vtable(_vtable: *mut usize, _vtable_index: usize, _hook_addr: usize) -> Result<HookHandle, Error> {
+pub unsafe fn hook_vtable(
+    _vtable: *mut usize,
+    _vtable_index: usize,
+    _hook_addr: usize,
+) -> Result<HookHandle, Error> {
     unimplemented!();
 }
 

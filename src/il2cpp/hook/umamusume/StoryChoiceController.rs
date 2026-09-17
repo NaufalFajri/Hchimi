@@ -1,14 +1,19 @@
 use std::sync::atomic::{self, AtomicBool};
 
 use crate::{
-    core::{Hachimi, game::Region},
+    core::{game::Region, Hachimi},
     il2cpp::{
-        symbols::{get_method_addr, get_field_from_name},
-        types::*
-    }
+        symbols::{get_field_from_name, get_method_addr},
+        types::*,
+    },
 };
 
-def_field_value_accessors!(get__choiceAutoSelectWaitTime, set__choiceAutoSelectWaitTime, _CHOICEAUTOSELECTWAITTIME_FIELD, f32);
+def_field_value_accessors!(
+    get__choiceAutoSelectWaitTime,
+    set__choiceAutoSelectWaitTime,
+    _CHOICEAUTOSELECTWAITTIME_FIELD,
+    f32
+);
 
 static IS_CHECKING_CHOICE_AUTO_TAP: AtomicBool = AtomicBool::new(false);
 pub fn is_checking_choice_auto_tap() -> bool {
@@ -21,7 +26,10 @@ extern "C" fn CheckChoiceAutoTap(this: *mut Il2CppObject) {
 
     // Global has a different way of handling choice auto select delay in stories
     let is_global = Hachimi::instance().game.region == Region::Global;
-    let delay = Hachimi::instance().config.load().story_choice_auto_select_delay;
+    let delay = Hachimi::instance()
+        .config
+        .load()
+        .story_choice_auto_select_delay;
     let needs_scaling = is_global && delay != 0.75 && delay > 0.0 && delay.is_finite();
     let before = if needs_scaling {
         get__choiceAutoSelectWaitTime(this)
@@ -50,7 +58,8 @@ pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, StoryChoiceController);
 
     unsafe {
-        _CHOICEAUTOSELECTWAITTIME_FIELD = get_field_from_name(StoryChoiceController, c"_choiceAutoSelectWaitTime");
+        _CHOICEAUTOSELECTWAITTIME_FIELD =
+            get_field_from_name(StoryChoiceController, c"_choiceAutoSelectWaitTime");
     }
 
     let CheckChoiceAutoTap_addr = get_method_addr(StoryChoiceController, c"CheckChoiceAutoTap", 0);

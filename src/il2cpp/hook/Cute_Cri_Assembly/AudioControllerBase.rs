@@ -1,7 +1,4 @@
-use crate::il2cpp::{
-    symbols::get_field_from_name,
-    types::*
-};
+use crate::il2cpp::{symbols::get_field_from_name, types::*};
 
 def_field_object_accessors!(get_pool, set_pool, _POOL_FIELD, Il2CppObject);
 

@@ -5,8 +5,8 @@ use crate::{
     il2cpp::{
         api::il2cpp_array_new,
         symbols::{get_field_from_name, set_field_object_value},
-        types::*
-    }
+        types::*,
+    },
 };
 
 static mut CLASS: *mut Il2CppClass = 0 as _;

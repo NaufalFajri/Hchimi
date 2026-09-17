@@ -1,9 +1,6 @@
 use crate::{
+    il2cpp::{symbols::get_method_addr, types::*},
     windows::free_camera::{self, CameraScene},
-    il2cpp::{
-        symbols::get_method_addr,
-        types::*,
-    },
 };
 
 static mut GET_PREFAB_ATTACH_TRANSFORM_ADDR: usize = 0;
@@ -31,12 +28,10 @@ extern "C" fn RaceModelController_UpdateCameraDistanceBlendRate(
     if free_camera::is_scene_enabled(CameraScene::Race) {
         return;
     }
-    get_orig_fn!(RaceModelController_UpdateCameraDistanceBlendRate, RaceUpdateCameraDistanceBlendRateFn)(
-        this,
-        p1,
-        p2,
-        p3,
-    );
+    get_orig_fn!(
+        RaceModelController_UpdateCameraDistanceBlendRate,
+        RaceUpdateCameraDistanceBlendRateFn
+    )(this, p1, p2, p3);
 }
 
 pub fn init(umamusume: *const Il2CppImage) {
