@@ -1079,6 +1079,7 @@ pub fn set_live_active() {
         .set_scene(CameraScene::Live, &config.windows.free_camera);
 }
 
+#[allow(dead_code)]
 pub fn set_home_active() {
     let config = Hachimi::instance().config.load();
     if !config.windows.free_camera.enabled {
@@ -1089,6 +1090,25 @@ pub fn set_home_active() {
         .lock()
         .unwrap()
         .set_scene(CameraScene::Home, &config.windows.free_camera);
+}
+
+pub fn set_home_active_with_transform(pos: Vector3_t, rot: Quaternion_t) {
+    let config = Hachimi::instance().config.load();
+    if !config.windows.free_camera.enabled {
+        return;
+    }
+
+    let mut state = STATE.lock().unwrap();
+    if state.scene != CameraScene::Home {
+        state.scene = CameraScene::Home;
+        state.reset_with_config(&config.windows.free_camera);
+        state.camera_pos = Vec3::from(pos);
+        let q = Quat::from_quaternion(rot);
+        let forward = q.rotate_vec(Vec3::new(0.0, 0.0, 1.0));
+        state.yaw = forward.x.atan2(forward.z).to_degrees();
+        state.pitch = (-forward.y.clamp(-1.0, 1.0)).asin().to_degrees();
+        state.update_look_from_angles();
+    }
 }
 
 pub fn begin_live_director_update() {

@@ -1,5 +1,5 @@
 #[cfg(target_os = "windows")]
-use super::Director;
+use super::{Director, HomeCameraController};
 #[cfg(target_os = "windows")]
 use super::{RaceCameraManager, RaceManagerReplayBase};
 #[cfg(target_os = "windows")]
@@ -69,6 +69,11 @@ extern "C" fn GameSystem_LateUpdate(this: *mut Il2CppObject) {
     #[cfg(target_os = "windows")]
     if free_camera::scene() == CameraScene::Race && RaceManagerReplayBase::is_paused() {
         RaceCameraManager::apply_paused_free_camera();
+    }
+
+    #[cfg(target_os = "windows")]
+    if free_camera::scene() == CameraScene::Home {
+        HomeCameraController::apply_home_free_camera();
     }
 }
 

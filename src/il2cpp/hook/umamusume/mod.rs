@@ -156,7 +156,7 @@ pub mod DownloadPathRegister;
 mod DownloadView;
 pub mod GameDefine;
 #[cfg(target_os = "windows")]
-mod HomeCameraController;
+pub mod HomeCameraController;
 pub mod HomeViewController;
 pub mod HorseRaceInfoReplay;
 pub mod HubViewControllerBase;
