@@ -1,31 +1,14 @@
-use std::{
-    cmp::{max, min},
-    collections::HashSet,
-    fs,
-    io::{Cursor, Read, Write},
-    path::{Path, PathBuf},
-    sync::{
-        atomic::{self, AtomicBool, AtomicU64, AtomicUsize},
-        Arc, Mutex,
-    },
-    thread,
-};
+use std::{collections::HashSet, fs, io::{Read, Write, Cursor}, path::{Path, PathBuf}, sync::{atomic::{self, AtomicUsize, AtomicBool, AtomicU64}, Arc, Mutex}, thread, cmp::{min, max}};
 
 use arc_swap::ArcSwap;
 use crossbeam_channel::unbounded;
 use fnv::FnvHashMap;
 use rust_i18n::t;
 use serde::{Deserialize, Serialize};
-use size::Size;
+use size::{Base, Size};
 use thread_priority::{ThreadBuilderExt, ThreadPriority};
 
-use super::{
-    gui::{NotificationGuard, SimpleYesNoDialog, TranslationRepoUpdateWindow},
-    hachimi::LocalizedData,
-    http::{self, ureq_config, AsyncRequest},
-    utils, Error, Gui, Hachimi,
-};
-use crate::core::game::Region;
+use super::{gui::{NotificationGuard, SimpleYesNoDialog, TranslationRepoUpdateWindow}, hachimi::LocalizedData, http::{self, ureq_config, AsyncRequest}, utils, Error, Gui, Hachimi};
 use once_cell::sync::Lazy;
 
 #[derive(Deserialize)]
@@ -35,22 +18,19 @@ pub struct RepoInfo {
     pub short_desc: Option<String>,
     #[serde(default)]
     pub language: Option<String>,
-    #[serde(default)]
-    pub region: Region,
+    #[serde(default = "default_region")]
+    pub region: String
 }
 
+fn default_region() -> String { "Japan".to_owned() }
+
 static SYS_LOCALE: Lazy<String> = Lazy::new(|| {
-    sys_locale::get_locale()
-        .as_deref()
-        .unwrap_or("en")
-        .to_lowercase()
+    sys_locale::get_locale().as_deref().unwrap_or("en").to_lowercase()
 });
 
 impl RepoInfo {
     pub fn is_recommended(&self, current_lang_str: &str) -> bool {
-        let Some(repo_tag) = self.language.as_deref() else {
-            return false;
-        };
+        let Some(repo_tag) = self.language.as_deref() else { return false };
         let repo_tag = repo_tag.to_lowercase();
         let target = current_lang_str.to_lowercase();
 
@@ -104,9 +84,7 @@ impl LocalRepoInfo {
             .config
             .load()
             .selected_tl_repo_id
-            .ok_or_else(|| {
-                Error::RuntimeError("No active translation repository selected".to_string())
-            })?;
+            .ok_or_else(|| Error::RuntimeError("No active translation repository selected".to_string()))?;
 
         Self::load(id)
     }
@@ -114,15 +92,10 @@ impl LocalRepoInfo {
     pub fn format_contributors(&self) -> Option<String> {
         match &self.contributors {
             serde_json::Value::Array(arr) => {
-                let names: Vec<String> = arr
-                    .iter()
+                let names: Vec<String> = arr.iter()
                     .filter_map(|v| v.as_str().map(|s| s.to_string()))
                     .collect();
-                if names.is_empty() {
-                    None
-                } else {
-                    Some(names.join(", "))
-                }
+                if names.is_empty() { None } else { Some(names.join(", ")) }
             }
             serde_json::Value::String(_) => None,
             _ => None,
@@ -183,14 +156,14 @@ struct RepoIndex {
     base_url: String,
     zip_url: String,
     zip_dir: String,
-    files: Vec<RepoFile>,
+    files: Vec<RepoFile>
 }
 
 #[derive(Deserialize, Clone)]
 struct RepoFile {
     path: String,
     hash: String,
-    size: usize,
+    size: usize
 }
 
 impl RepoFile {
@@ -203,16 +176,12 @@ impl RepoFile {
         return root_dir.join(&self.path);
     }
     fn verify_integrity(&self, full_path: &Path) -> bool {
-        let Ok(mut file) = fs::File::open(full_path) else {
-            return false;
-        };
+        let Ok(mut file) = fs::File::open(full_path) else { return false };
         let mut hasher = blake3::Hasher::new();
         let mut buffer = [0u8; 8192];
 
         while let Ok(n) = file.read(&mut buffer) {
-            if n == 0 {
-                break;
-            }
+            if n == 0 { break; }
             hasher.update(&buffer[..n]);
         }
 
@@ -230,24 +199,36 @@ struct UpdateInfo {
     cached_files: FnvHashMap<String, String>, // from repo cache
     size: usize,
     // New fields for better user communication, idk why it complains about these never being read
+    update_size: usize,      // Size of changed files only
     #[allow(dead_code)]
-    update_size: usize, // Size of changed files only
-    #[allow(dead_code)]
-    total_size: usize, // Total size of all files (for ZIP downloads)
-    will_use_zip: bool,   // Whether ZIP download will be used
-    modifies_atlas: bool, // Whether file updates include atlases
+    total_size: usize,       // Total size of all files (for ZIP downloads)
+    will_use_zip: bool,      // Whether ZIP download will be used
+    modifies_atlas: bool,     // Whether file updates include atlases
     index_etag: Option<String>,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub enum UpdatePhase {
+    #[default]
+    Checking,
+    Downloading,
+    Extracting
 }
 
 #[derive(Default, Clone)]
 pub struct UpdateProgress {
     pub current: usize,
     pub total: usize,
+    pub phase: UpdatePhase
 }
 
 impl UpdateProgress {
-    pub fn new(current: usize, total: usize) -> UpdateProgress {
-        UpdateProgress { current, total }
+    pub fn new(current: usize, total: usize, phase: UpdatePhase) -> UpdateProgress {
+        UpdateProgress {
+            current,
+            total,
+            phase
+        }
     }
 }
 
@@ -257,7 +238,7 @@ struct RepoCache {
     base_url: String,
     #[serde(default)]
     index_etag: Option<String>,
-    files: FnvHashMap<String, String>, // path: hash
+    files: FnvHashMap<String, String> // path: hash
 }
 pub const REPO_EXCLUDES_FILENAME: &str = "excludes.txt";
 
@@ -268,7 +249,7 @@ pub struct Updater {
     new_update: ArcSwap<Option<UpdateInfo>>,
     progress: ArcSwap<Option<UpdateProgress>>,
     last_progress_ms: AtomicU64,
-    skipped_etag: Mutex<Option<String>>,
+    skipped_etag: Mutex<Option<String>>
 }
 
 const CHUNK_SIZE: usize = 8192; // 8KiB
@@ -280,14 +261,14 @@ static NUM_THREADS: Lazy<usize> = Lazy::new(|| {
 const INCREMENTAL_UPDATE_LIMIT_GITHUB: usize = 55;
 const INCREMENTAL_UPDATE_LIMIT_GITLAB: usize = 250;
 const INCREMENTAL_SIZE_RATIO_THRESHOLD: f64 = 0.8;
-const ZIP_SIZE_WARNING_RATIO: f64 = 1.2; // Warn if ZIP is 1.2x larger than changes
+const ZIP_SIZE_WARNING_RATIO: f64 = 1.2;  // Warn if ZIP is 1.2x larger than changes
 
 const MIN_CHUNK_SIZE: u64 = 1024 * 1024 * 5;
 
 struct DownloadJob {
     agent: ureq::Agent,
     hasher: blake3::Hasher,
-    buffer: Vec<u8>,
+    buffer: Vec<u8>
 }
 
 impl DownloadJob {
@@ -295,7 +276,7 @@ impl DownloadJob {
         DownloadJob {
             agent: agent1,
             hasher: blake3::Hasher::new(),
-            buffer: vec![0u8; CHUNK_SIZE],
+            buffer: vec![0u8; CHUNK_SIZE]
         }
     }
 }
@@ -306,6 +287,7 @@ fn store_progress(
     last_progress_ms: &AtomicU64,
     current: usize,
     total: usize,
+    phase: UpdatePhase
 ) {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -315,7 +297,7 @@ fn store_progress(
     let last = last_progress_ms.load(atomic::Ordering::Relaxed);
     if current == total || now.saturating_sub(last) >= 16 {
         last_progress_ms.store(now, atomic::Ordering::Relaxed);
-        progress.store(Arc::new(Some(UpdateProgress::new(current, total))));
+        progress.store(Arc::new(Some(UpdateProgress::new(current, total, phase))));
     }
 }
 
@@ -325,11 +307,7 @@ impl Drop for ZipCleanupGuard<'_> {
     fn drop(&mut self) {
         if self.0.exists() {
             if let Err(e) = fs::remove_file(self.0) {
-                error!(
-                    "Failed to clean up temporary ZIP file '{}': {}",
-                    self.0.display(),
-                    e
-                );
+                error!("Failed to clean up temporary ZIP file '{}': {}", self.0.display(), e);
             }
         }
     }
@@ -340,11 +318,7 @@ fn check_available_disk_space(_path: &Path, required_bytes: u64) -> Result<(), E
     {
         use std::os::windows::ffi::OsStrExt;
 
-        let wide: Vec<u16> = _path
-            .as_os_str()
-            .encode_wide()
-            .chain(std::iter::once(0u16))
-            .collect();
+        let wide: Vec<u16> = _path.as_os_str().encode_wide().chain(std::iter::once(0u16)).collect();
         let mut free_bytes: u64 = 0;
 
         extern "system" {
@@ -414,21 +388,16 @@ impl Updater {
     }
 
     fn is_github_hosted(url: &str) -> bool {
-        url.contains("github.com")
-            || url.contains("githubusercontent.com")
-            || url.contains("github.io")
+        url.contains("github.com") ||
+        url.contains("githubusercontent.com") ||
+        url.contains("github.io")
     }
 
     fn is_gitlab_hosted(url: &str) -> bool {
         url.contains("gitlab.com") || url.contains("gitlab.io")
     }
 
-    fn should_use_zip_download(
-        file_count: usize,
-        update_size: usize,
-        total_size: usize,
-        base_url: &str,
-    ) -> bool {
+    fn should_use_zip_download(file_count: usize, update_size: usize, total_size: usize, base_url: &str) -> bool {
         // if it's on GitHub and the update has > 55 files, use ZIP to avoid 403 errors
         if Self::is_github_hosted(base_url) && file_count > INCREMENTAL_UPDATE_LIMIT_GITHUB {
             return true;
@@ -470,12 +439,7 @@ impl Updater {
 
         let checking_notif_id = if !silent {
             if let Some(mutex) = Gui::instance() {
-                Some(
-                    mutex
-                        .lock()
-                        .unwrap()
-                        .show_persistent_notification(&t!("notification.checking_for_tl_updates")),
-                )
+                Some(mutex.lock().unwrap().show_persistent_notification(&t!("notification.checking_for_tl_updates")))
             } else {
                 None
             }
@@ -510,7 +474,8 @@ impl Updater {
         let repo_cache = if fs::metadata(&cache_path).is_ok() {
             let json = fs::read_to_string(&cache_path)?;
             serde_json::from_str(&json).unwrap_or_default()
-        } else {
+        }
+        else {
             RepoCache::default()
         };
 
@@ -519,9 +484,7 @@ impl Updater {
         // conditional GET: send If-None-Match with the current best ETag.
         // server replies 304 if nothing changed, 200 + body if it has.
         let etag_for_request = if !pedantic && config.etag_translation_updates {
-            repo_cache
-                .index_etag
-                .clone()
+            repo_cache.index_etag.clone()
                 .or_else(|| self.skipped_etag.lock().unwrap().clone())
         } else {
             None
@@ -542,9 +505,7 @@ impl Updater {
                         if !pedantic && config.etag_translation_updates {
                             if let Some(skipped) = &*self.skipped_etag.lock().unwrap() {
                                 if skipped == &etag_string {
-                                    debug!(
-                                        "Server ETag matches the skipped ETag. Ignoring update."
-                                    );
+                                    debug!("Server ETag matches the skipped ETag. Ignoring update.");
                                     return Ok(());
                                 }
                             }
@@ -557,9 +518,7 @@ impl Updater {
                                     info!("Server ETag matches cached ETag (server may not support conditional requests). No translation updates available.");
                                     if !silent {
                                         if let Some(mutex) = Gui::instance() {
-                                            mutex.lock().unwrap().show_notification(&t!(
-                                                "notification.no_tl_updates"
-                                            ));
+                                            mutex.lock().unwrap().show_notification(&t!("notification.no_tl_updates"));
                                         }
                                     }
                                     return Ok(());
@@ -576,10 +535,7 @@ impl Updater {
                 info!("Server returned 304 Not Modified. No translation updates available.");
                 if !silent {
                     if let Some(mutex) = Gui::instance() {
-                        mutex
-                            .lock()
-                            .unwrap()
-                            .show_notification(&t!("notification.no_tl_updates"));
+                        mutex.lock().unwrap().show_notification(&t!("notification.no_tl_updates"));
                     }
                 }
                 return Ok(());
@@ -615,7 +571,7 @@ impl Updater {
         if is_new_repo {
             // skip all filesystem checks, the directory will be wiped anyway
             for (i, file) in index.files.iter().enumerate() {
-                store_progress(&self.progress, &self.last_progress_ms, i, total_files);
+                store_progress(&self.progress, &self.last_progress_ms, i, total_files, UpdatePhase::Checking);
 
                 if file.path.contains("..") || Path::new(&file.path).has_root() {
                     warn!("File path '{}' sanitized", file.path);
@@ -630,7 +586,7 @@ impl Updater {
             }
         } else {
             for (i, file) in index.files.iter().enumerate() {
-                store_progress(&self.progress, &self.last_progress_ms, i, total_files);
+                store_progress(&self.progress, &self.last_progress_ms, i, total_files, UpdatePhase::Checking);
 
                 if file.path.contains("..") || Path::new(&file.path).has_root() {
                     warn!("File path '{}' sanitized", file.path);
@@ -661,10 +617,7 @@ impl Updater {
                             true
                         } else if hash != &file.hash {
                             true // index hash changed -> update
-                        } else if fs::metadata(&path)
-                            .map(|m| m.len() as usize != file.size)
-                            .unwrap_or(true)
-                        {
+                        } else if fs::metadata(&path).map(|m| m.len() as usize != file.size).unwrap_or(true) {
                             true // size mismatch -> redownload
                         } else if pedantic {
                             !file.verify_integrity(&path) // full blake3 integrity check if user requested pedantic update
@@ -700,15 +653,11 @@ impl Updater {
                 update_files.len(),
                 update_size,
                 total_size,
-                &index.base_url,
+                &index.base_url
             );
 
             // Calculate actual download size
-            let actual_download_size = if will_use_zip {
-                total_size
-            } else {
-                update_size
-            };
+            let actual_download_size = if will_use_zip { total_size } else { update_size };
 
             // Store update info with all relevant sizes
             self.new_update.store(Arc::new(Some(UpdateInfo {
@@ -741,30 +690,24 @@ impl Updater {
                     if size_ratio >= ZIP_SIZE_WARNING_RATIO {
                         // Warn user about larger ZIP download
                         debug!(
-                            "ZIP download warning: changed={} MB, total={} MB, ratio={:.2}x",
-                            update_size / (1024 * 1024),
-                            total_size / (1024 * 1024),
+                            "ZIP download warning: changed={}, total={}, ratio={:.2}x",
+                            Size::from_bytes(update_size).format().with_base(Base::Base10),
+                            Size::from_bytes(total_size).format().with_base(Base::Base10),
                             size_ratio
                         );
 
                         t!(
                             "tl_update_dialog.content_zip_warning",
-                            changed_size = Size::from_bytes(update_size),
-                            download_size = Size::from_bytes(total_size)
+                            changed_size = Size::from_bytes(update_size).format().with_base(Base::Base10),
+                            download_size = Size::from_bytes(total_size).format().with_base(Base::Base10)
                         )
                     } else {
                         // ZIP is being used but size difference is not significant
-                        t!(
-                            "tl_update_dialog.content",
-                            size = Size::from_bytes(actual_download_size)
-                        )
+                        t!("tl_update_dialog.content", size = Size::from_bytes(actual_download_size).format().with_base(Base::Base10))
                     }
                 } else {
                     // Incremental update or no warning needed
-                    t!(
-                        "tl_update_dialog.content",
-                        size = Size::from_bytes(actual_download_size)
-                    )
+                    t!("tl_update_dialog.content", size = Size::from_bytes(actual_download_size).format().with_base(Base::Base10))
                 };
 
                 let updater = Hachimi::instance().tl_updater.clone();
@@ -777,42 +720,37 @@ impl Updater {
                     .filter(|info| info.is_valid_changelog_url());
 
                 if let Some(info) = repo_info {
-                    mutex
-                        .lock()
-                        .unwrap()
-                        .show_window(Box::new(TranslationRepoUpdateWindow::new(
-                            &t!("tl_update_dialog.title"),
-                            &dialog_message,
-                            info.changelog_url.as_str(),
-                            info.is_markdown_changelog(),
-                            move |ok| {
-                                if !ok {
-                                    updater.skip_update(etag_to_skip);
-                                    updater.clear_pending_update();
-                                    return;
-                                }
-                                updater.run();
-                            },
-                        )));
+                    mutex.lock().unwrap().show_window(Box::new(TranslationRepoUpdateWindow::new(
+                        &t!("tl_update_dialog.title"),
+                        &dialog_message,
+                        info.changelog_url.as_str(),
+                        info.is_markdown_changelog(),
+                        move |ok| {
+                            if !ok {
+                                updater.skip_update(etag_to_skip);
+                                updater.clear_pending_update();
+                                return;
+                            }
+                            updater.run();
+                        }
+                    )));
                 } else {
-                    mutex
-                        .lock()
-                        .unwrap()
-                        .show_window(Box::new(SimpleYesNoDialog::new(
-                            &t!("tl_update_dialog.title"),
-                            &dialog_message,
-                            move |ok| {
-                                if !ok {
-                                    updater.skip_update(etag_to_skip);
-                                    updater.clear_pending_update();
-                                    return;
-                                }
-                                updater.run();
-                            },
-                        )));
+                    mutex.lock().unwrap().show_window(Box::new(SimpleYesNoDialog::new(
+                        &t!("tl_update_dialog.title"),
+                        &dialog_message,
+                        move |ok| {
+                            if !ok {
+                                updater.skip_update(etag_to_skip);
+                                updater.clear_pending_update();
+                                return;
+                            }
+                            updater.run();
+                        }
+                    )));
                 }
             }
-        } else {
+        }
+        else {
             if let Some(etag) = new_etag {
                 let mut updated_cache = repo_cache;
                 updated_cache.index_etag = Some(etag);
@@ -821,10 +759,7 @@ impl Updater {
 
             if !silent {
                 if let Some(mutex) = Gui::instance() {
-                    mutex
-                        .lock()
-                        .unwrap()
-                        .show_notification(&t!("notification.no_tl_updates"));
+                    mutex.lock().unwrap().show_notification(&t!("notification.no_tl_updates"));
                 }
             }
         }
@@ -841,10 +776,7 @@ impl Updater {
                     error!("{}", e);
                     self.progress.store(Arc::new(None));
                     if let Some(mutex) = Gui::instance() {
-                        mutex.lock().unwrap().show_notification(&t!(
-                            "notification.update_failed",
-                            reason = e.to_string()
-                        ));
+                        mutex.lock().unwrap().show_notification(&t!("notification.update_failed", reason = e.to_string()));
                     }
                 }
             })
@@ -877,21 +809,16 @@ impl Updater {
         self.new_update.store(Arc::new(None));
         self.last_progress_ms.store(0, atomic::Ordering::Relaxed);
 
-        self.progress
-            .store(Arc::new(Some(UpdateProgress::new(0, update_info.size))));
+        self.progress.store(Arc::new(Some(UpdateProgress::new(0, update_info.size, UpdatePhase::Downloading))));
         if let Some(mutex) = Gui::instance() {
             mutex.lock().unwrap().update_progress_visible = true;
         }
 
         // Empty the localized data so files couldnt be accessed while update is in progress
         let hachimi = Hachimi::instance();
-        hachimi
-            .localized_data
-            .store(Arc::new(LocalizedData::default()));
+        hachimi.localized_data.store(Arc::new(LocalizedData::default()));
 
-        let localized_data_dir = hachimi
-            .get_active_tl_dir()
-            .expect("Active TL repo directory not set.");
+        let localized_data_dir = hachimi.get_active_tl_dir().expect("Active TL repo directory not set.");
         let disk_check_path = localized_data_dir.parent().unwrap_or(Path::new("."));
         check_available_disk_space(disk_check_path, update_info.size as u64)?;
 
@@ -904,27 +831,19 @@ impl Updater {
         // Download the files - use the pre-determined strategy
         let cached_files = Arc::new(Mutex::new(std::mem::take(&mut update_info.cached_files)));
         let error_count = if update_info.will_use_zip {
-            self.clone()
-                .download_zip(&update_info, &localized_data_dir, cached_files.clone())
-        } else {
-            self.clone().download_incremental(
-                &update_info,
-                &localized_data_dir,
-                cached_files.clone(),
-            )
+            self.clone().download_zip(&update_info, &localized_data_dir, cached_files.clone())
+        }
+        else {
+            self.clone().download_incremental(&update_info, &localized_data_dir, cached_files.clone())
         }?;
 
         let config = hachimi.config.load();
-        if config.apply_atlas_workaround && (update_info.modifies_atlas || update_info.will_use_zip)
-        {
+        if config.apply_atlas_workaround && (update_info.modifies_atlas || update_info.will_use_zip) {
             let mut new_config = (**config).clone();
             new_config.apply_atlas_workaround = false;
             hachimi.save_and_reload_config(new_config)?;
             if let Some(gui_mutex) = Gui::instance() {
-                gui_mutex
-                    .lock()
-                    .unwrap()
-                    .show_notification(&t!("notification.atlas_workaround_reset"));
+                gui_mutex.lock().unwrap().show_notification(&t!("notification.atlas_workaround_reset"));
             }
         }
 
@@ -938,13 +857,9 @@ impl Updater {
         let repo_cache = RepoCache {
             base_url: update_info.base_url.clone(),
             index_etag: update_info.index_etag.clone(),
-            files: cached_files.lock().unwrap().clone(),
+            files: cached_files.lock().unwrap().clone()
         };
-        let repo_id = hachimi
-            .config
-            .load()
-            .selected_tl_repo_id
-            .expect("TL repo ID not set after update");
+        let repo_id = hachimi.config.load().selected_tl_repo_id.expect("TL repo ID not set after update");
         let cache_path = Self::get_repo_cache_path(repo_id);
         utils::write_json_file(&repo_cache, &cache_path)?;
 
@@ -954,10 +869,7 @@ impl Updater {
             let mut gui = mutex.lock().unwrap();
             gui.show_notification(&t!("notification.update_completed"));
             if error_count > 0 {
-                gui.show_notification(&t!(
-                    "notification.errors_during_update",
-                    count = error_count
-                ));
+                gui.show_notification(&t!("notification.errors_during_update", count = error_count));
             }
         }
         Ok(())
@@ -967,7 +879,7 @@ impl Updater {
         self: Arc<Self>,
         update_info: &UpdateInfo,
         localized_data_dir: &Path,
-        cached_files: Arc<Mutex<FnvHashMap<String, String>>>,
+        cached_files: Arc<Mutex<FnvHashMap<String, String>>>
     ) -> Result<usize, Error> {
         let total_size = update_info.size;
         let current_bytes = Arc::new(AtomicUsize::new(0));
@@ -998,16 +910,12 @@ impl Updater {
                 .stack_size(8 * 1024 * 1024)
                 .spawn_with_priority(ThreadPriority::Min, move |result| {
                     if result.is_err() {
-                        warn!(
-                            "Failed to set background thread priority for incremental downloader."
-                        );
+                        warn!("Failed to set background thread priority for incremental downloader.");
                     }
                     let mut job = DownloadJob::new(thread_agent);
 
                     while let Ok(repo_file) = receiver_clone.recv() {
-                        if stop_signal_clone.load(atomic::Ordering::Relaxed) {
-                            break;
-                        }
+                        if stop_signal_clone.load(atomic::Ordering::Relaxed) { break; }
 
                         let file_path = repo_file.get_fs_path(&localized_data_dir_clone);
                         let url = utils::concat_unix_path(&base_url_clone, &repo_file.path);
@@ -1019,28 +927,15 @@ impl Updater {
                             let mut file = fs::File::create(&file_path)?;
                             let res = job.agent.get(&url).call()?;
 
-                            http::download_file_buffered(
-                                res,
-                                &mut file,
-                                &mut job.buffer,
-                                |bytes| {
-                                    job.hasher.update(bytes);
-                                    let prev_size = current_bytes_clone
-                                        .fetch_add(bytes.len(), atomic::Ordering::Relaxed);
-                                    store_progress(
-                                        &updater.progress,
-                                        &updater.last_progress_ms,
-                                        prev_size + bytes.len(),
-                                        total_size,
-                                    );
-                                },
-                            )?;
+                            http::download_file_buffered(res, &mut file, &mut job.buffer, |bytes| {
+                                job.hasher.update(bytes);
+                                let prev_size = current_bytes_clone.fetch_add(bytes.len(), atomic::Ordering::Relaxed);
+                                store_progress(&updater.progress, &updater.last_progress_ms, prev_size + bytes.len(), total_size, UpdatePhase::Downloading);
+                            })?;
 
                             let hash = job.hasher.finalize().to_hex().to_string();
                             if hash != repo_file.hash {
-                                return Err(Error::FileHashMismatch(
-                                    file_path.to_str().unwrap_or("").to_string(),
-                                ));
+                                return Err(Error::FileHashMismatch(file_path.to_str().unwrap_or("").to_string()));
                             }
                             job.hasher.reset();
                             Ok(hash)
@@ -1048,11 +943,8 @@ impl Updater {
 
                         match execute_result {
                             Ok(hash) => {
-                                cached_files_clone
-                                    .lock()
-                                    .unwrap()
-                                    .insert(repo_file.path.clone(), hash);
-                            }
+                                cached_files_clone.lock().unwrap().insert(repo_file.path.clone(), hash);
+                            },
                             Err(e) => {
                                 if matches!(e, Error::OutOfDiskSpace | Error::FileHashMismatch(_)) {
                                     error!("Fatal error during incremental download: {}", e);
@@ -1061,21 +953,17 @@ impl Updater {
                                     return;
                                 } else {
                                     error!("Non-fatal error during incremental download: {}", e);
-                                    non_fatal_error_count_clone
-                                        .fetch_add(1, atomic::Ordering::Relaxed);
+                                    non_fatal_error_count_clone.fetch_add(1, atomic::Ordering::Relaxed);
                                 }
                             }
                         }
                     }
-                })
-                .unwrap();
+                }).unwrap();
             handles.push(handle);
         }
 
         for repo_file in update_info.files.iter() {
-            if sender.send(repo_file.clone()).is_err() {
-                break;
-            }
+            if sender.send(repo_file.clone()).is_err() { break; }
         }
         drop(sender);
 
@@ -1094,7 +982,7 @@ impl Updater {
         self: Arc<Self>,
         update_info: &UpdateInfo,
         localized_data_dir: &Path,
-        cached_files: Arc<Mutex<FnvHashMap<String, String>>>,
+        cached_files: Arc<Mutex<FnvHashMap<String, String>>>
     ) -> Result<usize, Error> {
         let zip_path = localized_data_dir.join(".tmp.zip");
         let _zip_cleanup = ZipCleanupGuard(&zip_path);
@@ -1103,25 +991,20 @@ impl Updater {
         let mut error_count = 0;
 
         {
-            let total_size_header = ureq::Agent::new_with_config(ureq_config())
-                .head(&update_info.zip_url)
-                .call()
+            let total_size_header = ureq::Agent::new_with_config(ureq_config()).head(&update_info.zip_url).call()
                 .ok()
                 .and_then(|res| {
                     res.headers()
-                        .get("Content-Length")
-                        .and_then(|v| v.to_str().ok())
-                        .and_then(|s| s.parse::<usize>().ok())
+                       .get("Content-Length")
+                       .and_then(|v| v.to_str().ok())
+                       .and_then(|s| s.parse::<usize>().ok())
                 });
 
             let progress_total = match total_size_header {
                 Some(size) if size > 0 => {
-                    debug!(
-                        "Using Content-Length from header for progress bar: {}",
-                        size
-                    );
+                    debug!("Using Content-Length from header for progress bar: {}", size);
                     size
-                }
+                },
                 _ => {
                     debug!("Server did not provide a valid Content-Length. Using fallback size from index: {}", update_info.size);
                     update_info.size
@@ -1135,12 +1018,7 @@ impl Updater {
             let progress_bar = Arc::new(move |bytes_read: usize| {
                 let prev_size = downloaded_clone.fetch_add(bytes_read, atomic::Ordering::Relaxed);
                 let current = prev_size + bytes_read;
-                store_progress(
-                    &self_clone.progress,
-                    &self_clone.last_progress_ms,
-                    current,
-                    progress_total,
-                );
+                store_progress(&self_clone.progress, &self_clone.last_progress_ms, current, progress_total, UpdatePhase::Downloading);
             });
 
             http::download_file_parallel(
@@ -1149,39 +1027,28 @@ impl Updater {
                 *NUM_THREADS,
                 MIN_CHUNK_SIZE,
                 CHUNK_SIZE,
-                progress_bar,
+                progress_bar
             )?;
 
             let files_to_extract = Arc::new(
-                update_info
-                    .files
-                    .iter()
-                    .map(|f| {
-                        (
-                            utils::concat_unix_path(&update_info.zip_dir, &f.path),
-                            f.clone(),
-                        )
-                    })
-                    .collect::<FnvHashMap<_, _>>(),
+                update_info.files.iter()
+                    .map(|f| (utils::concat_unix_path(&update_info.zip_dir, &f.path), f.clone()))
+                    .collect::<FnvHashMap<_, _>>()
             );
 
             let zip_file = fs::File::open(&zip_path)?;
             let file_len = zip_file.metadata()?.len();
             if file_len == 0 {
-                return Err(Error::RuntimeError(
-                    "Downloaded ZIP file is empty".to_string(),
-                ));
+                return Err(Error::RuntimeError("Downloaded ZIP file is empty".to_string()));
             }
             let mmap = Arc::new(unsafe { memmap2::Mmap::map(&zip_file)? });
             if mmap.is_empty() {
-                return Err(Error::RuntimeError(
-                    "Failed to memory-map the downloaded ZIP file".to_string(),
-                ));
+                return Err(Error::RuntimeError("Failed to memory-map the downloaded ZIP file".to_string()));
             }
 
             let zip_len = zip::ZipArchive::new(Cursor::new(&mmap[..]))?.len();
 
-            let total_size = update_info.size;
+            let total_size = update_info.update_size;
             let current_bytes = Arc::new(AtomicUsize::new(0));
             let non_fatal_error_count = Arc::new(AtomicUsize::new(0));
             let fatal_error = Arc::new(Mutex::new(None::<Error>));
@@ -1210,8 +1077,7 @@ impl Updater {
                             warn!("Failed to set background thread priority for zip extractor.");
                         }
 
-                        let mut archive = match zip::ZipArchive::new(Cursor::new(&mmap_thread[..]))
-                        {
+                        let mut archive = match zip::ZipArchive::new(Cursor::new(&mmap_thread[..])) {
                             Ok(a) => a,
                             Err(_) => return,
                         };
@@ -1220,15 +1086,12 @@ impl Updater {
                         let mut hasher = blake3::Hasher::new();
 
                         while let Ok(i) = receiver_clone.recv() {
-                            if stop_signal_clone.load(atomic::Ordering::Relaxed) {
-                                break;
-                            }
+                            if stop_signal_clone.load(atomic::Ordering::Relaxed) { break; }
 
                             let mut zip_entry = match archive.by_index(i) {
                                 Ok(entry) => entry,
                                 Err(_) => {
-                                    non_fatal_error_count_clone
-                                        .fetch_add(1, atomic::Ordering::Relaxed);
+                                    non_fatal_error_count_clone.fetch_add(1, atomic::Ordering::Relaxed);
                                     continue;
                                 }
                             };
@@ -1241,8 +1104,7 @@ impl Updater {
                             let path = repo_file.get_fs_path(&localized_data_dir_clone);
                             if let Some(parent) = path.parent() {
                                 if Self::create_dir(parent, false).is_err() {
-                                    non_fatal_error_count_clone
-                                        .fetch_add(1, atomic::Ordering::Relaxed);
+                                    non_fatal_error_count_clone.fetch_add(1, atomic::Ordering::Relaxed);
                                     continue;
                                 }
                             }
@@ -1250,8 +1112,7 @@ impl Updater {
                             let mut out_file = match fs::File::create(&path) {
                                 Ok(file) => file,
                                 Err(_) => {
-                                    non_fatal_error_count_clone
-                                        .fetch_add(1, atomic::Ordering::Relaxed);
+                                    non_fatal_error_count_clone.fetch_add(1, atomic::Ordering::Relaxed);
                                     continue;
                                 }
                             };
@@ -1262,25 +1123,16 @@ impl Updater {
                                     Ok(read_bytes) => {
                                         let data_slice = &buffer[..read_bytes];
                                         if out_file.write_all(data_slice).is_err() {
-                                            *fatal_error_clone.lock().unwrap() =
-                                                Some(Error::OutOfDiskSpace);
-                                            stop_signal_clone
-                                                .store(true, atomic::Ordering::Relaxed);
+                                            *fatal_error_clone.lock().unwrap() = Some(Error::OutOfDiskSpace);
+                                            stop_signal_clone.store(true, atomic::Ordering::Relaxed);
                                             return;
                                         }
                                         hasher.update(data_slice);
-                                        let prev_size = current_bytes_clone
-                                            .fetch_add(read_bytes, atomic::Ordering::Relaxed);
-                                        store_progress(
-                                            &updater.progress,
-                                            &updater.last_progress_ms,
-                                            prev_size + read_bytes,
-                                            total_size,
-                                        );
+                                        let prev_size = current_bytes_clone.fetch_add(read_bytes, atomic::Ordering::Relaxed);
+                                        store_progress(&updater.progress, &updater.last_progress_ms, prev_size + read_bytes, total_size, UpdatePhase::Extracting);
                                     }
                                     Err(_) => {
-                                        non_fatal_error_count_clone
-                                            .fetch_add(1, atomic::Ordering::Relaxed);
+                                        non_fatal_error_count_clone.fetch_add(1, atomic::Ordering::Relaxed);
                                         break;
                                     }
                                 }
@@ -1289,27 +1141,20 @@ impl Updater {
                             let hash = hasher.finalize().to_hex().to_string();
                             if hash != repo_file.hash {
                                 let path_str = path.to_str().unwrap_or("").to_string();
-                                *fatal_error_clone.lock().unwrap() =
-                                    Some(Error::FileHashMismatch(path_str));
+                                *fatal_error_clone.lock().unwrap() = Some(Error::FileHashMismatch(path_str));
                                 stop_signal_clone.store(true, atomic::Ordering::Relaxed);
                                 return;
                             }
 
-                            cached_files_clone
-                                .lock()
-                                .unwrap()
-                                .insert(repo_file.path.clone(), hash);
+                            cached_files_clone.lock().unwrap().insert(repo_file.path.clone(), hash);
                             hasher.reset();
                         }
-                    })
-                    .unwrap();
+                    }).unwrap();
                 handles.push(handle);
             }
 
             for i in 0..zip_len {
-                if sender.send(i).is_err() {
-                    break;
-                }
+                if sender.send(i).is_err() { break; }
             }
             drop(sender);
 
@@ -1317,18 +1162,12 @@ impl Updater {
                 handle.join().unwrap();
             }
 
-            if let Some(err) = fatal_error.lock().unwrap().take() {
-                return Err(err);
-            }
+            if let Some(err) = fatal_error.lock().unwrap().take() { return Err(err); }
             error_count = non_fatal_error_count.load(atomic::Ordering::Relaxed);
         }
 
         if let Err(e) = fs::remove_file(&zip_path) {
-            error!(
-                "Failed to remove temporary file '{}': {}",
-                zip_path.display(),
-                e
-            );
+            error!("Failed to remove temporary file '{}': {}", zip_path.display(), e);
             error_count += 1;
         }
 
@@ -1370,12 +1209,7 @@ impl RepoList {
     }
 
     pub fn next_id(&self) -> u32 {
-        self.repos
-            .iter()
-            .map(|r| r.id)
-            .max()
-            .map(|m| m + 1)
-            .unwrap_or(1)
+        self.repos.iter().map(|r| r.id).max().map(|m| m + 1).unwrap_or(1)
     }
 
     pub fn add(&mut self, index: String) -> u32 {
@@ -1389,9 +1223,6 @@ impl RepoList {
     }
 
     pub fn find_by_id(&self, id: u32) -> Option<&str> {
-        self.repos
-            .iter()
-            .find(|r| r.id == id)
-            .map(|r| r.index.as_str())
+        self.repos.iter().find(|r| r.id == id).map(|r| r.index.as_str())
     }
 }

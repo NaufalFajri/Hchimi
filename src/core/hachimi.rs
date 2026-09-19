@@ -1,88 +1,44 @@
+use std::{fs, path::{Path, PathBuf}, process, sync::{atomic::{self, AtomicBool, AtomicI32}, Arc, Mutex}, time::{Duration, Instant}};
 use arc_swap::ArcSwap;
 use fnv::{FnvHashMap, FnvHashSet};
 use once_cell::sync::OnceCell;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    process,
-    sync::{
-        atomic::{self, AtomicBool, AtomicI32},
-        Arc, Mutex,
-    },
-    time::{Duration, Instant},
-};
 use textwrap::wrap_algorithms::Penalties;
 
-use crate::{
-    core::{gui, plugin_api::Plugin, updater},
-    gui_impl, hachimi_impl,
-    il2cpp::{
-        self,
-        hook::umamusume::{CySpringController::SpringUpdateMode, GameSystem},
-        sql::{CharacterData, SkillDataDesc, SkillInfo},
-    },
-};
+use crate::{core::{gui, plugin_api::Plugin, updater}, gui_impl, hachimi_impl, il2cpp::{self, hook::umamusume::{CySpringController::SpringUpdateMode, GameSystem}, sql::{CharacterData, SkillDataDesc, SkillInfo}}};
 
-use super::{
-    game::{Game, Region},
-    ipc, plurals, template, template_filters, tl_repo, utils, Error, Interceptor,
-};
+use super::{game::{Game, Region}, ipc, plurals, template, template_filters, tl_repo, utils, Error, Interceptor};
 
 pub const REPO_PATH: &str = "kairusds/Hachimi-Edge";
 pub const GITHUB_API: &str = "https://api.github.com/repos";
 pub const CODEBERG_API: &str = "https://codeberg.org/api/v1/repos";
 pub const WEBSITE_URL: &str = "https://hachimi.noccu.art";
-pub const UMAPATCHER_PACKAGE_NAME: &str = "com.leadrdrk.umapatcher.edge";
-pub const UMAPATCHER_INSTALL_URL: &str =
-    "https://github.com/kairusds/UmaPatcher-Edge/releases/latest";
-pub const RACE_MECHANICS_URL: &str =
-    "https://docs.google.com/document/d/15VzW9W2tXBBTibBRbZ8IVpW6HaMX8H0RP03kq6Az7Xg";
+pub const UMAPATCHER_UPDATER_DEEPLINK: &str = "umapatcher-edge://update-hachimi";
+pub const RACE_MECHANICS_URL: &str = "https://docs.google.com/document/d/15VzW9W2tXBBTibBRbZ8IVpW6HaMX8H0RP03kq6Az7Xg";
 
-static mut ORIG_SQLITE3_OPEN_V2: Option<
-    extern "C" fn(*const i8, *mut *mut std::ffi::c_void, i32, *const i8) -> i32,
-> = None;
-static mut ORIG_SQLITE3_KEY: Option<
-    extern "C" fn(*mut std::ffi::c_void, *const std::ffi::c_void, i32) -> i32,
-> = None;
+static mut ORIG_SQLITE3_OPEN_V2: Option<extern "C" fn(*const i8, *mut *mut std::ffi::c_void, i32, *const i8) -> i32> = None;
+static mut ORIG_SQLITE3_KEY: Option<extern "C" fn(*mut std::ffi::c_void, *const std::ffi::c_void, i32) -> i32> = None;
 
-extern "C" fn sqlite3_open_v2_hook(
-    filename: *const i8,
-    pp_db: *mut *mut std::ffi::c_void,
-    flags: i32,
-    z_vfs: *const i8,
-) -> i32 {
+extern "C" fn sqlite3_open_v2_hook(filename: *const i8, pp_db: *mut *mut std::ffi::c_void, flags: i32, z_vfs: *const i8) -> i32 {
     let result = unsafe { ORIG_SQLITE3_OPEN_V2.unwrap()(filename, pp_db, flags, z_vfs) };
 
     if result == 0 && !pp_db.is_null() {
-        if crate::il2cpp::sql::AUTO_UNLOCK_NEXT_DB.swap(false, std::sync::atomic::Ordering::Relaxed)
-        {
+        if crate::il2cpp::sql::AUTO_UNLOCK_NEXT_DB.swap(false, std::sync::atomic::Ordering::Relaxed) {
             let raw_key = crate::il2cpp::sql::RETRIEVED_RAW_KEY.lock().unwrap();
             if !raw_key.is_empty() {
                 let db_ptr = unsafe { *pp_db };
-                unsafe {
-                    ORIG_SQLITE3_KEY.unwrap()(
-                        db_ptr,
-                        raw_key.as_ptr() as *const std::ffi::c_void,
-                        raw_key.len() as i32,
-                    )
-                };
+                unsafe { ORIG_SQLITE3_KEY.unwrap()(db_ptr, raw_key.as_ptr() as *const std::ffi::c_void, raw_key.len() as i32) };
             }
         }
     }
     result
 }
 
-extern "C" fn sqlite3_key_hook(
-    db: *mut std::ffi::c_void,
-    p_key: *const std::ffi::c_void,
-    n_key: i32,
-) -> i32 {
+extern "C" fn sqlite3_key_hook(db: *mut std::ffi::c_void, p_key: *const std::ffi::c_void, n_key: i32) -> i32 {
     if !p_key.is_null() {
         let mut raw_guard = crate::il2cpp::sql::RETRIEVED_RAW_KEY.lock().unwrap();
         if raw_guard.is_empty() {
-            let key_bytes =
-                unsafe { std::slice::from_raw_parts(p_key as *const u8, n_key as usize) };
+            let key_bytes = unsafe { std::slice::from_raw_parts(p_key as *const u8, n_key as usize) };
             *raw_guard = key_bytes.to_vec();
         }
     }
@@ -129,7 +85,7 @@ pub struct Hachimi {
     #[cfg(target_os = "windows")]
     pub discord_rpc: AtomicBool,
 
-    pub updater: Arc<updater::Updater>,
+    pub updater: Arc<updater::Updater>
 }
 
 static INSTANCE: OnceCell<Arc<Hachimi>> = OnceCell::new();
@@ -177,13 +133,10 @@ impl Hachimi {
     }
 
     pub fn instance() -> Arc<Hachimi> {
-        INSTANCE
-            .get()
-            .unwrap_or_else(|| {
-                error!("FATAL: Attempted to get Hachimi instance before initialization");
-                process::exit(1);
-            })
-            .clone()
+        INSTANCE.get().unwrap_or_else(|| {
+            error!("FATAL: Attempted to get Hachimi instance before initialization");
+            process::exit(1);
+        }).clone()
     }
 
     pub fn is_initialized() -> bool {
@@ -232,7 +185,7 @@ impl Hachimi {
 
             updater: Arc::default(),
 
-            config: ArcSwap::new(Arc::new(config)),
+            config: ArcSwap::new(Arc::new(config))
         })
     }
 
@@ -249,7 +202,7 @@ impl Hachimi {
                     Ok(Config::default())
                 }
             }
-        } else {
+        }else {
             Ok(Config::default())
         }
     }
@@ -312,10 +265,7 @@ impl Hachimi {
 
         let config = self.config.load();
         let ld_path = self.get_active_tl_dir().or_else(|| {
-            config
-                .localized_data_dir
-                .as_ref()
-                .map(|p| self.game.data_dir.join(p))
+            config.localized_data_dir.as_ref().map(|p| self.game.data_dir.join(p))
         });
 
         let mut new_data = match LocalizedData::new(&self.config.load(), ld_path) {
@@ -331,7 +281,7 @@ impl Hachimi {
                 new_data.localize_dict.remove(&format!("Common{id:04}"));
             }
         }
-
+        
         self.localized_data.store(Arc::new(new_data));
 
         if !self.skill_data_desc.load().descs.is_empty() {
@@ -382,27 +332,21 @@ impl Hachimi {
         #[cfg(target_os = "windows")]
         if filename_lower.contains("libnative.dll") {
             unsafe {
-                use windows::core::PCSTR;
                 use windows::Win32::System::LibraryLoader::GetProcAddress;
+                use windows::core::PCSTR;
 
                 let h_module = windows::Win32::Foundation::HMODULE(handle as _);
                 let open_addr = GetProcAddress(h_module, PCSTR("sqlite3_open_v2\0".as_ptr()));
                 let key_addr = GetProcAddress(h_module, PCSTR("sqlite3_key\0".as_ptr()));
 
                 if let Some(addr) = open_addr {
-                    if let Ok(orig) = self
-                        .interceptor
-                        .hook(addr as usize, sqlite3_open_v2_hook as *const () as usize)
-                    {
+                    if let Ok(orig) = self.interceptor.hook(addr as usize, sqlite3_open_v2_hook as *const () as usize) {
                         ORIG_SQLITE3_OPEN_V2 = Some(std::mem::transmute(orig));
                         info!("Successfully hooked native sqlite3_open_v2 (Windows)");
                     }
                 }
                 if let Some(addr) = key_addr {
-                    if let Ok(orig) = self
-                        .interceptor
-                        .hook(addr as usize, sqlite3_key_hook as *const () as usize)
-                    {
+                    if let Ok(orig) = self.interceptor.hook(addr as usize, sqlite3_key_hook as *const () as usize) {
                         ORIG_SQLITE3_KEY = Some(std::mem::transmute(orig));
                         info!("Successfully hooked native sqlite3_key (Windows)");
                     }
@@ -422,19 +366,13 @@ impl Hachimi {
                 let key_addr = libc::dlsym(handle_ptr, key_sym);
 
                 if !open_addr.is_null() {
-                    if let Ok(orig) = self.interceptor.hook(
-                        open_addr as usize,
-                        sqlite3_open_v2_hook as *const () as usize,
-                    ) {
+                    if let Ok(orig) = self.interceptor.hook(open_addr as usize, sqlite3_open_v2_hook  as *const () as usize) {
                         ORIG_SQLITE3_OPEN_V2 = Some(std::mem::transmute(orig));
                         info!("Successfully hooked native sqlite3_open_v2 (Android)");
                     }
                 }
                 if !key_addr.is_null() {
-                    if let Ok(orig) = self
-                        .interceptor
-                        .hook(key_addr as usize, sqlite3_key_hook as *const () as usize)
-                    {
+                    if let Ok(orig) = self.interceptor.hook(key_addr as usize, sqlite3_key_hook as *const () as usize) {
                         ORIG_SQLITE3_KEY = Some(std::mem::transmute(orig));
                         info!("Successfully hooked native sqlite3_key (Android)");
                     }
@@ -443,18 +381,18 @@ impl Hachimi {
         }
 
         // Prevent double initialization
-        if self.hooking_finished.load(atomic::Ordering::Relaxed) {
-            return false;
-        }
+        if self.hooking_finished.load(atomic::Ordering::Relaxed) { return false; }
 
         if hachimi_impl::is_il2cpp_lib(filename) {
             info!("Got il2cpp handle");
             il2cpp::symbols::set_handle(handle);
             false
-        } else if hachimi_impl::is_criware_lib(filename) {
+        }
+        else if hachimi_impl::is_criware_lib(filename) {
             self.on_hooking_finished();
             true
-        } else {
+        }
+        else {
             false
         }
     }
@@ -568,8 +506,7 @@ impl Hachimi {
                         let data_dir = self.get_repo_dir(id);
                         if !data_dir.is_dir() {
                             warn!("TL repo data folder '{}' is missing, clearing localised data until next update...", data_dir.display());
-                            self.localized_data
-                                .store(Arc::new(LocalizedData::default()));
+                            self.localized_data.store(Arc::new(LocalizedData::default()));
                             gui::request_notification(gui::NotificationRequest::TLFolderMissing);
                         }
                     }
@@ -601,10 +538,7 @@ impl Hachimi {
             let old_cache = self.get_data_path(".tl_repo_cache");
             if old_cache.exists() {
                 let new_cache = self.get_data_path(format!(".tl_repo_cache_{}", id));
-                info!(
-                    "Migrating standalone legacy tl repo cache file to {}",
-                    new_cache.display()
-                );
+                info!("Migrating standalone legacy tl repo cache file to {}", new_cache.display());
                 if let Err(e) = fs::rename(&old_cache, &new_cache) {
                     warn!("Failed to rename legacy tp repo cache file: {e}");
                 }
@@ -701,8 +635,7 @@ impl Hachimi {
 
 fn default_serde_instance<'a, T: Deserialize<'a>>() -> Option<T> {
     let empty_data = std::iter::empty::<((), ())>();
-    let empty_deserializer =
-        serde::de::value::MapDeserializer::<_, serde::de::value::Error>::new(empty_data);
+    let empty_deserializer = serde::de::value::MapDeserializer::<_, serde::de::value::Error>::new(empty_data);
     T::deserialize(empty_deserializer).ok()
 }
 
@@ -710,13 +643,11 @@ fn default_serde_instance<'a, T: Deserialize<'a>>() -> Option<T> {
 pub enum TLAutoUpdaterMode {
     Disabled,
     Periodic,
-    Silent,
+    Silent
 }
 
 impl Default for TLAutoUpdaterMode {
-    fn default() -> Self {
-        Self::Disabled
-    }
+    fn default() -> Self { Self::Disabled }
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -758,29 +689,37 @@ impl Default for CaptionConfig {
 }
 
 impl CaptionConfig {
-    fn default_lines_char_count() -> i32 {
-        26
-    }
-    fn default_font_size() -> i32 {
-        50
-    }
-    fn default_color() -> String {
-        "White".to_owned()
-    }
-    fn default_outline_size() -> String {
-        "L".to_owned()
-    }
-    fn default_outline_color() -> String {
-        "Brown".to_owned()
-    }
-    fn default_bg_alpha() -> f32 {
-        0.0
-    }
-    fn default_pos_x() -> f32 {
-        0.0
-    }
-    fn default_pos_y() -> f32 {
-        -3.0
+    fn default_lines_char_count() -> i32 { 26 }
+    fn default_font_size() -> i32 { 50 }
+    fn default_color() -> String { "White".to_owned() }
+    fn default_outline_size() -> String { "L".to_owned() }
+    fn default_outline_color() -> String { "Brown".to_owned() }
+    fn default_bg_alpha() -> f32 { 0.0 }
+    fn default_pos_x() -> f32 { 0.0 }
+    fn default_pos_y() -> f32 { -3.0 }
+}
+
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq)]
+pub struct RaceStatHudCloneConfig {
+    #[serde(default = "Config::default_race_stat_hud_drag_x")]
+    pub drag_x: f32,
+    #[serde(default = "Config::default_race_stat_hud_drag_y")]
+    pub drag_y: f32,
+    #[serde(default)]
+    pub selected_character: usize,
+    #[serde(default)]
+    pub toggle_key: Option<i32>,
+    #[serde(default)]
+    pub open: bool
+}
+
+impl RaceStatHudCloneConfig {
+    pub fn drag_pos(&self) -> Option<(f32, f32)> {
+        if (0.0..=1.0).contains(&self.drag_x) && (0.0..=1.0).contains(&self.drag_y) {
+            Some((self.drag_x, self.drag_y))
+        } else {
+            None
+        }
     }
 }
 
@@ -858,6 +797,8 @@ pub struct Config {
     #[serde(default)]
     pub skill_data_desc: bool,
     #[serde(default)]
+    pub old_config_editor: bool,
+    #[serde(default)]
     pub homescreen_bgseason: crate::il2cpp::hook::umamusume::GameDefine::BgSeason,
     pub sugoi_url: Option<String>,
     #[serde(default)]
@@ -866,6 +807,8 @@ pub struct Config {
     pub auto_translate_localize: bool,
     #[serde(default)]
     pub disable_skill_name_translation: bool,
+    #[serde(default)]
+    pub disable_factor_name_translation: bool,
     #[serde(default)]
     pub hide_ingame_ui_hotkey: bool,
     #[serde(default)]
@@ -884,10 +827,22 @@ pub struct Config {
     pub race_stat_hud_drag_x: f32,
     #[serde(default = "Config::default_race_stat_hud_drag_y")]
     pub race_stat_hud_drag_y: f32,
+    #[serde(default)]
+    pub race_stat_hud_main_open: bool,
+    #[serde(default)]
+    pub race_stat_hud_clones: Vec<RaceStatHudCloneConfig>,
+    #[serde(default)]
+    pub race_stat_hud_selected_character: Option<usize>,
+    #[serde(default)]
+    pub race_stat_hud_persist_clones: bool,
+    #[serde(default)]
+    pub race_stat_hud_persist_selected_index: bool,
     #[serde(default = "Config::default_race_stat_hud_width_scale")]
     pub race_stat_hud_width_scale: f32,
     #[serde(default = "Config::default_race_stat_hud_height_scale")]
     pub race_stat_hud_height_scale: f32,
+    #[serde(default = "Config::default_race_stat_hud_opacity_scale")]
+    pub race_stat_hud_opacity_scale: f32,
     #[serde(default)]
     pub race_playback_slider: bool,
     #[serde(default = "Config::default_true")]
@@ -919,8 +874,6 @@ pub struct Config {
     pub live_playback_loop: bool,
     #[serde(default)]
     pub champions_live_show_text: bool,
-    #[serde(default)]
-    pub chara_speak_home_idle: bool,
     #[serde(default = "Config::default_champions_live_resource_id")]
     pub champions_live_resource_id: i32,
     #[serde(default = "Config::default_champions_live_year")]
@@ -952,82 +905,35 @@ pub struct Config {
 
     #[cfg(target_os = "android")]
     #[serde(flatten)]
-    pub android: hachimi_impl::Config,
+    pub android: hachimi_impl::Config
 }
 
 impl Config {
-    fn default_open_browser_url() -> String {
-        "https://www.google.com/".to_owned()
-    }
-    fn default_virtual_res_mult() -> f32 {
-        1.0
-    }
-    fn default_ui_scale() -> f32 {
-        1.0
-    }
-    fn default_render_scale() -> f32 {
-        1.0
-    }
-    fn default_gui_scale() -> f32 {
-        1.0
-    }
-    fn default_story_choice_auto_select_delay() -> f32 {
-        1.2
-    }
-    fn default_story_tcps_multiplier() -> f32 {
-        3.0
-    }
-    fn default_meta_index_url() -> String {
-        "https://gitlab.com/umatl/hachimi-meta/-/raw/main/meta.json".to_owned()
-    }
-    fn default_ui_animation_scale() -> f32 {
-        1.0
-    }
-    fn default_live_vocals_swap() -> [i32; 6] {
-        [0; 6]
-    }
-    fn default_champions_live_resource_id() -> i32 {
-        15
-    }
-    fn default_champions_live_year() -> i32 {
-        2025
-    }
-    pub fn default_ui_accent() -> egui::Color32 {
-        egui::Color32::from_rgb(100, 150, 240)
-    }
-    pub fn default_window_fill() -> egui::Color32 {
-        egui::Color32::from_rgba_premultiplied(27, 27, 27, 220)
-    }
-    pub fn default_panel_fill() -> egui::Color32 {
-        egui::Color32::from_rgba_premultiplied(27, 27, 27, 220)
-    }
-    pub fn default_extreme_bg() -> egui::Color32 {
-        egui::Color32::from_rgb(15, 15, 15)
-    }
-    pub fn default_text_color() -> egui::Color32 {
-        egui::Color32::from_gray(170)
-    }
-    pub fn default_window_rounding() -> f32 {
-        10.0
-    }
-    fn default_tl_auto_updater_interval_sec() -> u64 {
-        3600
-    }
-    fn default_race_stat_hud_drag_x() -> f32 {
-        -1.0
-    }
-    fn default_race_stat_hud_drag_y() -> f32 {
-        -1.0
-    }
-    fn default_race_stat_hud_width_scale() -> f32 {
-        1.0
-    }
-    fn default_race_stat_hud_height_scale() -> f32 {
-        1.0
-    }
-    fn default_true() -> bool {
-        true
-    }
+    fn default_open_browser_url() -> String { "https://www.google.com/".to_owned() }
+    fn default_virtual_res_mult() -> f32 { 1.0 }
+    fn default_ui_scale() -> f32 { 1.0 }
+    fn default_render_scale() -> f32 { 1.0 }
+    fn default_gui_scale() -> f32 { 1.0 }
+    fn default_story_choice_auto_select_delay() -> f32 { 1.2 }
+    fn default_story_tcps_multiplier() -> f32 { 3.0 }
+    fn default_meta_index_url() -> String { "https://gitlab.com/umatl/hachimi-meta/-/raw/main/meta.json".to_owned() }
+    fn default_ui_animation_scale() -> f32 { 1.0 }
+    fn default_live_vocals_swap() -> [i32; 6] { [0; 6] }
+    fn default_champions_live_resource_id() -> i32 { 15 }
+    fn default_champions_live_year() -> i32 { 2025 }
+    pub fn default_ui_accent() -> egui::Color32 { egui::Color32::from_rgb(100, 150, 240) }
+    pub fn default_window_fill() -> egui::Color32 { egui::Color32::from_rgba_premultiplied(27, 27, 27, 220) }
+    pub fn default_panel_fill() -> egui::Color32 { egui::Color32::from_rgba_premultiplied(27, 27, 27, 220) }
+    pub fn default_extreme_bg() -> egui::Color32 { egui::Color32::from_rgb(15, 15, 15) }
+    pub fn default_text_color() -> egui::Color32 { egui::Color32::from_gray(170) }
+    pub fn default_window_rounding() -> f32 { 10.0 }
+    fn default_tl_auto_updater_interval_sec() -> u64 { 3600 }
+    fn default_race_stat_hud_drag_x() -> f32 { -1.0 }
+    fn default_race_stat_hud_drag_y() -> f32 { -1.0 }
+    fn default_race_stat_hud_width_scale() -> f32 { 1.0 }
+    fn default_race_stat_hud_height_scale() -> f32 { 1.0 }
+    fn default_race_stat_hud_opacity_scale() -> f32 { 1.0 }
+    fn default_true() -> bool { true }
 }
 
 impl Default for Config {
@@ -1042,7 +948,7 @@ pub struct OsOption<T> {
     android: Option<T>,
 
     #[cfg(target_os = "windows")]
-    windows: Option<T>,
+    windows: Option<T>
 }
 
 impl<T> OsOption<T> {
@@ -1086,15 +992,12 @@ pub enum Language {
     Russian,
 
     #[serde(rename = "ko")]
-    Korean,
+    Korean
 }
 
 impl Default for Language {
     fn default() -> Self {
-        let locale = sys_locale::get_locale()
-            .as_deref()
-            .unwrap_or("en")
-            .to_lowercase();
+        let locale = sys_locale::get_locale().as_deref().unwrap_or("en").to_lowercase();
         if locale.contains("zh-hk") || locale.contains("zh-tw") || locale.contains("zh-hant") {
             Self::TChinese
         } else if locale.contains("zh") {
@@ -1130,7 +1033,7 @@ impl Language {
         Self::BPortuguese.choice(),
         Self::Filipino.choice(),
         Self::Russian.choice(),
-        Self::Korean.choice(),
+        Self::Korean.choice()
     ];
 
     pub fn set_locale(&self) {
@@ -1148,7 +1051,7 @@ impl Language {
             Language::BPortuguese => "pt-br",
             Language::Filipino => "fil",
             Language::Russian => "ru",
-            Language::Korean => "ko",
+            Language::Korean => "ko"
         }
     }
 
@@ -1163,7 +1066,7 @@ impl Language {
             Language::BPortuguese => "Português (Brasil)",
             Language::Filipino => "Filipino",
             Language::Russian => "Русский",
-            Language::Korean => "한국어",
+            Language::Korean => "한국어"
         }
     }
 
@@ -1181,15 +1084,15 @@ pub struct LocalizedData {
     pub hashed_dict: FnvHashMap<u64, String>,
     pub text_data_dict: FnvHashMap<i32, FnvHashMap<i32, String>>, // {"category": {"index": "text"}}
     pub character_system_text_dict: FnvHashMap<i32, FnvHashMap<i32, String>>, // {"character_id": {"voice_id": "text"}}
-    pub race_jikkyo_comment_dict: FnvHashMap<i32, String>,                    // {"id": "text"}
-    pub race_jikkyo_message_dict: FnvHashMap<i32, String>,                    // {"id": "text"}
+    pub race_jikkyo_comment_dict: FnvHashMap<i32, String>, // {"id": "text"}
+    pub race_jikkyo_message_dict: FnvHashMap<i32, String>, // {"id": "text"}
     pub skill_data_desc_dict: FnvHashMap<String, String>, // {"skill_data_desc.<key>": "text"}
     assets_path: Option<PathBuf>,
 
     pub plural_form: plurals::Resolver,
     pub ordinal_form: plurals::Resolver,
 
-    pub wrapper_penalties: Penalties,
+    pub wrapper_penalties: Penalties
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -1215,22 +1118,19 @@ impl LocalizedData {
         let config: LocalizedDataConfig = if let Some(ref p) = path {
             // Create .nomedia
             #[cfg(target_os = "android")]
-            {
-                _ = fs::OpenOptions::new()
-                    .create_new(true)
-                    .write(true)
-                    .open(p.join(".nomedia"));
-            }
+            { _ = fs::OpenOptions::new().create_new(true).write(true).open(p.join(".nomedia")); }
 
             let ld_config_path = p.join("config.json");
             if fs::metadata(&ld_config_path).is_ok() {
                 let json = fs::read_to_string(&ld_config_path)?;
                 serde_json::from_str(&json)?
-            } else {
+            }
+            else {
                 warn!("Localized data config not found");
                 LocalizedDataConfig::default()
             }
-        } else {
+        }
+        else {
             LocalizedDataConfig::default()
         };
 
@@ -1240,36 +1140,17 @@ impl LocalizedData {
         let wrapper_penalties = Self::parse_wrap_penalties_or_default(&config.wrapper_penalties);
 
         Ok(LocalizedData {
-            localize_dict: Self::load_dict_static(&path, config.localize_dict.as_ref())
-                .unwrap_or_default(),
-            hashed_dict: Self::load_dict_static(&path, config.hashed_dict.as_ref())
-                .unwrap_or_default(),
-            text_data_dict: Self::load_dict_static(&path, config.text_data_dict.as_ref())
-                .unwrap_or_default(),
-            character_system_text_dict: Self::load_dict_static(
-                &path,
-                config.character_system_text_dict.as_ref(),
-            )
-            .unwrap_or_default(),
-            race_jikkyo_comment_dict: Self::load_dict_static(
-                &path,
-                config.race_jikkyo_comment_dict.as_ref(),
-            )
-            .unwrap_or_default(),
-            race_jikkyo_message_dict: Self::load_dict_static(
-                &path,
-                config.race_jikkyo_message_dict.as_ref(),
-            )
-            .unwrap_or_default(),
-            skill_data_desc_dict: Self::load_dict_static_ex(
-                &path,
-                Some("skill_data_desc_dict.json"),
-                true,
-            )
-            .unwrap_or_default(),
-            assets_path: path
-                .as_ref()
-                .map(|p| config.assets_dir.as_ref().map(|dir| p.join(dir)))
+            localize_dict: Self::load_dict_static(&path, config.localize_dict.as_ref()).unwrap_or_default(),
+            hashed_dict: Self::load_dict_static(&path, config.hashed_dict.as_ref()).unwrap_or_default(),
+            text_data_dict: Self::load_dict_static(&path, config.text_data_dict.as_ref()).unwrap_or_default(),
+            character_system_text_dict: Self::load_dict_static(&path, config.character_system_text_dict.as_ref()).unwrap_or_default(),
+            race_jikkyo_comment_dict: Self::load_dict_static(&path, config.race_jikkyo_comment_dict.as_ref()).unwrap_or_default(),
+            race_jikkyo_message_dict: Self::load_dict_static(&path, config.race_jikkyo_message_dict.as_ref()).unwrap_or_default(),
+            skill_data_desc_dict: Self::load_dict_static_ex(&path, Some("skill_data_desc_dict.json"), true).unwrap_or_default(),
+            assets_path: path.as_ref()
+                .map(|p| config.assets_dir.as_ref()
+                    .map(|dir| p.join(dir))
+                )
                 .unwrap_or_default(),
 
             plural_form,
@@ -1278,15 +1159,11 @@ impl LocalizedData {
             wrapper_penalties,
 
             config,
-            path,
+            path
         })
     }
 
-    fn load_dict_static_ex<T: DeserializeOwned, P: AsRef<Path>>(
-        ld_path_opt: &Option<PathBuf>,
-        rel_path_opt: Option<P>,
-        silent_fs_error: bool,
-    ) -> Option<T> {
+    fn load_dict_static_ex<T: DeserializeOwned, P: AsRef<Path>>(ld_path_opt: &Option<PathBuf>, rel_path_opt: Option<P>, silent_fs_error: bool) -> Option<T> {
         let Some(ld_path) = ld_path_opt else {
             return None;
         };
@@ -1316,45 +1193,37 @@ impl LocalizedData {
         Some(dict)
     }
 
-    fn load_dict_static<T: DeserializeOwned, P: AsRef<Path>>(
-        ld_path_opt: &Option<PathBuf>,
-        rel_path_opt: Option<P>,
-    ) -> Option<T> {
+    fn load_dict_static<T: DeserializeOwned, P: AsRef<Path>>(ld_path_opt: &Option<PathBuf>, rel_path_opt: Option<P>) -> Option<T> {
         Self::load_dict_static_ex(ld_path_opt, rel_path_opt, false)
     }
 
-    pub fn load_dict<T: DeserializeOwned, P: AsRef<Path>>(
-        &self,
-        rel_path_opt: Option<P>,
-    ) -> Option<T> {
+    pub fn load_dict<T: DeserializeOwned, P: AsRef<Path>>(&self, rel_path_opt: Option<P>) -> Option<T> {
         Self::load_dict_static(&self.path, rel_path_opt)
     }
 
-    pub fn load_assets_dict<T: DeserializeOwned, P: AsRef<Path>>(
-        &self,
-        rel_path_opt: Option<P>,
-    ) -> Option<T> {
+    pub fn load_assets_dict<T: DeserializeOwned, P: AsRef<Path>>(&self, rel_path_opt: Option<P>) -> Option<T> {
         Self::load_dict_static_ex(&self.assets_path, rel_path_opt, true)
     }
 
     fn parse_plural_form_or_default(opt: &Option<String>) -> Result<plurals::Resolver, Error> {
         if let Some(plural_form) = opt {
             Ok(plurals::Resolver::Expr(plurals::Ast::parse(plural_form)?))
-        } else {
+        }
+        else {
             Ok(plurals::Resolver::Function(|_| 0))
         }
     }
 
     fn parse_wrap_penalties_or_default(opt: &Option<PenaltiesConfig>) -> Penalties {
         let Some(cfg) = opt else {
-            return Penalties::new();
+            return Penalties::new()
         };
         Penalties {
             nline_penalty: cfg.nline_penalty,
             overflow_penalty: cfg.overflow_penalty,
             short_last_line_fraction: cfg.short_last_line_fraction,
             short_last_line_penalty: cfg.short_last_line_penalty,
-            hyphen_penalty: cfg.hyphen_penalty,
+            hyphen_penalty: cfg.hyphen_penalty
         }
     }
 
@@ -1369,43 +1238,29 @@ impl LocalizedData {
     pub fn load_asset_metadata<P: AsRef<Path>>(&self, rel_path: P) -> AssetMetadata {
         let mut path = rel_path.as_ref().to_owned();
         path.set_extension("json");
-        self.load_assets_dict(Some(path))
-            .unwrap_or_else(|| AssetInfo::<()>::default())
-            .metadata()
+        self.load_assets_dict(Some(path)).unwrap_or_else(|| AssetInfo::<()>::default()).metadata()
     }
 
-    pub fn load_asset_info<P: AsRef<Path>, T: DeserializeOwned>(
-        &self,
-        rel_path: P,
-    ) -> AssetInfo<T> {
+    pub fn load_asset_info<P: AsRef<Path>, T: DeserializeOwned>(&self, rel_path: P) -> AssetInfo<T> {
         let mut path = rel_path.as_ref().to_owned();
         path.set_extension("json");
-        self.load_assets_dict(Some(path))
-            .unwrap_or_else(|| AssetInfo::default())
+        self.load_assets_dict(Some(path)).unwrap_or_else(|| AssetInfo::default())
     }
 
     pub fn load_custom_story_ruby(&self, ast_ruby_name: &str) -> Option<Vec<CustomRubyBlock>> {
         // let filename = ast_ruby_name.split('/').last().unwrap_or(ast_ruby_name);
-        let filename = ast_ruby_name
-            .split('/')
-            .next_back()
-            .unwrap_or(ast_ruby_name);
+        let filename = ast_ruby_name.split('/').next_back().unwrap_or(ast_ruby_name);
 
         let filename_no_ext = filename.strip_suffix(".asset").unwrap_or(filename);
 
         let id_str = filename_no_ext.strip_prefix("ast_ruby_")?;
 
-        if id_str.len() < 6 {
-            return None;
-        }
+        if id_str.len() < 6 { return None; }
 
         let category_id = &id_str[0..2];
         let story_id = &id_str[2..6];
 
-        let path = format!(
-            "story/data/{}/{}/{}.json",
-            category_id, story_id, filename_no_ext
-        );
+        let path = format!("story/data/{}/{}/{}.json", category_id, story_id, filename_no_ext);
 
         self.load_assets_dict(Some(path))
     }
@@ -1465,14 +1320,14 @@ pub struct LocalizedDataConfig {
 
     // RESERVED
     #[serde(default)]
-    pub _debug: i32,
+    pub _debug: i32
 }
 
 #[derive(Deserialize, Clone)]
 pub struct UITextConfig {
     pub text: Option<String>,
     pub font_size: Option<i32>,
-    pub line_spacing: Option<f32>,
+    pub line_spacing: Option<f32>
 }
 
 impl Default for LocalizedDataConfig {
@@ -1491,7 +1346,7 @@ pub struct AssetInfo<T> {
     #[serde(default)]
     windows: AssetMetadata,
 
-    pub data: Option<T>,
+    pub data: Option<T>
 }
 
 // Can't derive(Default), see rust-lang/rust#26925
@@ -1504,7 +1359,7 @@ impl<T> Default for AssetInfo<T> {
             #[cfg(target_os = "windows")]
             windows: Default::default(),
 
-            data: None,
+            data: None
         }
     }
 }
@@ -1529,7 +1384,7 @@ impl<T> AssetInfo<T> {
 
 #[derive(Deserialize, Clone, Default)]
 pub struct AssetMetadata {
-    pub bundle_name: Option<String>,
+    pub bundle_name: Option<String>
 }
 
 #[derive(Deserialize, Clone)]
@@ -1538,7 +1393,7 @@ pub struct PenaltiesConfig {
     overflow_penalty: usize,
     short_last_line_fraction: usize,
     short_last_line_penalty: usize,
-    hyphen_penalty: usize,
+    hyphen_penalty: usize
 }
 
 #[derive(Deserialize, Clone)]
@@ -1556,15 +1411,9 @@ pub struct SkillFormatting {
     pub name_sp_mult: f32,
 }
 impl SkillFormatting {
-    fn default_length() -> i32 {
-        18
-    }
-    fn default_lines() -> i32 {
-        1
-    }
-    fn default_mult() -> f32 {
-        1.0
-    }
+    fn default_length() -> i32 { 18 }
+    fn default_lines() -> i32 { 1 }
+    fn default_mult() -> f32 { 1.0 }
 }
 
 impl Default for SkillFormatting {
@@ -1574,7 +1423,6 @@ impl Default for SkillFormatting {
             desc_length: 18,
             name_short_lines: 1,
             name_short_mult: 1.0,
-            name_sp_mult: 1.0,
-        }
+            name_sp_mult: 1.0 }
     }
 }

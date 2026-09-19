@@ -1,18 +1,18 @@
+use std::sync::Arc;
+use crate::{
+    core::{Hachimi, gui::{GameOpts, GAME_OPTS_CACHE}, game::Region},
+    il2cpp::{
+        sql::{get_champions_resources, get_champions_live_max_year},
+        symbols::{IEnumerator, MoveNextFn, SingletonLike, get_method_addr},
+        types::*, utils::umamusume_enum_options
+    }
+};
 #[cfg(target_os = "windows")]
-use super::{Director, HomeCameraController};
-#[cfg(target_os = "windows")]
-use super::{RaceCameraManager, RaceManagerReplayBase};
+use crate::windows::free_camera::{self, CameraScene};
 #[cfg(target_os = "windows")]
 use crate::core::live_utils;
 #[cfg(target_os = "windows")]
-use crate::windows::free_camera::{self, CameraScene};
-use crate::{
-    core::{game::Region, Hachimi},
-    il2cpp::{
-        symbols::{get_method_addr, IEnumerator, MoveNextFn, SingletonLike},
-        types::*,
-    },
-};
+use super::Director;
 // use std::sync::atomic::{AtomicBool, Ordering};
 // pub static GAME_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -65,15 +65,22 @@ type GameSystemLateUpdateFn = extern "C" fn(this: *mut Il2CppObject);
 extern "C" fn GameSystem_LateUpdate(this: *mut Il2CppObject) {
     get_orig_fn!(GameSystem_LateUpdate, GameSystemLateUpdateFn)(this);
     Director::apply_paused_free_camera();
+}
 
-    #[cfg(target_os = "windows")]
-    if free_camera::scene() == CameraScene::Race && RaceManagerReplayBase::is_paused() {
-        RaceCameraManager::apply_paused_free_camera();
-    }
-
-    #[cfg(target_os = "windows")]
-    if free_camera::scene() == CameraScene::Home {
-        HomeCameraController::apply_home_free_camera();
+fn init_game_opts() {
+    let opts = GameOpts {
+        champions_resources: Arc::new(get_champions_resources()),
+        champions_live_max_year: get_champions_live_max_year(),
+        font_color_options: Arc::new(umamusume_enum_options(c"FontColorType")),
+        outline_size_options: Arc::new(umamusume_enum_options(c"OutlineSizeType")),
+        outline_color_options: Arc::new(umamusume_enum_options(c"OutlineColorType")),
+    };
+    match GAME_OPTS_CACHE.lock() {
+        Ok(mut slot) => *slot = Some(opts),
+        Err(poisoned) => {
+            warn!("GAME_OPTS_CACHE mutex poisoned, recovering");
+            *poisoned.into_inner() = Some(opts);
+        }
     }
 }
 
@@ -83,6 +90,7 @@ pub fn on_game_initialized() {
     // GAME_INITIALIZED.store(true, Ordering::Relaxed);
     Hachimi::instance().init_skill_info();
     Hachimi::instance().init_skill_data_desc();
+    init_game_opts();
 
     #[cfg(target_os = "android")]
     crate::android::utils::set_audio_capture_policy_all();
@@ -94,14 +102,9 @@ pub fn on_game_initialized() {
     let callbacks = hachimi.plugin_init_callbacks.lock().unwrap();
     for (callback, userdata) in callbacks.iter() {
         let callback_ptr = *callback;
-        if callback_ptr == 0 {
-            continue;
-        }
-        let callback: unsafe extern "C" fn(*mut std::ffi::c_void) =
-            unsafe { std::mem::transmute(callback_ptr) };
-        unsafe {
-            callback(*userdata as *mut std::ffi::c_void);
-        }
+        if callback_ptr == 0 { continue; }
+        let callback: unsafe extern "C" fn(*mut std::ffi::c_void) = unsafe { std::mem::transmute(callback_ptr) };
+        unsafe { callback(*userdata as *mut std::ffi::c_void); }
     }
 }
 
@@ -115,9 +118,7 @@ extern "C" fn InitializeGame_MoveNext(enumerator: *mut Il2CppObject) -> bool {
 }
 
 fn InitializeGameCommon(enumerator: IEnumerator) -> IEnumerator {
-    if Hachimi::instance().config.load().ui_scale == 1.0 {
-        return enumerator;
-    }
+    if Hachimi::instance().config.load().ui_scale == 1.0 { return enumerator; }
 
     if let Err(e) = enumerator.hook_move_next(InitializeGame_MoveNext) {
         error!("Failed to hook InitializeGame enumerator: {}", e);
@@ -126,16 +127,9 @@ fn InitializeGameCommon(enumerator: IEnumerator) -> IEnumerator {
     enumerator
 }
 
-type InitializeGameJpFn = extern "C" fn(
-    this: *mut Il2CppObject,
-    on_complete_initialize_ui: *mut Il2CppObject,
-) -> IEnumerator;
-extern "C" fn InitializeGameJp(
-    this: *mut Il2CppObject,
-    on_complete_initialize_ui: *mut Il2CppObject,
-) -> IEnumerator {
-    let enumerator =
-        get_orig_fn!(InitializeGameJp, InitializeGameJpFn)(this, on_complete_initialize_ui);
+type InitializeGameJpFn = extern "C" fn(this: *mut Il2CppObject, on_complete_initialize_ui: *mut Il2CppObject) -> IEnumerator;
+extern "C" fn InitializeGameJp(this: *mut Il2CppObject, on_complete_initialize_ui: *mut Il2CppObject) -> IEnumerator {
+    let enumerator = get_orig_fn!(InitializeGameJp, InitializeGameJpFn)(this, on_complete_initialize_ui);
     InitializeGameCommon(enumerator)
 }
 
@@ -151,7 +145,8 @@ pub fn init(umamusume: *const Il2CppImage) {
     if Hachimi::instance().game.region == Region::Japan {
         let InitializeGame_addr = get_method_addr(GameSystem, c"InitializeGame", 1);
         new_hook!(InitializeGame_addr, InitializeGameJp);
-    } else {
+    }
+    else {
         let InitializeGame_addr = get_method_addr(GameSystem, c"InitializeGame", 0);
         new_hook!(InitializeGame_addr, InitializeGameOther);
     }

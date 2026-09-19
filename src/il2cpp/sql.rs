@@ -1,30 +1,13 @@
-use crate::{
-    core::{
-        game::Region,
-        utils::{get_masterdb_path, get_meta_path},
-        Hachimi,
-    },
-    il2cpp::{
-        ext::{Il2CppStringExt, StringExt},
-        hook::{
-            umamusume::SceneManager,
-            LibNative_Runtime::Sqlite3::{Connection, Query},
-        },
-        types::{Il2CppObject, Il2CppString},
-    },
-};
-use chrono::{Datelike, Utc};
+use std::{ptr, sync::{atomic::{AtomicBool, Ordering}, Mutex, RwLock}};
 use fnv::{FnvHashMap, FnvHashSet};
-use once_cell::sync::Lazy;
-use rust_i18n::locale;
 use sqlparser::ast;
-use std::{
-    ptr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex, RwLock,
-    },
+use once_cell::sync::Lazy;
+use crate::{
+    core::{utils::{get_masterdb_path, get_meta_path}, Hachimi, game::Region},
+    il2cpp::{ext::{StringExt, Il2CppStringExt}, hook::{LibNative_Runtime::Sqlite3::{Connection, Query}, umamusume::SceneManager}, types::{Il2CppObject, Il2CppString}}
 };
+use chrono::{Utc, Datelike};
+use rust_i18n::locale;
 
 pub static RETRIEVED_RAW_KEY: Lazy<Mutex<Vec<u8>>> = Lazy::new(|| Mutex::new(Vec::new()));
 pub static AUTO_UNLOCK_NEXT_DB: AtomicBool = AtomicBool::new(false);
@@ -34,7 +17,7 @@ pub static META_DATA: Lazy<RwLock<MetaData>> = Lazy::new(|| RwLock::new(MetaData
 #[derive(Default)]
 pub struct CharacterData {
     pub chara_ids: FnvHashSet<i32>,
-    pub chara_names: FnvHashMap<i32, String>,
+    pub chara_names: FnvHashMap<i32, String>
 }
 
 impl CharacterData {
@@ -45,13 +28,7 @@ impl CharacterData {
         let db_path = get_masterdb_path();
         let conn = Connection::new();
 
-        if Connection::Open(
-            conn,
-            db_path.to_il2cpp_string(),
-            ptr::null_mut(),
-            ptr::null_mut(),
-            0,
-        ) {
+        if Connection::Open(conn, db_path.to_il2cpp_string(), ptr::null_mut(), ptr::null_mut(), 0) {
             let sql = "SELECT C.id, T.text FROM chara_data AS C JOIN text_data AS T ON C.id = T.\"index\" WHERE T.id = 6";
             let query = Connection::Query(conn, sql.to_il2cpp_string());
 
@@ -60,9 +37,7 @@ impl CharacterData {
                     let id = Query::GetInt(query, 0);
                     let name_ptr = Query::GetText(query, 1);
 
-                    if let Some(name) =
-                        unsafe { name_ptr.as_ref() }.map(|s| s.as_utf16str().to_string())
-                    {
+                    if let Some(name) = unsafe { name_ptr.as_ref() }.map(|s| s.as_utf16str().to_string()) {
                         chara_ids.insert(id);
                         chara_names.insert(id, name);
                     }
@@ -72,10 +47,7 @@ impl CharacterData {
             Connection::CloseDB(conn);
         }
 
-        CharacterData {
-            chara_ids,
-            chara_names,
-        }
+        CharacterData { chara_ids, chara_names }
     }
 
     pub fn exists(&self, id: i32) -> bool {
@@ -84,12 +56,7 @@ impl CharacterData {
 
     pub fn get_name(&self, id: i32) -> String {
         // check text_data_dict.json (category 170)
-        if let Some(category_170) = Hachimi::instance()
-            .localized_data
-            .load()
-            .text_data_dict
-            .get(&170)
-        {
+        if let Some(category_170) = Hachimi::instance().localized_data.load().text_data_dict.get(&170) {
             if let Some(name) = category_170.get(&id) {
                 return name.clone();
             }
@@ -120,13 +87,7 @@ impl SkillInfo {
         let db_path = get_masterdb_path();
         let conn = Connection::new();
 
-        if Connection::Open(
-            conn,
-            db_path.to_il2cpp_string(),
-            ptr::null_mut(),
-            ptr::null_mut(),
-            0,
-        ) {
+        if Connection::Open(conn, db_path.to_il2cpp_string(), ptr::null_mut(), ptr::null_mut(), 0) {
             // category 47 = names, 48 = descriptions
             let sql = "SELECT \"index\", text, id FROM text_data WHERE id IN (47, 48)";
             let query = Connection::Query(conn, sql.to_il2cpp_string());
@@ -137,9 +98,7 @@ impl SkillInfo {
                     let text_ptr = Query::GetText(query, 1);
                     let category = Query::GetInt(query, 2);
 
-                    if let Some(text) =
-                        unsafe { text_ptr.as_ref() }.map(|s| s.as_utf16str().to_string())
-                    {
+                    if let Some(text) = unsafe { text_ptr.as_ref() }.map(|s| s.as_utf16str().to_string()) {
                         match category {
                             47 => skill_names.insert(index, text),
                             48 => skill_descs.insert(index, text),
@@ -152,10 +111,7 @@ impl SkillInfo {
             Connection::CloseDB(conn);
         }
 
-        SkillInfo {
-            skill_names,
-            skill_descs,
-        }
+        SkillInfo { skill_names, skill_descs }
     }
 
     pub fn get_name(&self, id: i32) -> String {
@@ -211,14 +167,15 @@ struct Column {
     param_idx: Option<i32>,
 
     /// The int value binded to this column as a parameter.
-    int_value: Option<i32>,
+    int_value: Option<i32>
 }
 
 impl Column {
     fn is_select_idx(&self, idx: i32) -> bool {
         if let Some(i) = self.select_idx {
             idx == i
-        } else {
+        }
+        else {
             false
         }
     }
@@ -226,7 +183,8 @@ impl Column {
     fn is_param_idx(&self, idx: i32) -> bool {
         if let Some(i) = self.param_idx {
             idx == i
-        } else {
+        }
+        else {
             false
         }
     }
@@ -240,7 +198,8 @@ impl Column {
     fn try_get_int(&self, query: *mut Il2CppObject) -> Option<i32> {
         if let Some(idx) = self.select_idx {
             Some(Query::GetInt(query, idx))
-        } else {
+        }
+        else {
             None
         }
     }
@@ -248,9 +207,11 @@ impl Column {
     fn value_or_try_get_int(&self, query: *mut Il2CppObject) -> Option<i32> {
         if let Some(value) = self.int_value {
             Some(value)
-        } else if let Some(value) = self.try_get_int(query) {
+        }
+        else if let Some(value) = self.try_get_int(query) {
             Some(value)
-        } else {
+        }
+        else {
             None
         }
     }
@@ -258,7 +219,7 @@ impl Column {
 
 #[derive(Default)]
 pub struct SkillDataDesc {
-    pub descs: FnvHashMap<i32, String>,
+    pub descs: FnvHashMap<i32, String>
 }
 
 struct SkillDataDescRow {
@@ -271,7 +232,7 @@ struct SkillDataDescRow {
     condition_2: String,
     ability_time_2: i32,
     cooldown_time_2: i32,
-    slots: [SkillDataDescSlot; 6],
+    slots: [SkillDataDescSlot; 6]
 }
 
 #[derive(Clone, Copy, Default)]
@@ -281,7 +242,7 @@ struct SkillDataDescSlot {
     ability_value_usage: i32,
     additional_activate_type: i32,
     target_type: i32,
-    target_value: i32,
+    target_value: i32
 }
 
 impl SkillDataDesc {
@@ -291,13 +252,7 @@ impl SkillDataDesc {
         let db_path = get_masterdb_path();
         let conn = Connection::new();
 
-        if Connection::Open(
-            conn,
-            db_path.to_il2cpp_string(),
-            ptr::null_mut(),
-            ptr::null_mut(),
-            0,
-        ) {
+        if Connection::Open(conn, db_path.to_il2cpp_string(), ptr::null_mut(), ptr::null_mut(), 0) {
             let sql = "SELECT id, \
                 precondition_1, condition_1, float_ability_time_1, float_cooldown_time_1, \
                 ability_type_1_1, ability_value_usage_1_1, additional_activate_type_1_1, float_ability_value_1_1, target_type_1_1, target_value_1_1, \
@@ -327,7 +282,7 @@ impl SkillDataDesc {
     pub fn get_desc(&self, id: i32) -> Option<&String> {
         self.descs.get(&id)
     }
-
+    
     fn get_data_slot(query: *mut Il2CppObject, base: i32) -> SkillDataDescSlot {
         SkillDataDescSlot {
             ability_type: Query::GetInt(query, base),
@@ -335,15 +290,13 @@ impl SkillDataDesc {
             additional_activate_type: Query::GetInt(query, base + 2),
             ability_value: Query::GetInt(query, base + 3),
             target_type: Query::GetInt(query, base + 4),
-            target_value: Query::GetInt(query, base + 5),
+            target_value: Query::GetInt(query, base + 5)
         }
     }
 
     fn get_data_text(query: *mut Il2CppObject, idx: i32) -> String {
         let text_ptr = Query::GetText(query, idx);
-        unsafe { text_ptr.as_ref() }
-            .map(|s| s.as_utf16str().to_string())
-            .unwrap_or_default()
+        unsafe { text_ptr.as_ref() }.map(|s| s.as_utf16str().to_string()).unwrap_or_default()
     }
 
     fn get_data_row(query: *mut Il2CppObject) -> SkillDataDescRow {
@@ -358,24 +311,16 @@ impl SkillDataDesc {
             ability_time_2: Query::GetInt(query, 25),
             cooldown_time_2: Query::GetInt(query, 26),
             slots: [
-                Self::get_data_slot(query, 5),
-                Self::get_data_slot(query, 11),
-                Self::get_data_slot(query, 17),
-                Self::get_data_slot(query, 27),
-                Self::get_data_slot(query, 33),
-                Self::get_data_slot(query, 39),
-            ],
+                Self::get_data_slot(query, 5), Self::get_data_slot(query, 11), Self::get_data_slot(query, 17),
+                Self::get_data_slot(query, 27), Self::get_data_slot(query, 33), Self::get_data_slot(query, 39)
+            ]
         }
     }
 
     fn round_ties_up(value: i32, units: i32) -> i32 {
         let rem = value.rem_euclid(units);
         let base = value - rem;
-        if rem * 2 >= units {
-            base + units
-        } else {
-            base
-        }
+        if rem * 2 >= units { base + units } else { base }
     }
 
     fn format_data_number(value: i32, div: i32, decimals: usize) -> String {
@@ -422,7 +367,7 @@ impl SkillDataDesc {
             ">=" => "ge",
             "<" => "lt",
             ">" => "gt",
-            _ => "op",
+            _ => "op"
         }
     }
 
@@ -470,9 +415,8 @@ impl SkillDataDesc {
             1 => Self::str("star.activate.1"),
             2 => Self::str("star.activate.2"),
             3 => Self::str("star.activate.3"),
-            _ => None,
-        }
-        .or_else(|| {
+            _ => None
+        }.or_else(|| {
             if slot.ability_value_usage != 1 {
                 Self::str(&format!("star.usage.{}", slot.ability_value_usage))
             } else {
@@ -488,41 +432,31 @@ impl SkillDataDesc {
             let target = match slot.target_type {
                 4 => Self::str("target.all_in_fov"),
                 7 => Self::data_fmt("target.leading", &(slot.target_value - 1).to_string()),
-                9 => {
-                    if slot.target_value == 18 {
-                        Self::str("target.all_ahead")
-                    } else {
-                        Self::data_fmt("target.closest_ahead", &slot.target_value.to_string())
-                    }
-                }
-                10 => {
-                    if slot.target_value == 18 {
-                        Self::str("target.all_behind")
-                    } else {
-                        Self::data_fmt("target.closest_behind", &slot.target_value.to_string())
-                    }
-                }
+                9 => if slot.target_value == 18 {
+                    Self::str("target.all_ahead")
+                } else {
+                    Self::data_fmt("target.closest_ahead", &slot.target_value.to_string())
+                },
+                10 => if slot.target_value == 18 {
+                    Self::str("target.all_behind")
+                } else {
+                    Self::data_fmt("target.closest_behind", &slot.target_value.to_string())
+                },
                 11 => Self::str("target.team"),
                 18 => match Self::str(&format!("target.style.{}", slot.target_value)) {
                     Some(text) => Some(text),
-                    None => return None,
+                    None => return None
                 },
                 19 => Self::data_fmt("target.random_rushed_ahead", &slot.target_value.to_string()),
-                20 => Self::data_fmt(
-                    "target.random_rushed_behind",
-                    &slot.target_value.to_string(),
-                ),
+                20 => Self::data_fmt("target.random_rushed_behind", &slot.target_value.to_string()),
                 21 => match Self::str(&format!("target.style_rushed.{}", slot.target_value)) {
                     Some(text) => Some(text),
-                    None => return None,
+                    None => return None
                 },
                 22 => Self::str("target.suzuka"),
-                23 => Self::data_fmt(
-                    "target.random_recovery_users",
-                    &slot.target_value.to_string(),
-                ),
+                23 => Self::data_fmt("target.random_recovery_users", &slot.target_value.to_string()),
                 24 => Self::str("target.unknown"),
-                _ => None,
+                _ => None
             };
             if let Some(target) = target {
                 out.push_str(&Self::str("sep.to").unwrap_or_default());
@@ -554,21 +488,12 @@ impl SkillDataDesc {
     fn format_data_atom(atom: &str) -> String {
         let bytes = atom.as_bytes();
         let mut token_end = 0;
-        while token_end < bytes.len()
-            && (bytes[token_end].is_ascii_lowercase()
-                || bytes[token_end] == b'_'
-                || bytes[token_end].is_ascii_digit())
-        {
+        while token_end < bytes.len() && (bytes[token_end].is_ascii_lowercase() || bytes[token_end] == b'_' || bytes[token_end].is_ascii_digit()) {
             token_end += 1;
         }
         let op_start = token_end;
         let mut op_end = op_start;
-        while op_end < bytes.len()
-            && (bytes[op_end] == b'='
-                || bytes[op_end] == b'!'
-                || bytes[op_end] == b'<'
-                || bytes[op_end] == b'>')
-        {
+        while op_end < bytes.len() && (bytes[op_end] == b'=' || bytes[op_end] == b'!' || bytes[op_end] == b'<' || bytes[op_end] == b'>') {
             op_end += 1;
         }
         let token = &atom[..token_end];
@@ -581,7 +506,7 @@ impl SkillDataDesc {
                 ">=" => Self::data_fmt("cond.order_rate.ge", &(100 - value).to_string()),
                 "<=" => Self::data_fmt("cond.order_rate.le", &value.to_string()),
                 "<" => Self::data_fmt("cond.order_rate.lt", &value.to_string()),
-                _ => None,
+                _ => None
             };
             if let Some(text) = text {
                 return text;
@@ -594,7 +519,7 @@ impl SkillDataDesc {
                 ("==", _) => Self::data_fmt("cond.corner.corner", &value.to_string()),
                 ("!=", 0) => Self::str("cond.corner.any"),
                 ("!=", _) => Self::data_fmt("cond.corner.not", &value.to_string()),
-                _ => None,
+                _ => None
             };
             if let Some(text) = text {
                 return text;
@@ -607,17 +532,14 @@ impl SkillDataDesc {
                     "==" => name,
                     "!=" => Self::data_fmt("cond.negate", &name).unwrap_or_default(),
                     "<=" => Self::data_fmt("cond.phase.le", &name).unwrap_or_default(),
-                    _ => Self::data_fmt("cond.phase.ge", &name).unwrap_or_default(),
+                    _ => Self::data_fmt("cond.phase.ge", &name).unwrap_or_default()
                 };
             }
         }
 
         if token == "ground_condition" && matches!(op, "==" | "!=" | "<=" | ">=") {
             if let Some(name) = Self::str(&format!("cond.ground_condition.name.{value}")) {
-                if let Some(text) = Self::data_fmt(
-                    &format!("cond.ground_condition.{}", Self::op_tag(op)),
-                    &name,
-                ) {
+                if let Some(text) = Self::data_fmt(&format!("cond.ground_condition.{}", Self::op_tag(op)), &name) {
                     return text;
                 }
             }
@@ -636,11 +558,7 @@ impl SkillDataDesc {
             }
             if op == "==" || op == "!=" {
                 if let Some(name) = Self::str(&format!("cond.track_name.{value}")) {
-                    let key = if op == "==" {
-                        "cond.track_id.at"
-                    } else {
-                        "cond.track_id.not_at"
-                    };
+                    let key = if op == "==" { "cond.track_id.at" } else { "cond.track_id.not_at" };
                     if let Some(text) = Self::data_fmt(key, &name) {
                         return text;
                     }
@@ -687,10 +605,7 @@ impl SkillDataDesc {
         }
 
         if token == "distance_diff_top_float" && op == "<=" {
-            if let Some(text) = Self::data_fmt(
-                "cond.template.distance_diff_top_float.le",
-                &Self::format_data_number(value, 10, 1),
-            ) {
+            if let Some(text) = Self::data_fmt("cond.template.distance_diff_top_float.le", &Self::format_data_number(value, 10, 1)) {
                 return text;
             }
         }
@@ -718,9 +633,7 @@ impl SkillDataDesc {
             if let Some(text) = Self::str(&format!("cond.used_skill_detail_one.{value}")) {
                 return text;
             }
-            if let Some(text) =
-                Self::data_fmt("cond.used_skill_detail_one.template", &value.to_string())
-            {
+            if let Some(text) = Self::data_fmt("cond.used_skill_detail_one.template", &value.to_string()) {
                 return text;
             }
         }
@@ -752,13 +665,7 @@ impl SkillDataDesc {
             .map(|text| text.replace("%{v}", &value.to_string()))
     }
 
-    fn format_data_group(
-        condition: &str,
-        precondition: &str,
-        ability_time: i32,
-        cooldown_time: i32,
-        slots: &[SkillDataDescSlot],
-    ) -> Option<String> {
+    fn format_data_group(condition: &str, precondition: &str, ability_time: i32, cooldown_time: i32, slots: &[SkillDataDescSlot]) -> Option<String> {
         let mut effects: Vec<String> = Vec::new();
         for slot in slots {
             if slot.ability_type == 0 && slot.ability_value == 0 {
@@ -775,18 +682,14 @@ impl SkillDataDesc {
         let first_type = slots.first().map(|s| s.ability_type).unwrap_or(0);
         let first_value = slots.first().map(|s| s.ability_value).unwrap_or(0);
         let time_suffix = if ability_time > 0 {
-            Self::data_fmt(
-                "group.duration",
-                &Self::format_data_number(ability_time, 10000, 2),
-            )
+            Self::data_fmt("group.duration", &Self::format_data_number(ability_time, 10000, 2))
         } else if ability_time == 0 {
             Self::str("group.immediate")
         } else if first_type == 21 && first_value < 0 {
             Self::str("group.long_negative")
         } else {
             Self::str("group.indefinite")
-        }
-        .unwrap_or_default();
+        }.unwrap_or_default();
 
         let mut body = effects.join(", ");
         body.push(' ');
@@ -794,20 +697,10 @@ impl SkillDataDesc {
 
         let mut line = format!("<b>{body}</b>");
         if cooldown_time > 0 && cooldown_time < 5000000 {
-            line.push_str(
-                &Self::data_fmt(
-                    "group.cd",
-                    &format!("{:.1}", cooldown_time as f64 / 10000.0),
-                )
-                .unwrap_or_default(),
-            );
+            line.push_str(&Self::data_fmt("group.cd", &format!("{:.1}", cooldown_time as f64 / 10000.0)).unwrap_or_default());
         }
         line.push_str(&Self::str("group.when").unwrap_or_default());
-        line.push_str(&Self::format_data_conditions(if condition.is_empty() {
-            "always==1"
-        } else {
-            condition
-        }));
+        line.push_str(&Self::format_data_conditions(if condition.is_empty() { "always==1" } else { condition }));
         if !precondition.is_empty() {
             line.push_str(&Self::str("group.after").unwrap_or_default());
             line.push_str(&Self::format_data_conditions(precondition));
@@ -816,26 +709,14 @@ impl SkillDataDesc {
     }
 
     fn format_data_desc(row: &SkillDataDescRow) -> String {
-        let group1 = Self::format_data_group(
-            &row.condition_1,
-            &row.precondition_1,
-            row.ability_time_1,
-            row.cooldown_time_1,
-            &row.slots[0..3],
-        );
-        let group2 = Self::format_data_group(
-            &row.condition_2,
-            &row.precondition_2,
-            row.ability_time_2,
-            row.cooldown_time_2,
-            &row.slots[3..6],
-        );
+        let group1 = Self::format_data_group(&row.condition_1, &row.precondition_1, row.ability_time_1, row.cooldown_time_1, &row.slots[0..3]);
+        let group2 = Self::format_data_group(&row.condition_2, &row.precondition_2, row.ability_time_2, row.cooldown_time_2, &row.slots[3..6]);
 
         match (group1, group2) {
             (Some(g1), Some(g2)) => format!("{g1}\n{g2}"),
             (Some(g1), None) => g1,
             (None, Some(g2)) => g2,
-            (None, None) => String::new(),
+            (None, None) => String::new()
         }
     }
 }
@@ -848,24 +729,31 @@ pub struct TextDataQuery {
 
     // WHERE
     category: Column,
-    index: Column,
+    index: Column
 }
 
 impl TextDataQuery {
     pub fn get_skill_name(index: i32) -> Option<*mut Il2CppString> {
         // Return None if skill name translation is disabled
-        if Hachimi::instance()
-            .config
-            .load()
-            .disable_skill_name_translation
-        {
+        if Hachimi::instance().config.load().disable_skill_name_translation {
             return None;
         }
 
         let localized_data = Hachimi::instance().localized_data.load();
-        localized_data
-            .text_data_dict
+        localized_data.text_data_dict
             .get(&47)
+            .and_then(|c| c.get(&index))
+            .map(|t| t.to_il2cpp_string())
+    }
+
+    pub fn get_factor_name(index: i32) -> Option<*mut Il2CppString> {
+        if Hachimi::instance().config.load().disable_factor_name_translation {
+            return None;
+        }
+
+        let localized_data = Hachimi::instance().localized_data.load();
+        localized_data.text_data_dict
+            .get(&147)
             .and_then(|c| c.get(&index))
             .map(|t| t.to_il2cpp_string())
     }
@@ -898,7 +786,7 @@ impl SelectQueryState for TextDataQuery {
         match name {
             "category" => self.category.param_idx = Some(idx),
             "index" => self.index.param_idx = Some(idx),
-            _ => (),
+            _ => ()
         }
     }
 
@@ -918,16 +806,15 @@ impl SelectQueryState for TextDataQuery {
                 match category {
                     47 => return Self::get_skill_name(index),
                     48 => return Self::get_skill_desc(index),
-                    _ => (),
+                    147 => return Self::get_factor_name(index),
+                    _ => ()
                 };
 
-                return Hachimi::instance()
-                    .localized_data
-                    .load()
+                return Hachimi::instance().localized_data.load()
                     .text_data_dict
                     .get(&category)
                     .map(|c| c.get(&index).map(|s| s.to_il2cpp_string()))
-                    .unwrap_or_default();
+                    .unwrap_or_default()
             }
         }
 
@@ -945,7 +832,7 @@ pub struct CharacterSystemTextQuery {
     character_id: Column,
 
     // may appear in both
-    voice_id: Column,
+    voice_id: Column
 }
 
 impl SelectQueryState for CharacterSystemTextQuery {
@@ -953,7 +840,7 @@ impl SelectQueryState for CharacterSystemTextQuery {
         match name {
             "text" => self.text.select_idx = Some(idx),
             "voice_id" => self.voice_id.select_idx = Some(idx),
-            _ => (),
+            _ => ()
         }
     }
 
@@ -961,7 +848,7 @@ impl SelectQueryState for CharacterSystemTextQuery {
         match name {
             "character_id" => self.character_id.param_idx = Some(idx),
             "voice_id" => self.voice_id.param_idx = Some(idx),
-            _ => (),
+            _ => ()
         }
     }
 
@@ -977,13 +864,11 @@ impl SelectQueryState for CharacterSystemTextQuery {
 
         if let Some(character_id) = self.character_id.int_value {
             if let Some(voice_id) = self.voice_id.value_or_try_get_int(query) {
-                return Hachimi::instance()
-                    .localized_data
-                    .load()
+                return Hachimi::instance().localized_data.load()
                     .character_system_text_dict
                     .get(&character_id)
                     .map(|c| c.get(&voice_id).map(|s| s.to_il2cpp_string()))
-                    .unwrap_or_default();
+                    .unwrap_or_default()
             }
         }
 
@@ -996,7 +881,7 @@ impl SelectQueryState for CharacterSystemTextQuery {
 pub struct RaceJikkyoCommentQuery {
     // SELECT
     id: Column,
-    message: Column,
+    message: Column
 }
 
 impl SelectQueryState for RaceJikkyoCommentQuery {
@@ -1004,7 +889,7 @@ impl SelectQueryState for RaceJikkyoCommentQuery {
         match name {
             "id" => self.id.select_idx = Some(idx),
             "message" => self.message.select_idx = Some(idx),
-            _ => (),
+            _ => ()
         }
     }
 
@@ -1018,12 +903,10 @@ impl SelectQueryState for RaceJikkyoCommentQuery {
         }
 
         if let Some(id) = self.id.try_get_int(query) {
-            return Hachimi::instance()
-                .localized_data
-                .load()
+            return Hachimi::instance().localized_data.load()
                 .race_jikkyo_comment_dict
                 .get(&id)
-                .map(|s| s.to_il2cpp_string());
+                .map(|s| s.to_il2cpp_string())
         }
 
         None
@@ -1035,7 +918,7 @@ impl SelectQueryState for RaceJikkyoCommentQuery {
 pub struct RaceJikkyoMessageQuery {
     // SELECT
     id: Column,
-    message: Column,
+    message: Column
 }
 
 impl SelectQueryState for RaceJikkyoMessageQuery {
@@ -1043,7 +926,7 @@ impl SelectQueryState for RaceJikkyoMessageQuery {
         match name {
             "id" => self.id.select_idx = Some(idx),
             "message" => self.message.select_idx = Some(idx),
-            _ => (),
+            _ => ()
         }
     }
 
@@ -1057,17 +940,16 @@ impl SelectQueryState for RaceJikkyoMessageQuery {
         }
 
         if let Some(id) = self.id.try_get_int(query) {
-            return Hachimi::instance()
-                .localized_data
-                .load()
+            return Hachimi::instance().localized_data.load()
                 .race_jikkyo_message_dict
                 .get(&id)
-                .map(|s| s.to_il2cpp_string());
+                .map(|s| s.to_il2cpp_string())
         }
 
         None
     }
 }
+
 
 // sqlparser extensions
 pub trait SelectExt {
@@ -1077,10 +959,7 @@ pub trait SelectExt {
 impl SelectExt for ast::Select {
     fn get_first_table_name(&self) -> Option<&String> {
         if let Some(table_with_joins) = self.from.get(0) {
-            if let ast::TableFactor::Table {
-                name: object_name, ..
-            } = &table_with_joins.relation
-            {
+            if let ast::TableFactor::Table { name: object_name, .. } = &table_with_joins.relation {
                 if let Some(ident) = object_name.0.get(0) {
                     return Some(&ident.value);
                 }
@@ -1136,13 +1015,13 @@ impl ExprExt for ast::Expr {
 }
 
 pub struct BinaryOpIter<'a> {
-    stack: Vec<&'a ast::Expr>,
+    stack: Vec<&'a ast::Expr>
 }
 
 pub struct BinaryOpRef<'a> {
     pub left: &'a Box<ast::Expr>,
     pub op: &'a ast::BinaryOperator,
-    pub right: &'a Box<ast::Expr>,
+    pub right: &'a Box<ast::Expr>
 }
 
 impl<'a> Iterator for BinaryOpIter<'a> {
@@ -1161,7 +1040,7 @@ impl<'a> Iterator for BinaryOpIter<'a> {
             self.stack.push(right);
             self.stack.push(left); // left will be pop'd first
 
-            return Some(BinaryOpRef { left, op, right });
+            return Some(BinaryOpRef { left, op, right })
         }
     }
 }
@@ -1204,13 +1083,7 @@ impl MetaData {
             AUTO_UNLOCK_NEXT_DB.store(true, Ordering::Relaxed);
         }
 
-        if Connection::Open(
-            conn,
-            db_path_str.to_il2cpp_string(),
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            0,
-        ) {
+        if Connection::Open(conn, db_path_str.to_il2cpp_string(), std::ptr::null_mut(), std::ptr::null_mut(), 0) {
             let sql = "SELECT n, h FROM a";
             let query = Connection::Query(conn, sql.to_il2cpp_string());
 
@@ -1239,9 +1112,7 @@ impl MetaData {
             error!("Failed to open meta database at: {}", db_path_str);
         }
 
-        MetaData {
-            logical_name_to_hash,
-        }
+        MetaData { logical_name_to_hash }
     }
 }
 
@@ -1249,13 +1120,7 @@ fn get_single_column_int(sql: &str) -> Vec<i32> {
     let mut items = Vec::new();
     let db_path = get_masterdb_path();
     let conn = Connection::new();
-    if Connection::Open(
-        conn,
-        db_path.to_il2cpp_string(),
-        std::ptr::null_mut(),
-        std::ptr::null_mut(),
-        0,
-    ) {
+    if Connection::Open(conn, db_path.to_il2cpp_string(), std::ptr::null_mut(), std::ptr::null_mut(), 0) {
         let query = Connection::Query(conn, sql.to_il2cpp_string());
         if !query.is_null() {
             while Query::Step(query) {
@@ -1292,17 +1157,8 @@ pub fn get_all_cards() -> Vec<(i32, i32)> {
     let mut items = Vec::new();
     let db_path = get_masterdb_path();
     let conn = Connection::new();
-    if Connection::Open(
-        conn,
-        db_path.to_il2cpp_string(),
-        std::ptr::null_mut(),
-        std::ptr::null_mut(),
-        0,
-    ) {
-        let query = Connection::Query(
-            conn,
-            "SELECT id, default_rarity FROM card_data WHERE id <= 999999".to_il2cpp_string(),
-        );
+    if Connection::Open(conn, db_path.to_il2cpp_string(), std::ptr::null_mut(), std::ptr::null_mut(), 0) {
+        let query = Connection::Query(conn, "SELECT id, default_rarity FROM card_data WHERE id <= 999999".to_il2cpp_string());
         if !query.is_null() {
             while Query::Step(query) {
                 items.push((Query::GetInt(query, 0), Query::GetInt(query, 1)));
@@ -1317,24 +1173,13 @@ pub fn get_all_cards() -> Vec<(i32, i32)> {
 pub fn get_master_text(category: i32, index: i32) -> Option<String> {
     let db_path = get_masterdb_path();
     let conn = Connection::new();
-    if Connection::Open(
-        conn,
-        db_path.to_il2cpp_string(),
-        std::ptr::null_mut(),
-        std::ptr::null_mut(),
-        0,
-    ) {
-        let sql = format!(
-            "SELECT text FROM text_data WHERE \"category\" = {} AND \"index\" = {}",
-            category, index
-        );
+    if Connection::Open(conn, db_path.to_il2cpp_string(), std::ptr::null_mut(), std::ptr::null_mut(), 0) {
+        let sql = format!("SELECT text FROM text_data WHERE \"category\" = {} AND \"index\" = {}", category, index);
         let query = Connection::Query(conn, sql.to_il2cpp_string());
         if !query.is_null() {
             if Query::Step(query) {
                 let text_ptr = Query::GetText(query, 0);
-                if let Some(text) =
-                    unsafe { text_ptr.as_ref() }.map(|s| s.as_utf16str().to_string())
-                {
+                if let Some(text) = unsafe { text_ptr.as_ref() }.map(|s| s.as_utf16str().to_string()) {
                     Query::Dispose(query);
                     Connection::CloseDB(conn);
                     return Some(text);
@@ -1350,17 +1195,8 @@ pub fn get_master_text(category: i32, index: i32) -> Option<String> {
 pub fn get_jobs_info(reward_id: i32) -> Option<(i32, i32)> {
     let db_path = get_masterdb_path();
     let conn = Connection::new();
-    if Connection::Open(
-        conn,
-        db_path.to_il2cpp_string(),
-        std::ptr::null_mut(),
-        std::ptr::null_mut(),
-        0,
-    ) {
-        let sql = format!(
-            "SELECT place_id, genre_id FROM jobs_reward WHERE \"id\" = {}",
-            reward_id
-        );
+    if Connection::Open(conn, db_path.to_il2cpp_string(), std::ptr::null_mut(), std::ptr::null_mut(), 0) {
+        let sql = format!("SELECT place_id, genre_id FROM jobs_reward WHERE \"id\" = {}", reward_id);
         let query = Connection::Query(conn, sql.to_il2cpp_string());
         if !query.is_null() {
             if Query::Step(query) {
@@ -1380,17 +1216,8 @@ pub fn get_jobs_info(reward_id: i32) -> Option<(i32, i32)> {
 pub fn get_jobs_place_race_track_id(place_id: i32) -> Option<i32> {
     let db_path = get_masterdb_path();
     let conn = Connection::new();
-    if Connection::Open(
-        conn,
-        db_path.to_il2cpp_string(),
-        std::ptr::null_mut(),
-        std::ptr::null_mut(),
-        0,
-    ) {
-        let sql = format!(
-            "SELECT race_track_id FROM jobs_place WHERE \"id\" = {}",
-            place_id
-        );
+    if Connection::Open(conn, db_path.to_il2cpp_string(), std::ptr::null_mut(), std::ptr::null_mut(), 0) {
+        let sql = format!("SELECT race_track_id FROM jobs_place WHERE \"id\" = {}", place_id);
         let query = Connection::Query(conn, sql.to_il2cpp_string());
         if !query.is_null() {
             if Query::Step(query) {
@@ -1410,21 +1237,13 @@ pub fn get_champions_resources() -> Vec<String> {
     let mut items = Vec::new();
     let db_path = get_masterdb_path();
     let conn = Connection::new();
-    if Connection::Open(
-        conn,
-        db_path.to_il2cpp_string(),
-        ptr::null_mut(),
-        ptr::null_mut(),
-        0,
-    ) {
+    if Connection::Open(conn, db_path.to_il2cpp_string(), ptr::null_mut(), ptr::null_mut(), 0) {
         let sql = "SELECT t.text FROM champions_schedule c LEFT OUTER JOIN text_data t on t.category = 206 AND t.\"index\" = c.id GROUP BY c.resource_id";
         let query = Connection::Query(conn, sql.to_il2cpp_string());
         if !query.is_null() {
             while Query::Step(query) {
                 let text_ptr = Query::GetText(query, 0);
-                if let Some(text) =
-                    unsafe { text_ptr.as_ref() }.map(|s| s.as_utf16str().to_string())
-                {
+                if let Some(text) = unsafe { text_ptr.as_ref() }.map(|s| s.as_utf16str().to_string()) {
                     items.push(text);
                 } else {
                     items.push(rust_i18n::t!("unknown").into_owned());
@@ -1439,22 +1258,14 @@ pub fn get_champions_resources() -> Vec<String> {
 
 pub fn get_champions_live_max_year() -> i32 {
     let mut max_year = Utc::now().year(); // fallback to the current year since it's guaranteed to have textures
-    if !SceneManager::is_home_init() {
-        return max_year;
-    }
+    if !SceneManager::is_home_init() { return max_year; }
     let db_path_str = get_meta_path();
 
     let conn = Connection::new();
     if Hachimi::instance().game.region == Region::Japan {
         AUTO_UNLOCK_NEXT_DB.store(true, Ordering::Relaxed);
     }
-    if Connection::Open(
-        conn,
-        db_path_str.to_il2cpp_string(),
-        ptr::null_mut(),
-        ptr::null_mut(),
-        0,
-    ) {
+    if Connection::Open(conn, db_path_str.to_il2cpp_string(), ptr::null_mut(), ptr::null_mut(), 0) {
         let sql = "SELECT n FROM a WHERE n LIKE 'live/image/champions/tex_championslive_year_%'";
         let query = Connection::Query(conn, sql.to_il2cpp_string());
 
@@ -1462,12 +1273,8 @@ pub fn get_champions_live_max_year() -> i32 {
             let mut max_idx = -1;
             while Query::Step(query) {
                 let text_ptr = Query::GetText(query, 0);
-                if let Some(text) =
-                    unsafe { text_ptr.as_ref() }.map(|s| s.as_utf16str().to_string())
-                {
-                    if let Some(idx_str) =
-                        text.strip_prefix("live/image/champions/tex_championslive_year_")
-                    {
+                if let Some(text) = unsafe { text_ptr.as_ref() }.map(|s| s.as_utf16str().to_string()) {
+                    if let Some(idx_str) = text.strip_prefix("live/image/champions/tex_championslive_year_") {
                         if let Ok(idx) = idx_str.parse::<i32>() {
                             max_idx = max_idx.max(idx);
                         }

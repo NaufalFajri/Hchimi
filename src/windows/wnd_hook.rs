@@ -1,60 +1,40 @@
-use std::{
-    os::raw::c_uint,
-    ptr,
-    sync::{
-        atomic::{self, AtomicBool, AtomicI32, AtomicIsize, AtomicU32, AtomicUsize},
-        Arc,
-    },
-};
+use std::{os::raw::c_uint, ptr, sync::{Arc, atomic::{self, AtomicBool, AtomicI32, AtomicIsize, AtomicU32, AtomicUsize}}};
 
 use rust_i18n::t;
-use windows::{
-    core::{w, BOOL, HSTRING},
-    Win32::{
-        Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
-        Graphics::Gdi::{RedrawWindow, RDW_ALLCHILDREN, RDW_FRAME, RDW_INVALIDATE, RDW_UPDATENOW},
-        System::{
-            LibraryLoader::GetModuleHandleW,
-            Threading::{GetCurrentProcessId, GetCurrentThreadId},
+use windows::{core::{w, BOOL, HSTRING}, Win32::{
+    Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
+    Graphics::Gdi::{RedrawWindow, RDW_ALLCHILDREN, RDW_FRAME, RDW_INVALIDATE, RDW_UPDATENOW},
+    System::{LibraryLoader::GetModuleHandleW, Threading::{GetCurrentProcessId, GetCurrentThreadId}},
+    UI::{
+        Input::{Ime::ISC_SHOWUICOMPOSITIONWINDOW, KeyboardAndMouse::VK_RETURN},
+        WindowsAndMessaging::{
+            CallNextHookEx, CallWindowProcW, DefWindowProcW, EnumWindows, GetClassNameW, GetClientRect, GetWindowLongPtrW,
+            GetWindowRect, GetWindowThreadProcessId, SetWindowLongPtrW, SetWindowPos, SetWindowsHookExW,
+            UnhookWindowsHookEx, SetWindowTextW,
+            GWLP_WNDPROC, HCBT_MINMAX, HHOOK, SW_RESTORE, WH_CBT, WM_CLOSE, WM_KEYDOWN, WM_SYSKEYDOWN, WNDPROC,
+            WM_IME_SETCONTEXT, WM_IME_NOTIFY, WM_ACTIVATE, WA_INACTIVE, GWL_STYLE, SIZE_MAXIMIZED,
+            SIZE_MINIMIZED,
+            SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WM_ENTERSIZEMOVE,
+            WM_EXITSIZEMOVE, WM_KEYUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_MOVING, WM_RBUTTONDOWN,
+            WM_RBUTTONUP, WM_SIZE, WM_SIZING, WM_SYSKEYUP, WM_INPUT, WINDOW_LONG_PTR_INDEX, WS_MAXIMIZEBOX
         },
-        UI::{
-            Input::{Ime::ISC_SHOWUICOMPOSITIONWINDOW, KeyboardAndMouse::VK_RETURN},
-            WindowsAndMessaging::{
-                CallNextHookEx, CallWindowProcW, DefWindowProcW, EnumWindows, GetClassNameW,
-                GetClientRect, GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId,
-                SetWindowLongPtrW, SetWindowPos, SetWindowTextW, SetWindowsHookExW,
-                UnhookWindowsHookEx, GWLP_WNDPROC, GWL_STYLE, HCBT_MINMAX, HHOOK, SIZE_MAXIMIZED,
-                SIZE_MINIMIZED, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_RESTORE,
-                WA_INACTIVE, WH_CBT, WINDOW_LONG_PTR_INDEX, WM_ACTIVATE, WM_CLOSE,
-                WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE, WM_IME_NOTIFY, WM_IME_SETCONTEXT, WM_INPUT,
-                WM_KEYDOWN, WM_KEYUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_MOVING, WM_RBUTTONDOWN,
-                WM_RBUTTONUP, WM_SIZE, WM_SIZING, WM_SYSKEYDOWN, WM_SYSKEYUP, WNDPROC,
-                WS_MAXIMIZEBOX,
-            },
-        },
-    },
-};
+    }
+}};
 
 use crate::{
     core::{game::Region, gui, Gui, Hachimi},
     il2cpp::{
         hook::{
-            umamusume::{
-                GameSystem, RaceManagerReplayBase, Screen as GallopScreen, StandaloneWindowResize,
-                UIManager,
-            },
-            UnityEngine_CoreModule::{
-                FullScreenMode_FullScreenWindow, FullScreenMode_Windowed, Screen as UnityScreen,
-                UnityAction::UNITYACTION_CLASS,
-            },
+            umamusume::{GameSystem, Screen as GallopScreen, StandaloneWindowResize, UIManager, RaceManagerReplayBase},
+            UnityEngine_CoreModule::{FullScreenMode_Windowed, FullScreenMode_FullScreenWindow, Screen as UnityScreen, UnityAction::UNITYACTION_CLASS}
         },
         symbols::{create_delegate, get_assembly_image, get_class, get_method_addr, Thread},
-        types::{Il2CppDelegate, RefreshRate},
+        types::{Il2CppDelegate, RefreshRate}
     },
-    windows::utils,
+    windows::utils
 };
 
-use super::{discord, free_camera, gui_impl::input, smtc, taskbar, webview};
+use super::{free_camera, gui_impl::input, discord, smtc, taskbar, webview};
 
 static TARGET_HWND: AtomicIsize = AtomicIsize::new(0);
 static ALT_ENTER_PRESSED: AtomicBool = AtomicBool::new(false);
@@ -133,7 +113,8 @@ pub fn get_client_size() -> Option<(i32, i32)> {
     let height = rect.bottom - rect.top;
     if width <= 0 || height <= 0 {
         None
-    } else {
+    }
+    else {
         Some((width, height))
     }
 }
@@ -164,7 +145,7 @@ pub fn apply_freeform_window_style() {
                 0,
                 0,
                 0,
-                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER
             );
         }
     }
@@ -184,7 +165,7 @@ fn restore_freeform_window_defaults() {
                 Some(hwnd),
                 None,
                 None,
-                RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME,
+                RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME
             );
         }
     });
@@ -198,8 +179,8 @@ fn disable_freeform_window() -> bool {
     }
 
     let mut new_config = config.as_ref().clone();
-    drop(config);
-
+    drop(config); 
+    
     new_config.windows.freeform_window = false;
 
     if let Err(e) = hachimi.save_and_reload_config(new_config.clone()) {
@@ -222,10 +203,7 @@ fn wait_for_resize_end_frame(callback: fn()) -> bool {
     let Some(delegate) = create_delegate(delegate_class, 0, callback) else {
         return false;
     };
-    let wait_for_end_frame: extern "C" fn(
-        *mut crate::il2cpp::types::Il2CppObject,
-        *mut Il2CppDelegate,
-    ) = unsafe { std::mem::transmute(addr) };
+    let wait_for_end_frame: extern "C" fn(*mut crate::il2cpp::types::Il2CppObject, *mut Il2CppDelegate) = unsafe { std::mem::transmute(addr) };
     wait_for_end_frame(game_system, delegate);
     true
 }
@@ -248,10 +226,7 @@ fn resize_end_frame_tick() {
         if width > 0 && height > 0 {
             let mut window_rect = RECT::default();
             let (ww, wh) = if unsafe { GetWindowRect(hwnd, &mut window_rect) }.is_ok() {
-                (
-                    window_rect.right - window_rect.left,
-                    window_rect.bottom - window_rect.top,
-                )
+                (window_rect.right - window_rect.left, window_rect.bottom - window_rect.top)
             } else {
                 (width, height)
             };
@@ -262,10 +237,8 @@ fn resize_end_frame_tick() {
             apply_freeform_window_style();
             unsafe {
                 let _ = RedrawWindow(
-                    Some(hwnd),
-                    None,
-                    None,
-                    RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME,
+                    Some(hwnd), None, None,
+                    RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME
                 );
             }
         }
@@ -280,9 +253,8 @@ fn resize_end_frame_tick() {
     }
 
     RESIZE_WAIT_ACTIVE.store(false, atomic::Ordering::Release);
-    if generation != RESIZE_GENERATION.load(atomic::Ordering::Acquire)
-        && !RESIZE_WAIT_ACTIVE.swap(true, atomic::Ordering::AcqRel)
-    {
+    if generation != RESIZE_GENERATION.load(atomic::Ordering::Acquire) &&
+        !RESIZE_WAIT_ACTIVE.swap(true, atomic::Ordering::AcqRel) {
         RESIZE_WAIT_FRAMES.store(2, atomic::Ordering::Release);
         if !wait_for_resize_end_frame(resize_end_frame_tick) {
             Thread::main_thread().schedule(resize_end_frame_tick);
@@ -331,7 +303,7 @@ pub fn close_freeform_window_for_landscape() -> bool {
 
     if disable_freeform_window() {
         gui::request_notification(gui::NotificationRequest::Custom(
-            t!("notification.freeform_window_disabled_landscape").into_owned(),
+            t!("notification.freeform_window_disabled_landscape").into_owned()
         ));
     }
     FREEFORM_LANDSCAPE_CLOSE_IN_PROGRESS.store(false, atomic::Ordering::Release);
@@ -361,27 +333,28 @@ fn toggle_freeform_full_screen() {
     } else {
         FullScreenMode_FullScreenWindow
     };
-    let refresh_rate = RefreshRate {
-        numerator: 0,
-        denominator: 1,
-    };
-    UnityScreen::set_resolution_direct(resolution.width, resolution.height, mode, &refresh_rate);
+    let refresh_rate = RefreshRate { numerator: 0, denominator: 1 };
+    UnityScreen::set_resolution_direct(
+        resolution.width,
+        resolution.height,
+        mode,
+        &refresh_rate
+    );
 }
 
 type SetWindowLongPtrFn = unsafe extern "system" fn(HWND, WINDOW_LONG_PTR_INDEX, isize) -> isize;
 unsafe extern "system" fn set_window_long_ptr_w_hook(
     hwnd: HWND,
     index: WINDOW_LONG_PTR_INDEX,
-    new_long: isize,
+    new_long: isize
 ) -> isize {
     std::hint::black_box(SET_WINDOW_LONG_PTR_W_HOOK_ID.load(atomic::Ordering::Relaxed));
     let orig_fn = get_orig_fn!(set_window_long_ptr_w_hook, SetWindowLongPtrFn);
     let target_hwnd = get_target_hwnd();
 
-    if hwnd.0 == target_hwnd.0
-        && index == GWLP_WNDPROC
-        && !RESTORING_WNDPROC.load(atomic::Ordering::Acquire)
-    {
+    if hwnd.0 == target_hwnd.0 &&
+        index == GWLP_WNDPROC &&
+        !RESTORING_WNDPROC.load(atomic::Ordering::Acquire) {
         if new_long != 0 && new_long != wnd_proc as *const () as isize {
             return GAME_WNDPROC_ORIG.swap(new_long, atomic::Ordering::AcqRel);
         }
@@ -389,10 +362,9 @@ unsafe extern "system" fn set_window_long_ptr_w_hook(
     }
 
     let mut new_long = new_long;
-    if hwnd.0 == target_hwnd.0
-        && index == GWL_STYLE
-        && Hachimi::instance().config.load().windows.freeform_window
-    {
+    if hwnd.0 == target_hwnd.0 &&
+        index == GWL_STYLE &&
+        Hachimi::instance().config.load().windows.freeform_window {
         new_long |= WS_MAXIMIZEBOX.0 as isize;
     }
 
@@ -402,15 +374,15 @@ unsafe extern "system" fn set_window_long_ptr_w_hook(
 unsafe extern "system" fn set_window_long_ptr_a_hook(
     hwnd: HWND,
     index: WINDOW_LONG_PTR_INDEX,
-    new_long: isize,
+    new_long: isize
 ) -> isize {
     std::hint::black_box(SET_WINDOW_LONG_PTR_A_HOOK_ID.load(atomic::Ordering::Relaxed));
     let orig_fn = get_orig_fn!(set_window_long_ptr_a_hook, SetWindowLongPtrFn);
     let target_hwnd = get_target_hwnd();
 
-    if hwnd.0 == target_hwnd.0
-        && index == GWLP_WNDPROC
-        && !RESTORING_WNDPROC.load(atomic::Ordering::Acquire)
+    if hwnd.0 == target_hwnd.0 &&
+        index == GWLP_WNDPROC &&
+        !RESTORING_WNDPROC.load(atomic::Ordering::Acquire)
     {
         if new_long != 0 && new_long != wnd_proc as *const () as isize {
             return GAME_WNDPROC_ORIG.swap(new_long, atomic::Ordering::AcqRel);
@@ -419,9 +391,9 @@ unsafe extern "system" fn set_window_long_ptr_a_hook(
     }
 
     let mut new_long = new_long;
-    if hwnd.0 == target_hwnd.0
-        && index == GWL_STYLE
-        && Hachimi::instance().config.load().windows.freeform_window
+    if hwnd.0 == target_hwnd.0 &&
+        index == GWL_STYLE &&
+        Hachimi::instance().config.load().windows.freeform_window
     {
         new_long |= WS_MAXIMIZEBOX.0 as isize;
     }
@@ -436,11 +408,7 @@ fn restore_original_wnd_proc(hwnd: HWND) {
 
     let freeform_orig = WNDPROC_ORIG.swap(0, atomic::Ordering::AcqRel);
     let game_orig = GAME_WNDPROC_ORIG.swap(0, atomic::Ordering::AcqRel);
-    let orig = if game_orig != 0 {
-        game_orig
-    } else {
-        freeform_orig
-    };
+    let orig = if game_orig != 0 { game_orig } else { freeform_orig };
     if orig == 0 {
         return;
     }
@@ -458,19 +426,21 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
 
     let orig_addr = if inline_hooked || freeform_window {
         WNDPROC_ORIG.load(atomic::Ordering::Acquire)
-    } else {
+    }
+    else {
         GAME_WNDPROC_ORIG.load(atomic::Ordering::Acquire)
     };
-    let Some(orig_fn) = (unsafe { std::mem::transmute::<isize, WNDPROC>(orig_addr) }) else {
+    let Some(orig_fn) = (unsafe {
+        std::mem::transmute::<isize, WNDPROC>(orig_addr)
+    }) else {
         return unsafe { DefWindowProcW(hwnd, umsg, wparam, lparam) };
     };
 
     if Hachimi::instance().game.region != Region::Global {
         if freeform_window {
-            if umsg == WM_SYSKEYDOWN
-                && wparam.0 == VK_RETURN.0 as usize
-                && lparam.0 & (1 << 29) != 0
-            {
+            if umsg == WM_SYSKEYDOWN &&
+                wparam.0 == VK_RETURN.0 as usize &&
+                lparam.0 & (1 << 29) != 0 {
                 if !ALT_ENTER_PRESSED.swap(true, atomic::Ordering::AcqRel) {
                     Thread::main_thread().schedule(toggle_freeform_full_screen);
                 }
@@ -509,7 +479,7 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
                                 Some(hwnd),
                                 None,
                                 None,
-                                RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME,
+                                RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME
                             );
                         }
                     }
@@ -531,83 +501,62 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
                 return LRESULT(0);
             }
 
-            if current_key == 0x4B {
-                // Virtual keycode for "K", see the get_key method on gui_impl/input.rs
-                let hotkey_vk = Hachimi::instance()
-                    .config
-                    .load()
-                    .windows
-                    .hide_ingame_ui_hotkey_bind;
+            if !Gui::is_egui_typing_atomic() {
+                if current_key == 0x4B { // Virtual keycode for "K", see the get_key method on gui_impl/input.rs
+                    let hotkey_vk = Hachimi::instance().config.load().windows.hide_ingame_ui_hotkey_bind;
 
-                if unsafe {
-                    windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(hotkey_vk as i32) < 0
-                } {
-                    if let Some(mut gui) = Gui::instance().map(|m| m.lock().unwrap()) {
-                        gui.set_consuming_input(false);
+                    if unsafe { windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(hotkey_vk as i32) < 0 } {
+                        if let Some(mut gui) = Gui::instance().map(|m| m.lock().unwrap()) {
+                            gui.set_consuming_input(false);
+                        }
+                        return LRESULT(0); 
                     }
-                    return LRESULT(0);
                 }
-            }
 
-            if current_key == Hachimi::instance().config.load().windows.menu_open_key {
-                let Some(mut gui) = Gui::instance().map(|m| m.lock().unwrap()) else {
-                    return unsafe { orig_fn(hwnd, umsg, wparam, lparam) };
-                };
-                gui.toggle_menu();
-                return LRESULT(0);
-            } else if current_key
-                == Hachimi::instance()
-                    .config
-                    .load()
-                    .windows
-                    .hide_ingame_ui_hotkey_bind
-                && Hachimi::instance().config.load().hide_ingame_ui_hotkey
-            {
-                Thread::main_thread().schedule(Gui::toggle_game_ui);
-            }
+                if current_key == Hachimi::instance().config.load().windows.menu_open_key {
+                    let Some(mut gui) = Gui::instance().map(|m| m.lock().unwrap()) else {
+                        return unsafe { orig_fn(hwnd, umsg, wparam, lparam) };
+                    };
+                    gui.toggle_menu();
+                    return LRESULT(0);
+                } else if current_key == Hachimi::instance().config.load().windows.hide_ingame_ui_hotkey_bind && Hachimi::instance().config.load().hide_ingame_ui_hotkey {
+                    Thread::main_thread().schedule(Gui::toggle_game_ui);
+                }
 
-            if matches!(
-                Hachimi::instance().game.region,
-                Region::Japan | Region::Global
-            ) && current_key
-                == Hachimi::instance()
-                    .config
-                    .load()
-                    .windows
-                    .race_stat_hud_toggle_key
-                && Hachimi::instance().config.load().race_stat_hud
-            {
-                Thread::main_thread().schedule(gui::toggle_race_stat_hud);
-            }
+                if matches!(Hachimi::instance().game.region, Region::Japan | Region::Global) && current_key == Hachimi::instance().config.load().windows.race_stat_hud_toggle_key
+                    && Hachimi::instance().config.load().race_stat_hud {
+                    Thread::main_thread().schedule(gui::toggle_race_stat_hud);
+                }
 
-            if current_key == Hachimi::instance().config.load().windows.race_playback_key
-                && Hachimi::instance().config.load().race_playback_key_enable
-            {
-                Thread::main_thread().schedule(RaceManagerReplayBase::toggle_playback);
+                if matches!(Hachimi::instance().game.region, Region::Japan | Region::Global) && Hachimi::instance().config.load().race_stat_hud {
+                    if let Some(i) = Hachimi::instance().config.load().race_stat_hud_clones.iter()
+                        .position(|c| c.toggle_key == Some(current_key as i32)) {
+                        gui::toggle_race_stat_hud_clone(i);
+                    }
+                }
+
+                if current_key == Hachimi::instance().config.load().windows.race_playback_key
+                    && Hachimi::instance().config.load().race_playback_key_enable {
+                    Thread::main_thread().schedule(RaceManagerReplayBase::toggle_playback);
+                }
             }
 
             if !Gui::is_gui_input_active_atomic() {
-                if free_camera::toggle_from_windows_key(current_key, true, repeat) {
-                    return LRESULT(0);
-                }
                 free_camera::on_windows_key(current_key, true, repeat);
                 if free_camera::is_windows_key_bound(current_key) {
                     return LRESULT(0);
                 }
             }
-        }
+        },
         WM_KEYUP | WM_SYSKEYUP => {
             let current_key = wparam.0 as u16;
             if !Gui::is_gui_input_active_atomic() {
-                if free_camera::toggle_from_windows_key(current_key, false, false) {
-                    return LRESULT(0);
-                }
                 free_camera::on_windows_key(current_key, false, false);
                 if free_camera::is_windows_key_bound(current_key) {
                     return LRESULT(0);
                 }
             }
-        }
+        },
         WM_RBUTTONDOWN => {
             if !Gui::is_gui_input_active_atomic() {
                 free_camera::on_mouse_button(true);
@@ -615,7 +564,7 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
                     return LRESULT(0);
                 }
             }
-        }
+        },
         WM_RBUTTONUP => {
             if !Gui::is_gui_input_active_atomic() {
                 free_camera::on_mouse_button(false);
@@ -623,7 +572,7 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
                     return LRESULT(0);
                 }
             }
-        }
+        },
         WM_MOUSEMOVE => {
             if !Gui::is_gui_input_active_atomic() {
                 let x = (lparam.0 & 0xffff) as i16 as i32;
@@ -633,7 +582,7 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
                     return LRESULT(0);
                 }
             }
-        }
+        },
         WM_MOUSEWHEEL => {
             if !Gui::is_gui_input_active_atomic() {
                 let delta = (wparam.0 >> 16) as u16 as i16;
@@ -642,12 +591,12 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
                     return LRESULT(0);
                 }
             }
-        }
+        },
         WM_INPUT => {
             if !Gui::is_gui_input_active_atomic() && free_camera::is_game_input_capture_active() {
                 return LRESULT(0);
             }
-        }
+        },
         WM_ACTIVATE => {
             let res = unsafe { orig_fn(hwnd, umsg, wparam, lparam) };
 
@@ -663,11 +612,11 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
                 });
             }
             return res;
-        }
+        },
         WM_CLOSE => {
             return unsafe { CallWindowProcW(Some(orig_fn), hwnd, umsg, wparam, lparam) };
-        }
-        _ => (),
+        },
+        _ => ()
     }
 
     // Only capture input if gui needs it
@@ -707,14 +656,10 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
 
         // Inject IME strings directly into egui
         if let Some(s) = ime_commit {
-            gui.input
-                .events
-                .push(egui::Event::Ime(egui::ImeEvent::Commit(s)));
+            gui.input.events.push(egui::Event::Ime(egui::ImeEvent::Commit(s)));
         }
         if let Some(s) = ime_preedit {
-            gui.input
-                .events
-                .push(egui::Event::Ime(egui::ImeEvent::Preedit(s)));
+            gui.input.events.push(egui::Event::Ime(egui::ImeEvent::Preedit(s)));
         }
 
         // Process standard Key/Mouse inputs ONLY if it wasn't an IME message
@@ -737,14 +682,10 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
 
 static mut HCBTHOOK: HHOOK = HHOOK(ptr::null_mut());
 extern "system" fn cbt_proc(ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if ncode == HCBT_MINMAX as i32
-        && lparam.0 as i32 != SW_RESTORE.0
-        && Hachimi::instance()
-            .config
-            .load()
-            .windows
-            .block_minimize_in_full_screen
-        && UnityScreen::get_fullScreen()
+    if ncode == HCBT_MINMAX as i32 &&
+        lparam.0 as i32 != SW_RESTORE.0 &&
+        Hachimi::instance().config.load().windows.block_minimize_in_full_screen &&
+        UnityScreen::get_fullScreen()
     {
         return LRESULT(1);
     }
@@ -804,7 +745,7 @@ unsafe fn init_hwnd(hwnd: HWND) {
             {
                 RESIZE_WAIT_FOR_END_FRAME_ADDR.store(
                     get_method_addr(mono_behaviour_extension, c"WaitForEndFrame", 2),
-                    atomic::Ordering::Release,
+                    atomic::Ordering::Release
                 );
             }
         }
@@ -818,22 +759,18 @@ unsafe fn init_hwnd(hwnd: HWND) {
             GAME_WNDPROC_ORIG.store(wnd_proc_orig, atomic::Ordering::Release);
         }
 
-        let subclass_ok = if actual_wndproc != 0 && actual_wndproc != wnd_proc as *const () as isize
-        {
+        let subclass_ok = if actual_wndproc != 0 && actual_wndproc != wnd_proc as *const () as isize {
             if wnd_proc_orig == 0 {
-                info!(
-                    "SetWindowLongPtrW returned 0 and the WndProc was not replaced (foreign hook)"
-                );
+                info!("SetWindowLongPtrW returned 0 and the WndProc was not replaced (foreign hook)");
             }
             info!("SetWindowLongPtrW was swallowed, falling back to inline WndProc hook");
-            match hachimi
-                .interceptor
-                .hook(actual_wndproc as usize, wnd_proc as *const () as _)
-            {
+            match hachimi.interceptor.hook(
+                actual_wndproc as usize,
+                wnd_proc as *const () as _) {
                 Ok(_) => {
-                    let trampoline = hachimi
-                        .interceptor
-                        .get_trampoline_addr(wnd_proc as *const () as usize);
+                    let trampoline = hachimi.interceptor.get_trampoline_addr(
+                        wnd_proc as *const () as usize
+                    );
                     WNDPROC_ORIG.store(trampoline as isize, atomic::Ordering::Release);
                     GAME_WNDPROC_ORIG.store(trampoline as isize, atomic::Ordering::Release);
                     WNDPROC_INLINE_HOOKED.store(true, atomic::Ordering::Release);
@@ -856,17 +793,16 @@ unsafe fn init_hwnd(hwnd: HWND) {
         if subclass_ok {
             if Hachimi::instance().game.region != Region::Global {
                 if let Ok(user32) = GetModuleHandleW(w!("user32.dll")) {
-                    let set_window_long_ptr_w_addr =
-                        utils::get_proc_address(user32, c"SetWindowLongPtrW");
-                    let set_window_long_ptr_a_addr =
-                        utils::get_proc_address(user32, c"SetWindowLongPtrA");
+                    let set_window_long_ptr_w_addr = utils::get_proc_address(user32, c"SetWindowLongPtrW");
+                    let set_window_long_ptr_a_addr = utils::get_proc_address(user32, c"SetWindowLongPtrA");
 
                     info!("Hooking SetWindowLongPtrW");
                     if set_window_long_ptr_w_addr == 0 {
                         error!("Failed to find SetWindowLongPtrW");
-                    } else if let Err(e) = hachimi.interceptor.hook(
+                    }
+                    else if let Err(e) = hachimi.interceptor.hook(
                         set_window_long_ptr_w_addr,
-                        set_window_long_ptr_w_hook as *const () as _,
+                        set_window_long_ptr_w_hook as *const () as _
                     ) {
                         error!("Failed to hook SetWindowLongPtrW: {}", e);
                     }
@@ -876,7 +812,7 @@ unsafe fn init_hwnd(hwnd: HWND) {
                         error!("Failed to find SetWindowLongPtrA");
                     } else if let Err(e) = hachimi.interceptor.hook(
                         set_window_long_ptr_a_addr,
-                        set_window_long_ptr_a_hook as *const () as _,
+                        set_window_long_ptr_a_hook as *const () as _
                     ) {
                         error!("Failed to hook SetWindowLongPtrA: {}", e);
                     }
@@ -913,12 +849,8 @@ unsafe fn init_hwnd(hwnd: HWND) {
 pub fn uninit() {
     unsafe {
         restore_original_wnd_proc(get_target_hwnd());
-        Hachimi::instance()
-            .interceptor
-            .unhook(set_window_long_ptr_w_hook as *const () as _);
-        Hachimi::instance()
-            .interceptor
-            .unhook(set_window_long_ptr_a_hook as *const () as _);
+        Hachimi::instance().interceptor.unhook(set_window_long_ptr_w_hook as *const () as _);
+        Hachimi::instance().interceptor.unhook(set_window_long_ptr_a_hook as *const () as _);
 
         if HCBTHOOK.0 != ptr::null_mut() {
             info!("Removing CBT hook");

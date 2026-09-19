@@ -1,16 +1,9 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{sync::{Arc, Mutex}, time::Duration};
 
 use rust_i18n::t;
 use serde::Deserialize;
 
-use crate::core::{
-    gui::{NotificationGuard, SimpleYesNoDialog},
-    hachimi::{CODEBERG_API, GITHUB_API, REPO_PATH},
-    http, Error, Gui, Hachimi,
-};
+use crate::core::{gui::{NotificationGuard, SimpleYesNoDialog}, hachimi::{REPO_PATH, CODEBERG_API, GITHUB_API}, http, Error, Gui, Hachimi};
 
 const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -18,14 +11,16 @@ const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(10);
 pub struct Updater {
     update_check_mutex: Mutex<()>,
     #[cfg(target_os = "windows")]
-    new_update: arc_swap::ArcSwap<Option<ReleaseAsset>>,
+    new_update: arc_swap::ArcSwap<Option<ReleaseAsset>>
 }
 
 impl Updater {
     pub fn check_for_updates(self: Arc<Self>, callback: fn(bool)) {
-        std::thread::spawn(move || match self.check_for_updates_internal() {
-            Ok(v) => callback(v),
-            Err(e) => error!("{}", e),
+        std::thread::spawn(move || {
+            match self.check_for_updates_internal() {
+                Ok(v) => callback(v),
+                Err(e) => error!("{}", e)
+            }
         });
     }
 
@@ -36,33 +31,23 @@ impl Updater {
         };
 
         let checking_notif_id = if let Some(mutex) = Gui::instance() {
-            Some(
-                mutex
-                    .lock()
-                    .unwrap()
-                    .show_persistent_notification(&t!("notification.checking_for_updates")),
-            )
+            Some(mutex.lock().unwrap().show_persistent_notification(&t!("notification.checking_for_updates")))
         } else {
             None
         };
         let _guard = checking_notif_id.map(NotificationGuard);
 
         let latest = match http::get_json_with_timeout::<Release>(
-            &format!("{}/{}/releases/latest", GITHUB_API, REPO_PATH),
-            UPDATE_CHECK_TIMEOUT,
+            &format!("{}/{}/releases/latest", GITHUB_API, REPO_PATH), UPDATE_CHECK_TIMEOUT
         ) {
             Ok(res) => res,
             Err(e) => {
                 warn!("GitHub update check failed, trying Codeberg: {}", e);
                 if let Some(mutex) = Gui::instance() {
-                    mutex
-                        .lock()
-                        .unwrap()
-                        .show_notification(&t!("notification.github_update_unreachable"));
+                    mutex.lock().unwrap().show_notification(&t!("notification.github_update_unreachable"));
                 }
                 http::get_json_with_timeout::<Release>(
-                    &format!("{}/{}/releases/latest", CODEBERG_API, REPO_PATH),
-                    UPDATE_CHECK_TIMEOUT,
+                    &format!("{}/{}/releases/latest", CODEBERG_API, REPO_PATH), UPDATE_CHECK_TIMEOUT
                 )?
             }
         };
@@ -70,35 +55,24 @@ impl Updater {
         if latest.is_different_version() {
             #[cfg(target_os = "windows")]
             {
-                let installer_asset = latest
-                    .assets
-                    .iter()
-                    .find(|asset| asset.name == "hachimi_installer.exe");
-                let hash_asset = latest
-                    .assets
-                    .iter()
-                    .find(|asset| asset.name == "blake3.json");
-
+                let installer_asset = latest.assets.iter().find(|asset| asset.name == "hachimi_installer.exe");
+                let hash_asset = latest.assets.iter().find(|asset| asset.name == "blake3.json");
+    
                 if let (Some(installer), Some(h_json)) = (installer_asset, hash_asset) {
                     let hash_data = http::get_json::<Blake3Hashes>(&h_json.browser_download_url)?;
                     let mut asset = installer.clone();
                     asset.expected_hash = Some(hash_data.installer_exe);
                     self.new_update.store(Arc::new(Some(asset)));
-
+    
                     if let Some(mutex) = Gui::instance() {
-                        mutex
-                            .lock()
-                            .unwrap()
-                            .show_window(Box::new(SimpleYesNoDialog::new(
-                                &t!("update_prompt_dialog.title"),
-                                &t!("update_prompt_dialog.content", version = latest.tag_name),
-                                |ok| {
-                                    if !ok {
-                                        return;
-                                    }
-                                    Hachimi::instance().updater.clone().run();
-                                },
-                            )));
+                        mutex.lock().unwrap().show_window(Box::new(SimpleYesNoDialog::new(
+                            &t!("update_prompt_dialog.title"),
+                            &t!("update_prompt_dialog.content", version = latest.tag_name),
+                            |ok| {
+                                if !ok { return; }
+                                Hachimi::instance().updater.clone().run();
+                            }
+                        )));
                     }
                     return Ok(true);
                 }
@@ -106,29 +80,18 @@ impl Updater {
             #[cfg(target_os = "android")]
             {
                 if let Some(mutex) = Gui::instance() {
-                    mutex
-                        .lock()
-                        .unwrap()
-                        .show_window(Box::new(SimpleYesNoDialog::new(
-                            &t!("update_prompt_dialog.title"),
-                            &t!(
-                                "update_prompt_dialog.android_content",
-                                version = latest.tag_name
-                            ),
-                            |ok| {
-                                if !ok {
-                                    return;
-                                }
-                                Hachimi::instance().updater.clone().run();
-                            },
-                        )));
+                    mutex.lock().unwrap().show_window(Box::new(SimpleYesNoDialog::new(
+                        &t!("update_prompt_dialog.title"),
+                        &t!("update_prompt_dialog.android_content", version = latest.tag_name),
+                        |ok| {
+                            if !ok { return; }
+                            Hachimi::instance().updater.clone().run();
+                        }
+                    )));
                 }
             }
         } else if let Some(mutex) = Gui::instance() {
-            mutex
-                .lock()
-                .unwrap()
-                .show_notification(&t!("notification.no_updates"));
+            mutex.lock().unwrap().show_notification(&t!("notification.no_updates"));
         }
 
         Ok(false)
@@ -140,42 +103,30 @@ impl Updater {
             std::thread::spawn(move || {
                 let dialog_show = Arc::new(std::sync::atomic::AtomicBool::new(true));
                 if let Some(mutex) = Gui::instance() {
-                    mutex.lock().unwrap().show_window(Box::new(
-                        crate::core::gui::PersistentMessageWindow::new(
-                            &t!("updating_dialog.title"),
-                            &t!("updating_dialog.content"),
-                            dialog_show.clone(),
-                        ),
-                    ));
+                    mutex.lock().unwrap().show_window(Box::new(crate::core::gui::PersistentMessageWindow::new(
+                        &t!("updating_dialog.title"),
+                        &t!("updating_dialog.content"),
+                        dialog_show.clone()
+                    )));
                 }
-
+    
                 if let Err(e) = self.clone().run_internal() {
                     error!("{}", e);
                     if let Some(mutex) = Gui::instance() {
-                        mutex.lock().unwrap().show_notification(&t!(
-                            "notification.update_failed",
-                            reason = e.to_string()
-                        ));
+                        mutex.lock().unwrap().show_notification(&t!("notification.update_failed", reason = e.to_string()));
                     }
                 }
-
+    
                 dialog_show.store(false, std::sync::atomic::Ordering::Relaxed)
             });
         }
         #[cfg(target_os = "android")]
         {
             use crate::{
-                android::utils,
-                core::hachimi::{UMAPATCHER_INSTALL_URL, UMAPATCHER_PACKAGE_NAME},
+                core::hachimi::UMAPATCHER_UPDATER_DEEPLINK,
+                il2cpp::{ext::StringExt, hook::UnityEngine_CoreModule::Application}
             };
-            utils::open_app_or_fallback(
-                UMAPATCHER_PACKAGE_NAME,
-                &format!(
-                    "{}.MainActivity",
-                    UMAPATCHER_PACKAGE_NAME.replace(".edge", "")
-                ),
-                UMAPATCHER_INSTALL_URL,
-            );
+            Application::OpenURL(UMAPATCHER_UPDATER_DEEPLINK.to_il2cpp_string());
         }
     }
 
@@ -186,21 +137,15 @@ impl Updater {
         };
         self.new_update.store(Arc::new(None));
 
-        use crate::windows::{
-            main::DLL_HMODULE,
-            utils::{self, get_module_file_name},
-        };
-        use std::{fs::File, io::Read};
+        use crate::windows::{main::DLL_HMODULE, utils::{self, get_module_file_name}};
         use windows::{
             core::{HSTRING, PCWSTR},
             Win32::{
-                Foundation::{LPARAM, WPARAM},
-                UI::{
-                    Shell::ShellExecuteW,
-                    WindowsAndMessaging::{PostMessageW, SW_NORMAL, WM_CLOSE},
-                },
-            },
+                Foundation::{WPARAM, LPARAM},
+                UI::{Shell::ShellExecuteW, WindowsAndMessaging::{PostMessageW, SW_NORMAL, WM_CLOSE}}
+            }
         };
+        use std::{fs::File, io::Read};
 
         // Download the installer
         let installer_path = utils::get_tmp_installer_path();
@@ -216,17 +161,13 @@ impl Updater {
             let mut buffer = [0u8; 8192];
 
             while let Ok(n) = file.read(&mut buffer) {
-                if n == 0 {
-                    break;
-                }
+                if n == 0 { break; }
                 hasher.update(&buffer[..n]);
             }
 
             if hasher.finalize().to_hex().as_str() != expected_hash {
                 let _ = std::fs::remove_file(&installer_path);
-                return Err(Error::FileHashMismatch(
-                    installer_path.to_string_lossy().into(),
-                ));
+                return Err(Error::FileHashMismatch(installer_path.to_string_lossy().into()));
             }
         }
 
@@ -259,7 +200,7 @@ pub struct Release {
     // STUB
     tag_name: String,
     #[cfg(target_os = "windows")]
-    assets: Vec<ReleaseAsset>,
+    assets: Vec<ReleaseAsset>
 }
 
 impl Release {
@@ -275,12 +216,12 @@ pub struct ReleaseAsset {
     name: String,
     browser_download_url: String,
     #[serde(skip)]
-    pub expected_hash: Option<String>,
+    pub expected_hash: Option<String>
 }
 
 #[cfg(target_os = "windows")]
 #[derive(Deserialize)]
 struct Blake3Hashes {
     #[serde(rename = "hachimi_installer.exe")]
-    installer_exe: String,
+    installer_exe: String
 }
