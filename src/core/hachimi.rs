@@ -725,6 +725,8 @@ impl RaceStatHudCloneConfig {
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Config {
+    #[serde(default = "Config::default_true")]
+    pub chara_speak_home_idle: bool,
     #[serde(default)]
     pub debug_mode: bool,
     #[serde(default)]

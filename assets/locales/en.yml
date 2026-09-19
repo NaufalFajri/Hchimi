@@ -262,6 +262,7 @@ config_editor:
   caption_color: "Captions Text Color"
   caption_outline_color: "Captions Outline Color"
   caption_outline_size: "Captions Outline Size"
+  chara_speak_home_idle: "Character Speaks When Idle on Home Screen"
   disable_tap_effect: "Disable Tap Effect"
   discord_rpc: "Discord RPC"
   enable_smtc: "Enable Windows Media Controls"
