@@ -181,6 +181,8 @@ mod PartsRaceAnalyzeRaceEventListItem;
 mod PartsScheduleBookAutoPlayScreen;
 mod PartsSingleModeChoiceRewardTextElementViewModel;
 mod PartsSupportCardImproveDetail;
+#[cfg(target_os = "windows")]
+pub mod PhotoStudioCutPlayController;
 pub mod SceneDefine;
 pub mod SkillBase;
 pub mod SkillManager;
@@ -345,6 +347,8 @@ pub fn init() {
     HomeViewController::init(image);
     #[cfg(target_os = "windows")]
     HomeCameraController::init(image);
+    #[cfg(target_os = "windows")]
+    PhotoStudioCutPlayController::init(image);
     WorkDataManager::init(image);
     AssetManager::init(image);
     WorkJukeboxData::init(image);

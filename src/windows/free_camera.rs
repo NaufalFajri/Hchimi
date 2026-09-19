@@ -269,6 +269,7 @@ pub enum CameraScene {
     Home,
     Live,
     Race,
+    PhotoStudioCutPlay,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -848,7 +849,7 @@ pub fn is_game_input_capture_active() -> bool {
 
     matches!(
         STATE.lock().unwrap().scene,
-        CameraScene::Home | CameraScene::Live | CameraScene::Race
+        CameraScene::Home | CameraScene::Live | CameraScene::Race | CameraScene::PhotoStudioCutPlay
     )
 }
 
@@ -1031,7 +1032,7 @@ pub fn fov_for_scene(scene: CameraScene) -> Option<f32> {
     }
 
     Some(match scene {
-        CameraScene::Home => state.live_fov,
+        CameraScene::Home | CameraScene::PhotoStudioCutPlay => state.live_fov,
         CameraScene::Live => state.live_fov,
         CameraScene::Race => state.race_fov,
         CameraScene::None => return None,
@@ -1101,6 +1102,25 @@ pub fn set_home_active_with_transform(pos: Vector3_t, rot: Quaternion_t) {
     let mut state = STATE.lock().unwrap();
     if state.scene != CameraScene::Home {
         state.scene = CameraScene::Home;
+        state.reset_with_config(&config.windows.free_camera);
+        state.camera_pos = Vec3::from(pos);
+        let q = Quat::from_quaternion(rot);
+        let forward = q.rotate_vec(Vec3::new(0.0, 0.0, 1.0));
+        state.yaw = forward.x.atan2(forward.z).to_degrees();
+        state.pitch = (-forward.y.clamp(-1.0, 1.0)).asin().to_degrees();
+        state.update_look_from_angles();
+    }
+}
+
+pub fn set_photo_studio_cut_play_active_with_transform(pos: Vector3_t, rot: Quaternion_t) {
+    let config = Hachimi::instance().config.load();
+    if !config.windows.free_camera.enabled {
+        return;
+    }
+
+    let mut state = STATE.lock().unwrap();
+    if state.scene != CameraScene::PhotoStudioCutPlay {
+        state.scene = CameraScene::PhotoStudioCutPlay;
         state.reset_with_config(&config.windows.free_camera);
         state.camera_pos = Vec3::from(pos);
         let q = Quat::from_quaternion(rot);
@@ -1839,7 +1859,7 @@ pub fn tick() {
     }
     if !matches!(
         state.scene,
-        CameraScene::Home | CameraScene::Live | CameraScene::Race
+        CameraScene::Home | CameraScene::Live | CameraScene::Race | CameraScene::PhotoStudioCutPlay
     ) {
         state.last_tick = Instant::now();
         return;
@@ -2087,7 +2107,9 @@ fn adjust_follow_offset_y_locked(state: &mut FreeCameraState, value: f32) {
 
 fn change_fov_locked(state: &mut FreeCameraState, value: f32) {
     match state.scene {
-        CameraScene::Home => state.live_fov = (state.live_fov + value).clamp(1.0, 120.0),
+        CameraScene::Home | CameraScene::PhotoStudioCutPlay => {
+            state.live_fov = (state.live_fov + value).clamp(1.0, 120.0)
+        }
         CameraScene::Live => state.live_fov = (state.live_fov + value).clamp(1.0, 120.0),
         CameraScene::Race => state.race_fov = (state.race_fov + value).clamp(1.0, 120.0),
         CameraScene::None => (),

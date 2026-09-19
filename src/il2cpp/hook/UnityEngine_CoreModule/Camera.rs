@@ -1,4 +1,8 @@
-use crate::il2cpp::{api::il2cpp_resolve_icall, types::*};
+use crate::il2cpp::{
+    api::il2cpp_resolve_icall,
+    symbols::get_method_addr,
+    types::*,
+};
 
 #[cfg(target_os = "windows")]
 use crate::windows::free_camera::{self, CameraScene};
@@ -10,11 +14,18 @@ type CameraSetFloatFn = extern "C" fn(this: *mut Il2CppObject, value: f32);
 static mut SET_FIELD_OF_VIEW_ADDR: usize = 0;
 impl_addr_wrapper_fn!(set_fieldOfView, SET_FIELD_OF_VIEW_ADDR, (), this: *mut Il2CppObject, value: f32);
 
+static mut GET_MAIN_ADDR: usize = 0;
+impl_addr_wrapper_fn!(get_main, GET_MAIN_ADDR, *mut Il2CppObject,);
+
+static mut GET_ALL_CAMERAS_ADDR: usize = 0;
+impl_addr_wrapper_fn!(get_allCameras, GET_ALL_CAMERAS_ADDR, *mut Il2CppArray,);
+
 #[cfg(target_os = "windows")]
 fn should_override_near_clip() -> bool {
     free_camera::is_scene_enabled(CameraScene::Home)
         || free_camera::is_scene_enabled(CameraScene::Live)
         || free_camera::is_scene_enabled(CameraScene::Race)
+        || free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay)
 }
 
 #[cfg(target_os = "windows")]
@@ -47,6 +58,7 @@ extern "C" fn Camera_set_farClipPlane(this: *mut Il2CppObject, mut value: f32) {
     if free_camera::is_scene_enabled(CameraScene::Home)
         || free_camera::is_scene_enabled(CameraScene::Live)
         || free_camera::is_scene_enabled(CameraScene::Race)
+        || free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay)
     {
         value = 2500.0;
     }
@@ -58,16 +70,21 @@ extern "C" fn Camera_get_farClipPlane(this: *mut Il2CppObject) -> f32 {
     if free_camera::is_scene_enabled(CameraScene::Home)
         || free_camera::is_scene_enabled(CameraScene::Live)
         || free_camera::is_scene_enabled(CameraScene::Race)
+        || free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay)
     {
         return 2500.0;
     }
     get_orig_fn!(Camera_get_farClipPlane, CameraGetFloatFn)(this)
 }
 
-pub fn init(_UnityEngine_CoreModule: *const Il2CppImage) {
+pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
+    get_class_or_return!(UnityEngine_CoreModule, UnityEngine, Camera);
+
     unsafe {
         SET_FIELD_OF_VIEW_ADDR =
             il2cpp_resolve_icall(c"UnityEngine.Camera::set_fieldOfView(System.Single)".as_ptr());
+        GET_MAIN_ADDR = get_method_addr(Camera, c"get_main", 0);
+        GET_ALL_CAMERAS_ADDR = get_method_addr(Camera, c"get_allCameras", 0);
     }
 
     #[cfg(target_os = "windows")]

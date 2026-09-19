@@ -1,0 +1,338 @@
+use std::sync::atomic::{AtomicPtr, Ordering};
+
+use crate::{
+    il2cpp::{
+        ext::Il2CppStringExt,
+        hook::UnityEngine_CoreModule::{Camera, Component, Object, Transform},
+        symbols::{get_method_addr, Array},
+        types::*,
+    },
+    windows::free_camera::{self, CameraScene},
+};
+
+type NoArgsFn = extern "C" fn(this: *mut Il2CppObject);
+type EndViewFn = extern "C" fn(this: *mut Il2CppObject) -> *mut Il2CppObject;
+type SetTargetCameraFn = extern "C" fn(this: *mut Il2CppObject, target_camera: *mut Il2CppObject);
+type AlterLateUpdateMotionCameraFn = extern "C" fn(
+    this: *mut Il2CppObject,
+    active_sheet: *mut Il2CppObject,
+    update_pos: bool,
+    update_rot: bool,
+);
+type AlterLateUpdateCameraLayerFn =
+    extern "C" fn(this: *mut Il2CppObject, sheet: *mut Il2CppObject);
+
+static VIEW_CONTROLLER: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+static CUT_TIMELINE_CONTROLLER: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+static CUT_MOTION_CAMERA: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+static CUT_CAMERA: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+static CUT_CAMERA_TRANSFORM: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+static CUT_BG_CAMERA: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+static CUT_BG_CAMERA_TRANSFORM: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+
+static mut TIMELINE_CONTROLLER_GET_BACKGROUND_CAMERA_ADDR: usize = 0;
+impl_addr_wrapper_fn!(
+    get_BackGroundCamera,
+    TIMELINE_CONTROLLER_GET_BACKGROUND_CAMERA_ADDR,
+    *mut Il2CppObject,
+    this: *mut Il2CppObject
+);
+
+static mut LAST_CUT_CAMERA_POS: Vector3_t = Vector3_t {
+    x: 0.0,
+    y: 1.2,
+    z: -2.0,
+};
+static mut LAST_CUT_CAMERA_ROT: Quaternion_t = Quaternion_t {
+    w: 1.0,
+    x: 0.0,
+    y: 0.0,
+    z: 0.0,
+};
+
+pub fn apply_photo_studio_free_camera() {
+    if !free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay) {
+        return;
+    }
+
+    let mut position = free_camera::camera_pos();
+    let rotation_opt = free_camera::camera_rotation();
+    let look_at = free_camera::camera_look_at();
+    let mut world_up = Vector3_t {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+    };
+
+    let mut apply_transform = |transform: *mut Il2CppObject| {
+        if transform.is_null() {
+            return;
+        }
+        Transform::set_position_Injected(transform, &mut position);
+        if let Some(mut rot) = rotation_opt {
+            Transform::set_rotation_Injected(transform, &mut rot);
+        } else {
+            let mut l_at = look_at;
+            Transform::Internal_LookAt_Injected(transform, &mut l_at, &mut world_up);
+        }
+    };
+
+    let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+    let bg_transform = CUT_BG_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+
+    let mut applied = false;
+    if !cut_transform.is_null() {
+        apply_transform(cut_transform);
+        applied = true;
+    }
+    if !bg_transform.is_null() {
+        apply_transform(bg_transform);
+        applied = true;
+    }
+
+    // Fallback: search allCameras for active 3D cut cameras
+    if !applied {
+        let all_cams = Camera::get_allCameras();
+        if !all_cams.is_null() {
+            let arr = Array::<*mut Il2CppObject>::from(all_cams);
+            for cam in unsafe { arr.as_slice() }.iter().copied() {
+                if cam.is_null() {
+                    continue;
+                }
+                let name = Object::get_name(cam);
+                let name_str = if !name.is_null() {
+                    unsafe { (*name).as_utf16str().to_string() }
+                } else {
+                    String::new()
+                };
+                // Skip UI / Canvas cameras
+                if name_str.contains("UI") || name_str.contains("Canvas") {
+                    continue;
+                }
+                let t = Component::get_transform(cam);
+                if !t.is_null() {
+                    apply_transform(t);
+                }
+            }
+        }
+    }
+
+    // Keep camera FoV in sync
+    if let Some(fov) = free_camera::fov_for_scene(CameraScene::PhotoStudioCutPlay) {
+        let cut_cam = CUT_CAMERA.load(Ordering::Relaxed);
+        if !cut_cam.is_null() {
+            Camera::set_fieldOfView(cut_cam, fov);
+        }
+        let bg_cam = CUT_BG_CAMERA.load(Ordering::Relaxed);
+        if !bg_cam.is_null() {
+            Camera::set_fieldOfView(bg_cam, fov);
+        }
+    }
+}
+
+fn cache_cameras_from_controller(controller: *mut Il2CppObject) {
+    if controller.is_null() {
+        return;
+    }
+
+    // Extract _motionCamera (offset 0xf8)
+    let motion_cam = unsafe { *(controller.cast::<u8>().add(0xf8) as *const *mut Il2CppObject) };
+    if !motion_cam.is_null() {
+        CUT_MOTION_CAMERA.store(motion_cam, Ordering::Relaxed);
+
+        // _targetCamera (offset 0x88)
+        let target_cam =
+            unsafe { *(motion_cam.cast::<u8>().add(0x88) as *const *mut Il2CppObject) };
+        if !target_cam.is_null() {
+            CUT_CAMERA.store(target_cam, Ordering::Relaxed);
+
+            // _targetTransform (offset 0x98)
+            let target_trans =
+                unsafe { *(motion_cam.cast::<u8>().add(0x98) as *const *mut Il2CppObject) };
+            if !target_trans.is_null() {
+                CUT_CAMERA_TRANSFORM.store(target_trans, Ordering::Relaxed);
+            } else {
+                CUT_CAMERA_TRANSFORM
+                    .store(Component::get_transform(target_cam), Ordering::Relaxed);
+            }
+        }
+    }
+
+    // Extract BackgroundCamera
+    if unsafe { TIMELINE_CONTROLLER_GET_BACKGROUND_CAMERA_ADDR != 0 } {
+        let bg_cam = get_BackGroundCamera(controller);
+        if !bg_cam.is_null() {
+            CUT_BG_CAMERA.store(bg_cam, Ordering::Relaxed);
+            CUT_BG_CAMERA_TRANSFORM
+                .store(Component::get_transform(bg_cam), Ordering::Relaxed);
+        }
+    }
+}
+
+extern "C" fn CutInTimelineMotionCamera_SetTargetCamera(
+    this: *mut Il2CppObject,
+    target_camera: *mut Il2CppObject,
+) {
+    CUT_MOTION_CAMERA.store(this, Ordering::Relaxed);
+    if !target_camera.is_null() {
+        CUT_CAMERA.store(target_camera, Ordering::Relaxed);
+        let transform = Component::get_transform(target_camera);
+        if !transform.is_null() {
+            CUT_CAMERA_TRANSFORM.store(transform, Ordering::Relaxed);
+        }
+    }
+    get_orig_fn!(
+        CutInTimelineMotionCamera_SetTargetCamera,
+        SetTargetCameraFn
+    )(this, target_camera);
+}
+
+extern "C" fn CutInTimelineMotionCamera_OnDestroy(this: *mut Il2CppObject) {
+    if CUT_MOTION_CAMERA.load(Ordering::Relaxed) == this {
+        CUT_MOTION_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
+        CUT_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
+        CUT_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
+        CUT_BG_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
+        CUT_BG_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
+    }
+    get_orig_fn!(CutInTimelineMotionCamera_OnDestroy, NoArgsFn)(this);
+}
+
+extern "C" fn CutInTimelineController_AlterLateUpdate_MotionCamera(
+    this: *mut Il2CppObject,
+    active_sheet: *mut Il2CppObject,
+    mut update_pos: bool,
+    mut update_rot: bool,
+) {
+    CUT_TIMELINE_CONTROLLER.store(this, Ordering::Relaxed);
+    cache_cameras_from_controller(this);
+
+    let is_free_cam = free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay);
+    if is_free_cam {
+        // Stop timeline animation tracks from overwriting free camera position & rotation
+        update_pos = false;
+        update_rot = false;
+    }
+
+    get_orig_fn!(
+        CutInTimelineController_AlterLateUpdate_MotionCamera,
+        AlterLateUpdateMotionCameraFn
+    )(this, active_sheet, update_pos, update_rot);
+
+    if is_free_cam {
+        apply_photo_studio_free_camera();
+    } else {
+        // Track the current cut camera position when free camera is OFF
+        let transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+        if !transform.is_null() {
+            let mut pos = Vector3_t::default();
+            let mut rot = Quaternion_t::default();
+            Transform::get_position_Injected(transform, &mut pos);
+            Transform::get_rotation_Injected(transform, &mut rot);
+            unsafe {
+                LAST_CUT_CAMERA_POS = pos;
+                LAST_CUT_CAMERA_ROT = rot;
+            }
+        }
+    }
+}
+
+extern "C" fn CutInTimelineController_AlterLateUpdate_CameraLayer(
+    this: *mut Il2CppObject,
+    sheet: *mut Il2CppObject,
+) {
+    if free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay) {
+        // Skip camera layer alteration so timeline height offsets do not fight free cam
+        return;
+    }
+    get_orig_fn!(
+        CutInTimelineController_AlterLateUpdate_CameraLayer,
+        AlterLateUpdateCameraLayerFn
+    )(this, sheet);
+}
+
+extern "C" fn PhotoStudioPlayCutViewController_LateUpdateView(this: *mut Il2CppObject) {
+    VIEW_CONTROLLER.store(this, Ordering::Relaxed);
+
+    unsafe {
+        free_camera::set_photo_studio_cut_play_active_with_transform(
+            LAST_CUT_CAMERA_POS,
+            LAST_CUT_CAMERA_ROT,
+        );
+    }
+    free_camera::tick();
+
+    get_orig_fn!(PhotoStudioPlayCutViewController_LateUpdateView, NoArgsFn)(this);
+
+    if free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay) {
+        apply_photo_studio_free_camera();
+    }
+}
+
+extern "C" fn PhotoStudioPlayCutViewController_EndView(
+    this: *mut Il2CppObject,
+) -> *mut Il2CppObject {
+    VIEW_CONTROLLER.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_TIMELINE_CONTROLLER.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_MOTION_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_BG_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_BG_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
+    free_camera::end_scene(CameraScene::PhotoStudioCutPlay);
+    get_orig_fn!(PhotoStudioPlayCutViewController_EndView, EndViewFn)(this)
+}
+
+pub fn init(umamusume: *const Il2CppImage) {
+    // Hook View Controller
+    get_class_or_return!(umamusume, Gallop, PhotoStudioPlayCutViewController);
+
+    let late_update_view =
+        get_method_addr(PhotoStudioPlayCutViewController, c"LateUpdateView", 0);
+    new_hook!(
+        late_update_view,
+        PhotoStudioPlayCutViewController_LateUpdateView
+    );
+
+    let end_view = get_method_addr(PhotoStudioPlayCutViewController, c"EndView", 0);
+    new_hook!(end_view, PhotoStudioPlayCutViewController_EndView);
+
+    // Hook CUTT Motion Camera
+    if let Ok(motion_cam_class) =
+        crate::il2cpp::symbols::get_class(umamusume, c"Gallop.CutIn.Cutt", c"CutInTimelineMotionCamera")
+    {
+        let set_target_cam =
+            get_method_addr(motion_cam_class, c"SetTargetCamera", 1);
+        new_hook!(
+            set_target_cam,
+            CutInTimelineMotionCamera_SetTargetCamera
+        );
+
+        let on_destroy = get_method_addr(motion_cam_class, c"OnDestroy", 0);
+        new_hook!(on_destroy, CutInTimelineMotionCamera_OnDestroy);
+    }
+
+    // Hook CUTT Controller
+    if let Ok(timeline_ctrl_class) =
+        crate::il2cpp::symbols::get_class(umamusume, c"Gallop.CutIn.Cutt", c"CutInTimelineController")
+    {
+        unsafe {
+            TIMELINE_CONTROLLER_GET_BACKGROUND_CAMERA_ADDR =
+                get_method_addr(timeline_ctrl_class, c"get_BackGroundCamera", 0);
+        }
+
+        let alter_late_update_motion_camera =
+            get_method_addr(timeline_ctrl_class, c"AlterLateUpdate_MotionCamera", 3);
+        new_hook!(
+            alter_late_update_motion_camera,
+            CutInTimelineController_AlterLateUpdate_MotionCamera
+        );
+
+        let alter_late_update_camera_layer =
+            get_method_addr(timeline_ctrl_class, c"AlterLateUpdate_CameraLayer", 1);
+        new_hook!(
+            alter_late_update_camera_layer,
+            CutInTimelineController_AlterLateUpdate_CameraLayer
+        );
+    }
+}
