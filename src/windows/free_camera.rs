@@ -189,6 +189,9 @@ impl Default for FreeCameraKeybinds {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct FreeCameraConfig {
+    pub enable_momentum: bool,
+    pub momentum_acceleration: f32,
+    pub momentum_friction: f32,
     pub enabled: bool,
     pub remove_camera_effects: bool,
     pub live_remove_screen_effects: bool,
@@ -226,6 +229,9 @@ pub struct FreeCameraConfig {
 impl Default for FreeCameraConfig {
     fn default() -> Self {
         Self {
+            enable_momentum: false,
+            momentum_acceleration: 10.0,
+            momentum_friction: 5.0,
             enabled: false,
             remove_camera_effects: true,
             live_remove_screen_effects: false,
@@ -511,6 +517,7 @@ struct FreeCameraState {
     scene: CameraScene,
     mode: FreeCameraMode,
     camera_pos: Vec3,
+    velocity: Vec3,
     camera_look_at: Vec3,
     camera_rotation: Option<Quat>,
     yaw: f32,
@@ -563,6 +570,7 @@ impl FreeCameraState {
             scene: CameraScene::None,
             mode: config.mode,
             camera_pos: Vec3::default(),
+            velocity: Vec3::default(),
             camera_look_at: Vec3::default(),
             camera_rotation: None,
             yaw: 0.0,
@@ -613,6 +621,7 @@ impl FreeCameraState {
 
     fn reset_with_config(&mut self, config: &FreeCameraConfig) {
         self.mode = config.mode;
+        self.velocity = Vec3::default();
         self.last_config_mode = config.mode;
         self.last_overlay_mode = config.mode;
         self.live_fov = config.live_fov;
@@ -1883,7 +1892,7 @@ pub fn tick() {
     } * step_scale;
     let look_step = config.look_step * step_scale;
 
-    apply_input_locked(&mut state, config, move_step, look_step);
+    apply_input_locked(&mut state, config, move_step, look_step, delta);
 }
 
 fn apply_input_locked(
@@ -1891,6 +1900,7 @@ fn apply_input_locked(
     config: &FreeCameraConfig,
     move_step: f32,
     look_step: f32,
+    delta: f32,
 ) {
     let mut forward = bool_axis(state.key_state.forward, state.key_state.back);
     let mut side = bool_axis(state.key_state.left, state.key_state.right);
@@ -1931,15 +1941,47 @@ fn apply_input_locked(
         adjust_follow_offset_x_locked(state, -move_step * 10.0);
     }
 
-    if forward.abs() > f32::EPSILON {
-        move_forward_locked(state, forward * move_step);
+    if config.enable_momentum && state.mode == FreeCameraMode::Free {
+        let yaw = state.yaw.to_radians();
+        let pitch = state.pitch.to_radians();
+        let fwd = Vec3::new(yaw.sin() * pitch.cos(), pitch.sin(), -yaw.cos() * pitch.cos());
+        let rht = Vec3::new(yaw.cos(), 0.0, yaw.sin());
+        let up = Vec3::new(0.0, 1.0, 0.0);
+        
+        let wish_dir = (fwd * forward + rht * side + up * vertical).normalized();
+        let max_speed = match state.scene {
+            CameraScene::Race => config.race_move_step,
+            _ => config.live_move_step,
+        } * 100.0;
+        
+        let current_speed = state.velocity.len();
+        if current_speed > 0.0 {
+            let drop = current_speed * config.momentum_friction * delta;
+            let new_speed = f32::max(current_speed - drop, 0.0);
+            state.velocity = state.velocity * (new_speed / current_speed);
+        }
+        
+        let current_accel_speed = state.velocity.x * wish_dir.x + state.velocity.y * wish_dir.y + state.velocity.z * wish_dir.z;
+        let add_speed = max_speed - current_accel_speed;
+        if add_speed > 0.0 {
+            let accel_amount = f32::min(config.momentum_acceleration * max_speed * delta, add_speed);
+            state.velocity = state.velocity + wish_dir * accel_amount;
+        }
+        
+        state.camera_pos = state.camera_pos + state.velocity * delta;
+        state.update_look_from_angles();
+    } else {
+        if forward.abs() > f32::EPSILON {
+            move_forward_locked(state, forward * move_step);
+        }
+        if side.abs() > f32::EPSILON {
+            move_side_locked(state, side * move_step);
+        }
+        if vertical.abs() > f32::EPSILON {
+            move_vertical_locked(state, vertical * move_step);
+        }
     }
-    if side.abs() > f32::EPSILON {
-        move_side_locked(state, side * move_step);
-    }
-    if vertical.abs() > f32::EPSILON {
-        move_vertical_locked(state, vertical * move_step);
-    }
+
     if look_x.abs() > f32::EPSILON || look_y.abs() > f32::EPSILON {
         apply_look_delta_locked(state, look_x * look_step, look_y * look_step, false);
     }

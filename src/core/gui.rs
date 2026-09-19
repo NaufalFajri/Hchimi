@@ -7115,6 +7115,18 @@ impl Window for FreeCameraSettingsWindow {
                                 ui.add(egui::DragValue::new(&mut cfg.mouse_speed).speed(1.0).range(1.0..=1000.0));
                                 ui.end_row();
 
+                                ui.label(t!("free_camera.enable_momentum"));
+                                ui.checkbox(&mut cfg.enable_momentum, "");
+                                ui.end_row();
+
+                                ui.label(t!("free_camera.momentum_acceleration"));
+                                ui.add(egui::DragValue::new(&mut cfg.momentum_acceleration).speed(0.5).range(1.0..=100.0));
+                                ui.end_row();
+
+                                ui.label(t!("free_camera.momentum_friction"));
+                                ui.add(egui::DragValue::new(&mut cfg.momentum_friction).speed(0.5).range(1.0..=100.0));
+                                ui.end_row();
+
                                 ui.label(t!("free_camera.live_fov"));
                                 ui.add(egui::DragValue::new(&mut cfg.live_fov).speed(0.5).range(1.0..=120.0));
                                 ui.end_row();
