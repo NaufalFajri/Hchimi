@@ -7,11 +7,26 @@ use crate::{
 
 type SetTargetFrameRateFn = extern "C" fn(value: i32);
 pub extern "C" fn set_targetFrameRate(mut value: i32) {
-    let target_fps = Hachimi::instance()
+    let hachimi = Hachimi::instance();
+    let mut target_fps = hachimi
         .target_fps
         .load(atomic::Ordering::Relaxed);
+
+    let current_view_id = hachimi.current_view_id.load(atomic::Ordering::Acquire);
+    let config = hachimi.config.load();
+    for &(view_id, _, fps) in &config.view_overrides {
+        if view_id == current_view_id {
+            target_fps = fps;
+            break;
+        }
+    }
+
     if target_fps != -1 {
         value = target_fps;
+    }
+    // Don't call original if value is 0 (triggered from ChangeView internally without an explicit real value)
+    if value == 0 {
+        return;
     }
     get_orig_fn!(set_targetFrameRate, SetTargetFrameRateFn)(value);
 }

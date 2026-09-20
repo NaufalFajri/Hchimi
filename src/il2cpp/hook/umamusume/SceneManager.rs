@@ -57,6 +57,12 @@ fn ChangeViewCommon(next_view_id: i32) {
             SPLASH_SHOWN.load(atomic::Ordering::Acquire)
         );
     }
+    
+    Hachimi::instance().current_view_id.store(next_view_id, atomic::Ordering::Release);
+    crate::il2cpp::symbols::Thread::main_thread().schedule(|| {
+        crate::il2cpp::hook::UnityEngine_CoreModule::Application::set_targetFrameRate(0);
+    });
+
     if next_view_id == ViewId::Home && !HOME_INIT.swap(true, atomic::Ordering::AcqRel) {
         #[cfg(target_os = "windows")]
         {

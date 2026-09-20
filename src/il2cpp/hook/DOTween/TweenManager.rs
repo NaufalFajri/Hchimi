@@ -5,7 +5,18 @@ use crate::{
 
 type UpdateFn = extern "C" fn(update_type: i32, delta_time: f32, independent_time: f32);
 extern "C" fn Update(update_type: i32, mut delta_time: f32, mut independent_time: f32) {
-    let scale = Hachimi::instance().config.load().ui_animation_scale;
+    let hachimi = Hachimi::instance();
+    let config = hachimi.config.load();
+    let mut scale = config.ui_animation_scale;
+    let current_view_id = hachimi.current_view_id.load(std::sync::atomic::Ordering::Acquire);
+    
+    for &(view_id, override_scale, _) in &config.view_overrides {
+        if view_id == current_view_id {
+            scale = override_scale;
+            break;
+        }
+    }
+
     if scale != 1.0 {
         delta_time *= scale;
         independent_time *= scale;

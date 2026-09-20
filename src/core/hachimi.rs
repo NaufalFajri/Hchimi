@@ -75,6 +75,7 @@ pub struct Hachimi {
 
     /// -1 = default
     pub target_fps: AtomicI32,
+    pub current_view_id: AtomicI32,
 
     #[cfg(target_os = "windows")]
     pub vsync_count: AtomicI32,
@@ -173,6 +174,7 @@ impl Hachimi {
             template_parser: template::Parser::new(&template_filters::LIST),
 
             target_fps: AtomicI32::new(config.target_fps.unwrap_or(-1)),
+            current_view_id: AtomicI32::new(0),
 
             #[cfg(target_os = "windows")]
             vsync_count: AtomicI32::new(config.windows.vsync_count),
@@ -868,6 +870,8 @@ pub struct Config {
     pub cyspring_mono_uncap_frame_scale: bool,
     #[serde(default = "Config::default_ui_animation_scale")]
     pub ui_animation_scale: f32,
+    #[serde(default)]
+    pub view_overrides: Vec<(i32, f32, i32)>,
     #[serde(default)]
     pub trainer_live_landscape: bool,
     #[serde(default)]
