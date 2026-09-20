@@ -209,8 +209,6 @@ pub struct FreeCameraConfig {
     pub live_selfie_horizontal_stabilization: f32,
     pub live_selfie_vertical_stabilization: f32,
     pub mode: FreeCameraMode,
-    pub live_move_step: f32,
-    pub race_move_step: f32,
     pub look_step: f32,
     pub mouse_speed: f32,
     pub live_fov: f32,
@@ -252,8 +250,6 @@ impl Default for FreeCameraConfig {
             live_selfie_horizontal_stabilization: 0.0,
             live_selfie_vertical_stabilization: 0.0,
             mode: FreeCameraMode::Free,
-            live_move_step: 0.2,
-            race_move_step: 0.25,
             look_step: 1.0,
             mouse_speed: 10.0,
             live_fov: 60.0,
@@ -1908,10 +1904,7 @@ pub fn tick() {
     let delta = now.duration_since(state.last_tick).as_secs_f32();
     state.last_tick = now;
     let step_scale = (delta / 0.01).clamp(0.25, 4.0);
-    let move_step = match state.scene {
-        CameraScene::Race => config.race_move_step,
-        _ => config.live_move_step,
-    } * step_scale;
+    let move_step = config.sv_noclipspeed * 0.04 * step_scale;
     let look_step = config.look_step * step_scale;
 
     apply_input_locked(&mut state, config, move_step, look_step, delta);
@@ -1979,10 +1972,7 @@ fn apply_input_locked(
         let up = Vec3::new(0.0, 1.0, 0.0);
         
         let wish_dir = (fwd * forward + rht * side + up * vertical).normalized();
-        let max_speed = match state.scene {
-            CameraScene::Race => config.race_move_step,
-            _ => config.live_move_step,
-        } * 100.0 * speed_multiplier;
+        let max_speed = config.sv_noclipspeed * 4.0 * speed_multiplier;
         
         let current_speed = state.velocity.len();
         if current_speed > 0.0 {

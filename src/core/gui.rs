@@ -7099,14 +7099,6 @@ impl Window for FreeCameraSettingsWindow {
                                 Gui::run_combo(ui, "free_camera_mode", &mut cfg.mode, &mode_choices);
                                 ui.end_row();
 
-                                ui.label(t!("free_camera.live_move_step"));
-                                ui.add(egui::DragValue::new(&mut cfg.live_move_step).speed(0.01).range(0.001..=100.0));
-                                ui.end_row();
-
-                                ui.label(t!("free_camera.race_move_step"));
-                                ui.add(egui::DragValue::new(&mut cfg.race_move_step).speed(0.1).range(0.001..=100.0));
-                                ui.end_row();
-
                                 ui.label(t!("free_camera.look_step"));
                                 ui.add(egui::DragValue::new(&mut cfg.look_step).speed(0.05).range(0.001..=30.0));
                                 ui.end_row();
