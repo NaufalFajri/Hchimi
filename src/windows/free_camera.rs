@@ -134,6 +134,8 @@ pub struct FreeCameraKeybinds {
     pub move_right: u16,
     pub move_down: u16,
     pub move_up: u16,
+    pub move_run: u16,
+    pub move_walk: u16,
     pub look_up: u16,
     pub look_down: u16,
     pub look_left: u16,
@@ -164,6 +166,8 @@ impl Default for FreeCameraKeybinds {
             move_right: VK_D.0,          // D
             move_down: VK_LCONTROL.0,    // Left Ctrl
             move_up: VK_SPACE.0,         // Space
+            move_run: VK_LSHIFT.0,       // Left Shift
+            move_walk: VK_LMENU.0,       // Left Alt
             look_up: VK_UP.0,            // Up
             look_down: VK_DOWN.0,        // Down
             look_left: VK_LEFT.0,        // Left
@@ -190,8 +194,11 @@ impl Default for FreeCameraKeybinds {
 #[serde(default)]
 pub struct FreeCameraConfig {
     pub enable_momentum: bool,
-    pub momentum_acceleration: f32,
-    pub momentum_friction: f32,
+    pub sv_noclipspeed: f32,
+    pub sv_noclipaccelerate: f32,
+    pub sv_noclipfriction: f32,
+    pub noclip_run_speed_multiplier: f32,
+    pub noclip_walk_speed_multiplier: f32,
     pub enabled: bool,
     pub remove_camera_effects: bool,
     pub live_remove_screen_effects: bool,
@@ -230,8 +237,11 @@ impl Default for FreeCameraConfig {
     fn default() -> Self {
         Self {
             enable_momentum: false,
-            momentum_acceleration: 10.0,
-            momentum_friction: 5.0,
+            sv_noclipspeed: 5.0,
+            sv_noclipaccelerate: 5.0,
+            sv_noclipfriction: 5.0,
+            noclip_run_speed_multiplier: 2.0,
+            noclip_walk_speed_multiplier: 0.1,
             enabled: false,
             remove_camera_effects: true,
             live_remove_screen_effects: false,
@@ -492,6 +502,8 @@ struct KeyState {
     right: bool,
     down: bool,
     up: bool,
+    run: bool,
+    walk: bool,
     look_up: bool,
     look_down: bool,
     look_left: bool,
@@ -1711,6 +1723,8 @@ pub fn is_windows_key_bound(vk: u16) -> bool {
         || vk == kb.move_right
         || vk == kb.move_down
         || vk == kb.move_up
+        || vk == kb.move_run
+        || vk == kb.move_walk
         || vk == kb.look_up
         || vk == kb.look_down
         || vk == kb.look_left
@@ -1749,6 +1763,12 @@ fn set_key_flag(state: &mut KeyState, vk: u16, pressed: bool, kb: &FreeCameraKey
     }
     if vk == kb.move_up {
         state.up = pressed;
+    }
+    if vk == kb.move_run {
+        state.run = pressed;
+    }
+    if vk == kb.move_walk {
+        state.walk = pressed;
     }
     if vk == kb.look_up {
         state.look_up = pressed;
@@ -1796,6 +1816,8 @@ pub fn wants_windows_input_capture() -> bool {
         || state.key_state.right
         || state.key_state.down
         || state.key_state.up
+        || state.key_state.run
+        || state.key_state.walk
         || state.key_state.look_up
         || state.key_state.look_down
         || state.key_state.look_left
@@ -1941,6 +1963,14 @@ fn apply_input_locked(
         adjust_follow_offset_x_locked(state, -move_step * 10.0);
     }
 
+    let mut speed_multiplier = 1.0;
+    if state.key_state.run {
+        speed_multiplier *= config.noclip_run_speed_multiplier;
+    }
+    if state.key_state.walk {
+        speed_multiplier *= config.noclip_walk_speed_multiplier;
+    }
+
     if config.enable_momentum && state.mode == FreeCameraMode::Free {
         let yaw = state.yaw.to_radians();
         let pitch = state.pitch.to_radians();
@@ -1952,11 +1982,11 @@ fn apply_input_locked(
         let max_speed = match state.scene {
             CameraScene::Race => config.race_move_step,
             _ => config.live_move_step,
-        } * 100.0;
+        } * 100.0 * speed_multiplier;
         
         let current_speed = state.velocity.len();
         if current_speed > 0.0 {
-            let drop = current_speed * config.momentum_friction * delta;
+            let drop = current_speed * config.sv_noclipfriction * delta;
             let new_speed = f32::max(current_speed - drop, 0.0);
             state.velocity = state.velocity * (new_speed / current_speed);
         }
@@ -1964,7 +1994,7 @@ fn apply_input_locked(
         let current_accel_speed = state.velocity.x * wish_dir.x + state.velocity.y * wish_dir.y + state.velocity.z * wish_dir.z;
         let add_speed = max_speed - current_accel_speed;
         if add_speed > 0.0 {
-            let accel_amount = f32::min(config.momentum_acceleration * max_speed * delta, add_speed);
+            let accel_amount = f32::min(config.sv_noclipaccelerate * max_speed * delta, add_speed);
             state.velocity = state.velocity + wish_dir * accel_amount;
         }
         
@@ -1972,13 +2002,13 @@ fn apply_input_locked(
         state.update_look_from_angles();
     } else {
         if forward.abs() > f32::EPSILON {
-            move_forward_locked(state, forward * move_step);
+            move_forward_locked(state, forward * move_step * speed_multiplier);
         }
         if side.abs() > f32::EPSILON {
-            move_side_locked(state, side * move_step);
+            move_side_locked(state, side * move_step * speed_multiplier);
         }
         if vertical.abs() > f32::EPSILON {
-            move_vertical_locked(state, vertical * move_step);
+            move_vertical_locked(state, vertical * move_step * speed_multiplier);
         }
     }
 

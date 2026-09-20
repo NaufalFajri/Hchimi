@@ -492,8 +492,18 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
     webview::process_message(umsg, lparam);
     match umsg {
         WM_KEYDOWN | WM_SYSKEYDOWN => {
-            let current_key = wparam.0 as u16;
-            let repeat = ((lparam.0 as usize) & (1usize << 30)) != 0;
+            let mut current_key = wparam.0 as u16;
+            let lparam_val = lparam.0 as usize;
+            let repeat = (lparam_val & (1usize << 30)) != 0;
+
+            if current_key == 0x10 {
+                let scancode = ((lparam_val >> 16) & 0xFF) as u32;
+                current_key = if scancode == 0x36 { 0xA1 } else { 0xA0 };
+            } else if current_key == 0x11 {
+                current_key = if (lparam_val & (1 << 24)) != 0 { 0xA3 } else { 0xA2 };
+            } else if current_key == 0x12 {
+                current_key = if (lparam_val & (1 << 24)) != 0 { 0xA5 } else { 0xA4 };
+            }
 
             if gui::is_keybind_capture_active() {
                 let display = utils::vk_to_display_label(current_key);
@@ -552,7 +562,18 @@ extern "system" fn wnd_proc(hwnd: HWND, umsg: c_uint, wparam: WPARAM, lparam: LP
             }
         },
         WM_KEYUP | WM_SYSKEYUP => {
-            let current_key = wparam.0 as u16;
+            let mut current_key = wparam.0 as u16;
+            let lparam_val = lparam.0 as usize;
+
+            if current_key == 0x10 {
+                let scancode = ((lparam_val >> 16) & 0xFF) as u32;
+                current_key = if scancode == 0x36 { 0xA1 } else { 0xA0 };
+            } else if current_key == 0x11 {
+                current_key = if (lparam_val & (1 << 24)) != 0 { 0xA3 } else { 0xA2 };
+            } else if current_key == 0x12 {
+                current_key = if (lparam_val & (1 << 24)) != 0 { 0xA5 } else { 0xA4 };
+            }
+
             if !Gui::is_gui_input_active_atomic() {
                 if free_camera::toggle_from_windows_key(current_key, false, false) {
                     return LRESULT(0);

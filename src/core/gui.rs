@@ -7119,12 +7119,24 @@ impl Window for FreeCameraSettingsWindow {
                                 ui.checkbox(&mut cfg.enable_momentum, "");
                                 ui.end_row();
 
-                                ui.label(t!("free_camera.momentum_acceleration"));
-                                ui.add(egui::DragValue::new(&mut cfg.momentum_acceleration).speed(0.5).range(1.0..=100.0));
+                                ui.label("sv_noclipspeed");
+                                ui.add(egui::DragValue::new(&mut cfg.sv_noclipspeed).speed(0.5).range(1.0..=100.0));
                                 ui.end_row();
 
-                                ui.label(t!("free_camera.momentum_friction"));
-                                ui.add(egui::DragValue::new(&mut cfg.momentum_friction).speed(0.5).range(1.0..=100.0));
+                                ui.label("sv_noclipaccelerate");
+                                ui.add(egui::DragValue::new(&mut cfg.sv_noclipaccelerate).speed(0.5).range(1.0..=100.0));
+                                ui.end_row();
+
+                                ui.label("sv_noclipfriction");
+                                ui.add(egui::DragValue::new(&mut cfg.sv_noclipfriction).speed(0.5).range(1.0..=100.0));
+                                ui.end_row();
+
+                                ui.label("Run Speed Multiplier");
+                                ui.add(egui::DragValue::new(&mut cfg.noclip_run_speed_multiplier).speed(0.1).range(1.0..=10.0));
+                                ui.end_row();
+
+                                ui.label("Walk Speed Multiplier");
+                                ui.add(egui::DragValue::new(&mut cfg.noclip_walk_speed_multiplier).speed(0.01).range(0.01..=1.0));
                                 ui.end_row();
 
                                 ui.label(t!("free_camera.live_fov"));
