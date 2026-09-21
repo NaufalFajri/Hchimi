@@ -7091,6 +7091,28 @@ impl Window for FreeCameraSettingsWindow {
                                 ui.checkbox(&mut cfg.show_overlay, "");
                                 ui.end_row();
 
+                                ui.label("Home Handheld Cam");
+                                ui.checkbox(&mut cfg.home_handheld.enabled, "Enable");
+                                ui.end_row();
+
+                                if cfg.home_handheld.enabled {
+                                    ui.label("Handheld Intensity X");
+                                    ui.add(egui::DragValue::new(&mut cfg.home_handheld.intensity_x).speed(0.001).range(0.0..=1.0));
+                                    ui.end_row();
+                                    
+                                    ui.label("Handheld Intensity Y");
+                                    ui.add(egui::DragValue::new(&mut cfg.home_handheld.intensity_y).speed(0.001).range(0.0..=1.0));
+                                    ui.end_row();
+                                    
+                                    ui.label("Handheld Intensity Z");
+                                    ui.add(egui::DragValue::new(&mut cfg.home_handheld.intensity_z).speed(0.001).range(0.0..=1.0));
+                                    ui.end_row();
+                                    
+                                    ui.label("Handheld Speed");
+                                    ui.add(egui::DragValue::new(&mut cfg.home_handheld.speed).speed(0.05).range(0.1..=10.0));
+                                    ui.end_row();
+                                }
+
                                 ui.label(t!("free_camera.selfie_use_head_transform"));
                                 ui.checkbox(&mut cfg.selfie_use_head_transform, "");
                                 ui.end_row();

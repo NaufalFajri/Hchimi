@@ -2,6 +2,7 @@ pub mod BouncyUma;
 pub mod discord;
 mod ffi;
 pub mod free_camera;
+pub mod home_handheld_cam;
 pub mod game_impl;
 pub mod gui_impl;
 pub mod hachimi_impl;

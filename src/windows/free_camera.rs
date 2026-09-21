@@ -228,6 +228,7 @@ pub struct FreeCameraConfig {
     pub gamepad_deadzone: f32,
     pub gamepad_move_speed: f32,
     pub gamepad_look_speed: f32,
+    pub home_handheld: super::home_handheld_cam::HandheldCamConfig,
     pub keybinds: FreeCameraKeybinds,
 }
 
@@ -269,6 +270,7 @@ impl Default for FreeCameraConfig {
             gamepad_deadzone: 0.18,
             gamepad_move_speed: 1.0,
             gamepad_look_speed: 1.0,
+            home_handheld: Default::default(),
             keybinds: FreeCameraKeybinds::default(),
         }
     }
@@ -565,6 +567,8 @@ struct FreeCameraState {
     last_enabled: bool,
     last_config_mode: FreeCameraMode,
     last_overlay_mode: FreeCameraMode,
+    home_handheld: super::home_handheld_cam::HomeHandheldCam,
+    handheld_noise: Vec3,
 }
 
 struct OverlayMessage {
@@ -624,6 +628,8 @@ impl FreeCameraState {
             last_enabled: false,
             last_config_mode: config.mode,
             last_overlay_mode: config.mode,
+            home_handheld: Default::default(),
+            handheld_noise: Vec3::default(),
         };
         state.reset_with_config(&config);
         state
@@ -1028,7 +1034,9 @@ pub fn camera_pos() -> Vector3_t {
 }
 
 pub fn camera_look_at() -> Vector3_t {
-    STATE.lock().unwrap().camera_look_at.to_vector3()
+    let state = STATE.lock().unwrap();
+    let look_at = state.camera_look_at + state.handheld_noise;
+    look_at.to_vector3()
 }
 
 pub fn camera_rotation() -> Option<Quaternion_t> {
@@ -1916,6 +1924,19 @@ pub fn tick() {
     let look_step = config.look_step * step_scale;
 
     apply_input_locked(&mut state, config, move_step, look_step, delta);
+
+    if state.scene == CameraScene::Home {
+        state.home_handheld.config = config.home_handheld;
+        let (nx, ny, nz) = state.home_handheld.tick(delta);
+        // Map from Carbon (X=Pitch, Y=Forward, Z=Yaw) to Unity (X=Right, Y=Up, Z=Forward)
+        // Wait, looking at the code I wrote in home_handheld_cam:
+        // off_x (Carbon X - Up/Down) -> Unity Y
+        // off_y (Carbon Y - Forward/Backward) -> Unity Z
+        // off_z (Carbon Z - Left/Right) -> Unity X
+        state.handheld_noise = Vec3::new(nz, nx, ny);
+    } else {
+        state.handheld_noise = Vec3::default();
+    }
 }
 
 fn apply_input_locked(
