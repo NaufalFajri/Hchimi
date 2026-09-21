@@ -532,6 +532,7 @@ struct FreeCameraState {
     pitch: f32,
     live_fov: f32,
     race_fov: f32,
+    fov_velocity: f32,
     live_target_position_index: i32,
     live_target_part_index: i32,
     live_follow_offset: Vec3,
@@ -585,6 +586,7 @@ impl FreeCameraState {
             pitch: 0.0,
             live_fov: config.live_fov,
             race_fov: config.race_fov,
+            fov_velocity: 0.0,
             live_target_position_index: 0,
             live_target_part_index: 0,
             live_follow_offset: Vec3::default(),
@@ -1865,8 +1867,14 @@ pub fn on_mouse_wheel(delta: i16) {
     }
 
     let mut state = STATE.lock().unwrap();
-    let step = if delta > 0 { 0.5 } else { -0.5 };
-    change_fov_locked(&mut state, step);
+    let config = Hachimi::instance().config.load();
+    if config.windows.free_camera.enable_momentum {
+        let step = if delta > 0 { 20.0 } else { -20.0 };
+        state.fov_velocity += step;
+    } else {
+        let step = if delta > 0 { 0.5 } else { -0.5 };
+        change_fov_locked(&mut state, step);
+    }
 }
 
 pub fn tick() {
@@ -1930,17 +1938,36 @@ fn apply_input_locked(
     look_x -= deadzone(axes.right_x, config.gamepad_deadzone) * config.gamepad_look_speed;
     look_y += deadzone(axes.right_y, config.gamepad_deadzone) * config.gamepad_look_speed;
 
-    if state.gamepad.lb {
-        change_fov_locked(state, 0.5 * move_step.max(0.1));
-    }
-    if state.gamepad.rb {
-        change_fov_locked(state, -0.5 * move_step.max(0.1));
-    }
-    if state.key_state.fov_increase {
-        change_fov_locked(state, 0.5 * move_step.max(0.1));
-    }
-    if state.key_state.fov_decrease {
-        change_fov_locked(state, -0.5 * move_step.max(0.1));
+    let mut fov_input = 0.0;
+    if state.gamepad.lb { fov_input += 1.0; }
+    if state.gamepad.rb { fov_input -= 1.0; }
+    if state.key_state.fov_increase { fov_input += 1.0; }
+    if state.key_state.fov_decrease { fov_input -= 1.0; }
+
+    if config.enable_momentum && state.mode == FreeCameraMode::Free {
+        let fov_max_speed = 30.0;
+        let wish_speed = fov_input * fov_max_speed;
+        let current_speed = state.fov_velocity.abs();
+        
+        if current_speed > 0.0 {
+            let drop = current_speed * config.sv_noclipfriction * delta;
+            let new_speed = f32::max(current_speed - drop, 0.0);
+            state.fov_velocity = state.fov_velocity.signum() * new_speed;
+        }
+
+        let add_speed = wish_speed - state.fov_velocity;
+        if add_speed.abs() > 0.0 {
+            let accel_amount = f32::min(config.sv_noclipaccelerate * fov_max_speed * delta, add_speed.abs());
+            state.fov_velocity += add_speed.signum() * accel_amount;
+        }
+
+        if state.fov_velocity.abs() > 0.0 {
+            change_fov_locked(state, state.fov_velocity * delta);
+        }
+    } else {
+        if fov_input.abs() > f32::EPSILON {
+            change_fov_locked(state, fov_input * 0.5 * move_step.max(0.1));
+        }
     }
 
     if state.key_state.follow_offset_up {
