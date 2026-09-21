@@ -732,6 +732,7 @@ pub struct CySpringBustModifierConfig {
     pub stiffness_multiplier: f32,
     pub drag_multiplier: f32,
     pub gravity_multiplier: f32,
+    pub disable_limit_angle: bool,
 }
 
 impl Default for CySpringBustModifierConfig {
@@ -741,6 +742,7 @@ impl Default for CySpringBustModifierConfig {
             stiffness_multiplier: 0.15,
             drag_multiplier: 0.2,
             gravity_multiplier: 1.8,
+            disable_limit_angle: true,
         }
     }
 }

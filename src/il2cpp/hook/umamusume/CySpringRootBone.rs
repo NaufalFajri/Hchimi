@@ -15,6 +15,7 @@ static mut ELEMENT_BONE_NAME_FIELD: *mut FieldInfo = 0 as _;
 static mut WORKING_STIFFNESS_OFFSET: usize = 0;
 static mut WORKING_DRAG_OFFSET: usize = 0;
 static mut WORKING_GRAVITY_OFFSET: usize = 0;
+static mut WORKING_IS_LIMIT_OFFSET: usize = 0;
 static mut WORKING_ELEM_SIZE: usize = 0;
 
 type SetNativeClothFn =
@@ -91,15 +92,21 @@ extern "C" fn SetNativeCloth(
             *stiffness_ptr *= bust_cfg.stiffness_multiplier;
             *drag_ptr *= bust_cfg.drag_multiplier;
             *gravity_ptr *= bust_cfg.gravity_multiplier;
+
+            if bust_cfg.disable_limit_angle && WORKING_IS_LIMIT_OFFSET != 0 {
+                let is_limit_ptr = elem_ptr.add(WORKING_IS_LIMIT_OFFSET) as *mut bool;
+                *is_limit_ptr = false;
+            }
         }
     }
 
     debug!(
-        "Applied bust physics multipliers to {}: stiffness x{}, drag x{}, gravity x{} ({} chain bones)",
+        "Applied bust physics multipliers to {}: stiffness x{}, drag x{}, gravity x{}, disable_limit={} ({} chain bones)",
         matched_name,
         bust_cfg.stiffness_multiplier,
         bust_cfg.drag_multiplier,
         bust_cfg.gravity_multiplier,
+        bust_cfg.disable_limit_angle,
         len,
     );
 }
@@ -121,6 +128,7 @@ pub fn init(umamusume: *const Il2CppImage) {
         let stiffness_field = get_field_from_name(NativeClothWorking, c"StiffnessForce");
         let drag_field = get_field_from_name(NativeClothWorking, c"DragForce");
         let gravity_field = get_field_from_name(NativeClothWorking, c"Gravity");
+        let is_limit_field = get_field_from_name(NativeClothWorking, c"IsLimit");
 
         if !stiffness_field.is_null() && !drag_field.is_null() && !gravity_field.is_null() {
             WORKING_STIFFNESS_OFFSET = (*stiffness_field).offset as usize - 0x10;
@@ -128,6 +136,10 @@ pub fn init(umamusume: *const Il2CppImage) {
             WORKING_GRAVITY_OFFSET = (*gravity_field).offset as usize - 0x10;
             WORKING_ELEM_SIZE =
                 il2cpp_class_value_size(NativeClothWorking, std::ptr::null_mut()) as usize;
+        }
+
+        if !is_limit_field.is_null() {
+            WORKING_IS_LIMIT_OFFSET = (*is_limit_field).offset as usize - 0x10;
         }
     }
 }
