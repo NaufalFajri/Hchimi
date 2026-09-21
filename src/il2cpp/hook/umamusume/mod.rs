@@ -145,6 +145,7 @@ pub mod AssetManager;
 #[cfg(target_os = "windows")]
 mod Connecting;
 mod CySpringNative;
+mod CySpringRootBone;
 mod DialogMissionListItem;
 pub mod Director;
 #[cfg(target_os = "windows")]
@@ -341,6 +342,7 @@ pub fn init() {
     PartsSupportCardImproveDetail::init(image);
     Director::init(image);
     CySpringNative::init(image);
+    CySpringRootBone::init(image);
     PartsHomeCharaMessage::init(image);
     LiveViewController::init(image);
     LiveTimeController::init(image);

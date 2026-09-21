@@ -725,6 +725,26 @@ impl RaceStatHudCloneConfig {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct CySpringBustModifierConfig {
+    pub enabled: bool,
+    pub stiffness_multiplier: f32,
+    pub drag_multiplier: f32,
+    pub gravity_multiplier: f32,
+}
+
+impl Default for CySpringBustModifierConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            stiffness_multiplier: 0.15,
+            drag_multiplier: 0.2,
+            gravity_multiplier: 1.8,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Config {
     #[serde(default = "Config::default_true")]
@@ -868,6 +888,8 @@ pub struct Config {
     pub physics_update_mode: Option<SpringUpdateMode>,
     #[serde(default)]
     pub cyspring_mono_uncap_frame_scale: bool,
+    #[serde(default, alias = "bouncy_bust")]
+    pub cyspring_bust_modifier: CySpringBustModifierConfig,
     #[serde(default = "Config::default_ui_animation_scale")]
     pub ui_animation_scale: f32,
     #[serde(default)]
