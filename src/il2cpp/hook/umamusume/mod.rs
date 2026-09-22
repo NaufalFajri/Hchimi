@@ -159,6 +159,7 @@ pub mod GameDefine;
 #[cfg(target_os = "windows")]
 pub mod HomeCameraController;
 pub mod HomeViewController;
+pub mod HomeWalkMotionDirector;
 pub mod HorseRaceInfoReplay;
 pub mod HubViewControllerBase;
 pub mod JukeboxBgmSelector;
@@ -347,6 +348,7 @@ pub fn init() {
     LiveViewController::init(image);
     LiveTimeController::init(image);
     HomeViewController::init(image);
+    HomeWalkMotionDirector::init(image);
     #[cfg(target_os = "windows")]
     HomeCameraController::init(image);
     #[cfg(target_os = "windows")]

@@ -6102,6 +6102,12 @@ impl ConfigEditor {
                 ui.end_row();
             }
 
+            if should_show_option(search, &t!("config_editor.home_walk_spawn_multiplier", default = "Home Walk Spawn Frequency")) {
+                ui.label(t!("config_editor.home_walk_spawn_multiplier", default = "Home Walk Spawn Frequency"));
+                ui.add(egui::Slider::new(&mut config.home_walk_spawn_multiplier, 0.1..=10.0));
+                ui.end_row();
+            }
+
             if should_show_option(search, &t!("config_editor.disable_tap_effect")) {
                 ui.label(t!("config_editor.disable_tap_effect"));
                 ui.checkbox(&mut config.disable_tap_effect, "");
