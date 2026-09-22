@@ -867,8 +867,8 @@ pub struct Config {
     pub auto_translate_localize: bool,
     #[serde(default = "Config::default_home_walk_spawn_multiplier")]
     pub home_walk_spawn_multiplier: f32,
-    #[serde(default = "Config::default_home_walk_max_walkers")]
-    pub home_walk_max_walkers: i32,
+    #[serde(default = "Config::default_true")]
+    pub home_walk_playback_button: bool,
 
     #[serde(default)]
     pub disable_skill_name_translation: bool,
@@ -985,7 +985,6 @@ impl Config {
     fn default_open_browser_url() -> String { "https://www.google.com/".to_owned() }
     fn default_virtual_res_mult() -> f32 { 1.0 }
     fn default_home_walk_spawn_multiplier() -> f32 { 1.0 }
-    fn default_home_walk_max_walkers() -> i32 { 1 }
     fn default_ui_scale() -> f32 { 1.0 }
     fn default_render_scale() -> f32 { 1.0 }
     fn default_gui_scale() -> f32 { 1.0 }

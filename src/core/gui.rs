@@ -3350,6 +3350,111 @@ impl Gui {
             });
     }
 
+    fn home_walk_playback_showing() -> bool {
+        Hachimi::instance().config.load().home_walk_playback_button
+            && Hachimi::instance().current_view_id.load(atomic::Ordering::Acquire) == 101
+    }
+
+    fn run_home_walk_playback_bar(ctx: &egui::Context) {
+        if !Self::home_walk_playback_showing() {
+            return;
+        }
+
+        use crate::il2cpp::hook::umamusume::HomeWalkMotionDirector;
+
+        let scale = get_scale(ctx);
+        let screen = ctx.viewport_rect();
+
+        #[cfg(target_os = "windows")]
+        let game_view = match windows_split_game_view(screen, ctx.pixels_per_point()) {
+            Some((rect, _)) => rect,
+            None => screen,
+        };
+        #[cfg(target_os = "android")]
+        let game_view = screen;
+
+        let paused = HomeWalkMotionDirector::is_walk_paused();
+        let is_rev = HomeWalkMotionDirector::is_walk_reverse();
+        let speed = HomeWalkMotionDirector::get_walk_speed();
+
+        let btn_size = 24.0 * scale;
+        let margin = 12.0 * scale;
+        let btn_pos = egui::Pos2::new(
+            game_view.left() + margin,
+            game_view.center().y - btn_size / 2.0,
+        );
+
+        let active_color = egui::Color32::from_rgb(0, 255, 200);
+        let default_color = egui::Color32::WHITE;
+
+        egui::Area::new(egui::Id::new("home_walk_playback_bar_area"))
+            .fixed_pos(btn_pos)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing = egui::Vec2::new(3.0 * scale, 0.0);
+
+                    // 1. Reverse (◀)
+                    let rev_active = !paused && is_rev;
+                    let btn_rev = egui::Button::new(
+                        egui::RichText::new("◀").size(12.0 * scale).color(if rev_active { active_color } else { default_color })
+                    ).min_size(egui::Vec2::new(btn_size, btn_size));
+                    if ui.add(btn_rev).on_hover_text("Walk Reverse").clicked() {
+                        HomeWalkMotionDirector::set_walk_reverse(true);
+                        HomeWalkMotionDirector::set_walk_paused(false);
+                    }
+
+                    // 2. Pause / Play toggle
+                    let icon = if paused { "\u{f04b}" } else { "\u{f04c}" };
+                    let btn_pause = egui::Button::new(
+                        egui::RichText::new(icon).size(14.0 * scale).color(if paused { egui::Color32::YELLOW } else { default_color })
+                    ).min_size(egui::Vec2::new(btn_size, btn_size));
+                    if ui.add(btn_pause).on_hover_text(if paused { "Resume Play" } else { "Pause" }).clicked() {
+                        HomeWalkMotionDirector::toggle_walk_pause();
+                    }
+
+                    // 3. Forward (▶)
+                    let fwd_active = !paused && !is_rev;
+                    let btn_fwd = egui::Button::new(
+                        egui::RichText::new("▶").size(12.0 * scale).color(if fwd_active { active_color } else { default_color })
+                    ).min_size(egui::Vec2::new(btn_size, btn_size));
+                    if ui.add(btn_fwd).on_hover_text("Walk Forward").clicked() {
+                        HomeWalkMotionDirector::set_walk_reverse(false);
+                        HomeWalkMotionDirector::set_walk_paused(false);
+                    }
+
+                    ui.separator();
+
+                    // 4. 1x Speed
+                    let is_1x = (speed - 1.0).abs() < 0.01;
+                    let btn_1x = egui::Button::new(
+                        egui::RichText::new("1x").size(11.0 * scale).color(if is_1x { active_color } else { default_color })
+                    ).min_size(egui::Vec2::new(btn_size, btn_size));
+                    if ui.add(btn_1x).on_hover_text("1x Normal Speed").clicked() {
+                        HomeWalkMotionDirector::set_walk_speed(1.0);
+                    }
+
+                    // 5. 2x Speed
+                    let is_2x = (speed - 2.0).abs() < 0.01;
+                    let btn_2x = egui::Button::new(
+                        egui::RichText::new("2x").size(11.0 * scale).color(if is_2x { active_color } else { default_color })
+                    ).min_size(egui::Vec2::new(btn_size, btn_size));
+                    if ui.add(btn_2x).on_hover_text("2x Speed").clicked() {
+                        HomeWalkMotionDirector::set_walk_speed(2.0);
+                    }
+
+                    // 6. 4x Speed
+                    let is_4x = (speed - 4.0).abs() < 0.01;
+                    let btn_4x = egui::Button::new(
+                        egui::RichText::new("4x").size(11.0 * scale).color(if is_4x { active_color } else { default_color })
+                    ).min_size(egui::Vec2::new(btn_size, btn_size));
+                    if ui.add(btn_4x).on_hover_text("4x Speed").clicked() {
+                        HomeWalkMotionDirector::set_walk_speed(4.0);
+                    }
+                });
+            });
+    }
+
+
     pub fn run(&mut self) -> egui::FullOutput {
         if let Ok(mut lock) = PENDING_THEME.lock() {
             if let Some(config) = lock.take() {
@@ -3492,11 +3597,13 @@ impl Gui {
         self.run_live_slider(&ctx);
         self.run_race_slider(&ctx);
         Self::run_race_playback_button(&ctx);
+        Self::run_home_walk_playback_bar(&ctx);
         RaceStatHud::run(&ctx);
 
         let has_interactive_widgets = IS_LIVE_SCENE.load(atomic::Ordering::Relaxed);
         let race_slider_input = Self::race_slider_showing();
         let race_playback_button_input = Self::race_playback_button_showing();
+        let home_walk_playback_input = Self::home_walk_playback_showing();
         let race_stat_hud_input = RaceStatHud::is_active();
         #[cfg(target_os = "windows")]
         let free_camera_input_capture = free_camera::wants_windows_input_capture();
@@ -3504,14 +3611,14 @@ impl Gui {
         // Store these as atomic values so the input thread can check them without locking the gui
         #[cfg(target_os = "android")]
         IS_CONSUMING_INPUT.store(
-            self.is_consuming_input() || has_interactive_widgets || race_slider_input || race_playback_button_input || race_stat_hud_input,
+            self.is_consuming_input() || has_interactive_widgets || race_slider_input || race_playback_button_input || home_walk_playback_input || race_stat_hud_input,
             atomic::Ordering::Release
         );
         #[cfg(target_os = "windows")]
         {
             GUI_INPUT_ACTIVE.store(self.menu_visible || !self.windows.is_empty(), atomic::Ordering::Release);
             IS_CONSUMING_INPUT.store(
-                self.is_consuming_input() || has_interactive_widgets || race_slider_input || race_playback_button_input || race_stat_hud_input || free_camera_input_capture,
+                self.is_consuming_input() || has_interactive_widgets || race_slider_input || race_playback_button_input || home_walk_playback_input || race_stat_hud_input || free_camera_input_capture,
                 atomic::Ordering::Release
             );
         }
@@ -4254,6 +4361,7 @@ impl Gui {
             !IS_LIVE_SCENE.load(atomic::Ordering::Acquire) &&
             !Self::race_slider_showing() &&
             !Self::race_playback_button_showing() &&
+            !Self::home_walk_playback_showing() &&
             !free_camera::has_overlay_message() &&
             !RaceStatHud::elements_showing() && !RaceStatHud::is_active()
         }
@@ -4264,6 +4372,7 @@ impl Gui {
             !IS_LIVE_SCENE.load(atomic::Ordering::Acquire) &&
             !Self::race_slider_showing() &&
             !Self::race_playback_button_showing() &&
+            !Self::home_walk_playback_showing() &&
             !RaceStatHud::elements_showing() && !RaceStatHud::is_active()
         }
     }
@@ -6104,15 +6213,16 @@ impl ConfigEditor {
 
             if should_show_option(search, &t!("config_editor.home_walk_spawn_multiplier", default = "Home Walk Spawn Frequency")) {
                 ui.label(t!("config_editor.home_walk_spawn_multiplier", default = "Home Walk Spawn Frequency"));
-                ui.add(egui::Slider::new(&mut config.home_walk_spawn_multiplier, 0.1..=10.0));
+                ui.add(egui::Slider::new(&mut config.home_walk_spawn_multiplier, 0.0..=10.0));
                 ui.end_row();
             }
 
-            if should_show_option(search, &t!("config_editor.home_walk_max_walkers", default = "Home Walk Max Concurrent")) {
-                ui.label(t!("config_editor.home_walk_max_walkers", default = "Home Walk Max Concurrent"));
-                ui.add(egui::Slider::new(&mut config.home_walk_max_walkers, 1..=5));
+            if should_show_option(search, &t!("config_editor.home_walk_playback_button", default = "Home Walk Playback Controls")) {
+                ui.label(t!("config_editor.home_walk_playback_button", default = "Home Walk Playback Controls"));
+                ui.checkbox(&mut config.home_walk_playback_button, "");
                 ui.end_row();
             }
+
 
             if should_show_option(search, &t!("config_editor.disable_tap_effect")) {
                 ui.label(t!("config_editor.disable_tap_effect"));
