@@ -6108,6 +6108,12 @@ impl ConfigEditor {
                 ui.end_row();
             }
 
+            if should_show_option(search, &t!("config_editor.home_walk_max_walkers", default = "Home Walk Max Concurrent")) {
+                ui.label(t!("config_editor.home_walk_max_walkers", default = "Home Walk Max Concurrent"));
+                ui.add(egui::Slider::new(&mut config.home_walk_max_walkers, 1..=5));
+                ui.end_row();
+            }
+
             if should_show_option(search, &t!("config_editor.disable_tap_effect")) {
                 ui.label(t!("config_editor.disable_tap_effect"));
                 ui.checkbox(&mut config.disable_tap_effect, "");
