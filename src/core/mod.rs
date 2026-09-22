@@ -34,3 +34,4 @@ pub mod updater;
 pub mod captions;
 pub mod live_utils;
 pub mod taskbar;
+pub mod facial_override;

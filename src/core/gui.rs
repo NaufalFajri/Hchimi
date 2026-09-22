@@ -64,6 +64,7 @@ use crate::il2cpp::hook::UnityEngine_CoreModule::QualitySettings;
 use crate::windows::free_camera::{self, FreeCameraMode};
 
 use super::{
+    facial_override,
     game::Region,
     hachimi::{self, Language, REPO_PATH, WEBSITE_URL, RACE_MECHANICS_URL},
     http::{ureq_config, AsyncRequest},
@@ -3579,6 +3580,9 @@ impl Gui {
                         if ui.button(t!("menu.open_config_editor")).clicked() {
                             show_window = Some(Box::new(ConfigEditor::new()));
                         }
+                        if ui.button("Facial Expression Override").clicked() {
+                            show_window = Some(Box::new(FacialOverrideWindow::new()));
+                        }
                         if ui.button(t!("menu.reload_config")).clicked() {
                             hachimi.reload_config();
                             show_notification = Some(t!("notification.config_reloaded"));
@@ -5627,6 +5631,24 @@ impl ConfigEditor {
                 ui.end_row();
             }
 
+            if should_show_option(search, "Override Facial Expression") {
+                ui.label("Override Facial Expression");
+                ui.horizontal(|ui| {
+                    let mut cfg = facial_override::get_config();
+                    if ui.checkbox(&mut cfg.enabled, "").changed() {
+                        facial_override::update_config(|c| c.enabled = cfg.enabled);
+                    }
+                    if ui.button(t!("open")).clicked() {
+                        thread::spawn(|| {
+                            if let Some(gui) = Gui::instance() {
+                                gui.lock().unwrap().show_window(Box::new(FacialOverrideWindow::new()));
+                            }
+                        });
+                    }
+                });
+                ui.end_row();
+            }
+
             if should_show_option(search, &t!("config_editor.skill_info_dialog")) && Hachimi::instance().game.region == Region::Japan {
                 ui.label(t!("config_editor.skill_info_dialog"));
                 ui.checkbox(&mut config.skill_info_dialog, "");
@@ -7045,6 +7067,411 @@ impl Window for LiveVocalsSwapWindow {
         }
 
         open &= open2;
+        open
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FacialMorphTab {
+    Emotion,
+    Eye,
+    EyeBrow,
+    Mouth,
+    Ear,
+}
+
+impl FacialMorphTab {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Emotion => "Emotion",
+            Self::Eye => "Eye",
+            Self::EyeBrow => "EyeBrow",
+            Self::Mouth => "Mouth",
+            Self::Ear => "Ear",
+        }
+    }
+}
+
+pub struct FacialOverrideWindow {
+    id: egui::Id,
+    config: facial_override::FacialOverrideConfig,
+    search_target: String,
+    search_filter: String,
+    current_tab: FacialMorphTab,
+}
+
+impl FacialOverrideWindow {
+    pub fn new() -> FacialOverrideWindow {
+        FacialOverrideWindow {
+            id: random_id(),
+            config: facial_override::get_config(),
+            search_target: String::new(),
+            search_filter: String::new(),
+            current_tab: FacialMorphTab::Emotion,
+        }
+    }
+}
+
+impl Window for FacialOverrideWindow {
+    fn run(&mut self, ctx: &egui::Context) -> bool {
+        let scale = get_scale(ctx);
+        let mut open = true;
+        let mut changed = false;
+        let mut reset_clicked = false;
+        let mut reset_tab_clicked = false;
+
+        let mut target_choices: Vec<(i32, &str)> = vec![(-1, "All Characters")];
+        #[cfg(target_os = "windows")]
+        {
+            for (i, (name, _)) in crate::windows::free_camera::LIVE_POSITION_CHOICES.iter().enumerate() {
+                target_choices.push((i as i32, *name));
+            }
+        }
+
+        new_window(ctx, self.id, "Facial Expression Override")
+            .default_width(380.0 * scale)
+            .max_width(450.0 * scale)
+            .default_height(520.0 * scale)
+            .open(&mut open)
+            .show(ctx, |ui| {
+                simple_window_layout(
+                    ui,
+                    self.id,
+                    |ui| {
+                        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
+
+                        // Header controls: Enable & Target
+                        ui.horizontal(|ui| {
+                            if ui
+                                .checkbox(&mut self.config.enabled, "Override Facial Expression")
+                                .changed()
+                            {
+                                changed = true;
+                            }
+                        });
+
+                        if self.config.enabled {
+                            ui.horizontal(|ui| {
+                                ui.label("Target:");
+                                if Gui::run_combo_menu(
+                                    ui,
+                                    self.id.with("target_chara"),
+                                    &mut self.config.target_character,
+                                    &target_choices,
+                                    &mut self.search_target,
+                                ) {
+                                    changed = true;
+                                }
+                            });
+
+                            ui.separator();
+
+                            // Filter & Reset Tab toolbar
+                            ui.horizontal(|ui| {
+                                ui.label("🔍");
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut self.search_filter)
+                                        .hint_text("Filter morphs...")
+                                        .desired_width(140.0 * scale),
+                                );
+                                if !self.search_filter.is_empty() {
+                                    if ui.small_button("✕").clicked() {
+                                        self.search_filter.clear();
+                                    }
+                                }
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    if ui.button("Reset Tab").clicked() {
+                                        reset_tab_clicked = true;
+                                    }
+                                });
+                            });
+
+                            ui.separator();
+
+                            // Tab bar: Emotion, Eye, EyeBrow, Mouth, Ear
+                            ui.horizontal(|ui| {
+                                for tab in &[
+                                    FacialMorphTab::Emotion,
+                                    FacialMorphTab::Eye,
+                                    FacialMorphTab::EyeBrow,
+                                    FacialMorphTab::Mouth,
+                                    FacialMorphTab::Ear,
+                                ] {
+                                    let is_selected = self.current_tab == *tab;
+                                    if ui.selectable_label(is_selected, tab.name()).clicked() {
+                                        self.current_tab = *tab;
+                                    }
+                                }
+                            });
+
+                            ui.separator();
+
+                            // Scrollable sliders list for current tab
+                            egui::ScrollArea::vertical()
+                                .id_salt(self.id.with("facial_morph_scroll"))
+                                .auto_shrink([false, false])
+                                .show(ui, |ui| {
+                                    let filter = self.search_filter.trim().to_lowercase();
+                                    match self.current_tab {
+                                        FacialMorphTab::Emotion => {
+                                            for &name in facial_override::PRESET_EXPRESSIONS {
+                                                if !filter.is_empty() && !name.to_lowercase().contains(&filter) {
+                                                    continue;
+                                                }
+                                                let mut weight = *self.config.emotion_weights.get(name).unwrap_or(&0.0);
+                                                let is_active = weight.abs() > 0.001;
+
+                                                ui.horizontal(|ui| {
+                                                    let label_text = egui::RichText::new(name);
+                                                    let label = if is_active {
+                                                        label_text.color(egui::Color32::from_rgb(100, 200, 255)).strong()
+                                                    } else {
+                                                        label_text
+                                                    };
+                                                    ui.allocate_ui_with_layout(
+                                                        egui::vec2(110.0 * scale, 18.0 * scale),
+                                                        egui::Layout::left_to_right(egui::Align::Center),
+                                                        |ui| {
+                                                            ui.label(label);
+                                                        },
+                                                    );
+
+                                                    let slider = egui::Slider::new(&mut weight, 0.0..=1.0)
+                                                        .step_by(0.01)
+                                                        .fixed_decimals(2);
+                                                    if ui.add(slider).changed() {
+                                                        self.config.emotion_weights.insert(name.to_string(), weight);
+                                                        self.config.active_emotion = name.to_string();
+                                                        self.config.active_emotion_weight = weight;
+                                                        changed = true;
+                                                    }
+
+                                                    if is_active {
+                                                        if ui.small_button("↺").on_hover_text("Reset to 0").clicked() {
+                                                            self.config.emotion_weights.insert(name.to_string(), 0.0);
+                                                            if self.config.active_emotion == name {
+                                                                self.config.active_emotion_weight = 0.0;
+                                                            }
+                                                            changed = true;
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        FacialMorphTab::Eye => {
+                                            for &name in facial_override::EYE_TYPES {
+                                                if !filter.is_empty() && !name.to_lowercase().contains(&filter) {
+                                                    continue;
+                                                }
+                                                let mut weight = *self.config.eye_weights.get(name).unwrap_or(&0.0);
+                                                let min_val = if name.contains("Range") { -1.0 } else { 0.0 };
+                                                let is_active = weight.abs() > 0.001;
+
+                                                ui.horizontal(|ui| {
+                                                    let label_text = egui::RichText::new(name);
+                                                    let label = if is_active {
+                                                        label_text.color(egui::Color32::from_rgb(100, 200, 255)).strong()
+                                                    } else {
+                                                        label_text
+                                                    };
+                                                    ui.allocate_ui_with_layout(
+                                                        egui::vec2(110.0 * scale, 18.0 * scale),
+                                                        egui::Layout::left_to_right(egui::Align::Center),
+                                                        |ui| {
+                                                            ui.label(label);
+                                                        },
+                                                    );
+
+                                                    let slider = egui::Slider::new(&mut weight, min_val..=1.0)
+                                                        .step_by(0.01)
+                                                        .fixed_decimals(2);
+                                                    if ui.add(slider).changed() {
+                                                        self.config.eye_weights.insert(name.to_string(), weight);
+                                                        changed = true;
+                                                    }
+
+                                                    if is_active {
+                                                        if ui.small_button("↺").on_hover_text("Reset to 0").clicked() {
+                                                            self.config.eye_weights.insert(name.to_string(), 0.0);
+                                                            changed = true;
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        FacialMorphTab::EyeBrow => {
+                                            for &name in facial_override::EYEBROW_TYPES {
+                                                if !filter.is_empty() && !name.to_lowercase().contains(&filter) {
+                                                    continue;
+                                                }
+                                                let mut weight = *self.config.eyebrow_weights.get(name).unwrap_or(&0.0);
+                                                let min_val = if name.contains("Offset") { -1.0 } else { 0.0 };
+                                                let is_active = weight.abs() > 0.001;
+
+                                                ui.horizontal(|ui| {
+                                                    let label_text = egui::RichText::new(name);
+                                                    let label = if is_active {
+                                                        label_text.color(egui::Color32::from_rgb(100, 200, 255)).strong()
+                                                    } else {
+                                                        label_text
+                                                    };
+                                                    ui.allocate_ui_with_layout(
+                                                        egui::vec2(110.0 * scale, 18.0 * scale),
+                                                        egui::Layout::left_to_right(egui::Align::Center),
+                                                        |ui| {
+                                                            ui.label(label);
+                                                        },
+                                                    );
+
+                                                    let slider = egui::Slider::new(&mut weight, min_val..=1.0)
+                                                        .step_by(0.01)
+                                                        .fixed_decimals(2);
+                                                    if ui.add(slider).changed() {
+                                                        self.config.eyebrow_weights.insert(name.to_string(), weight);
+                                                        changed = true;
+                                                    }
+
+                                                    if is_active {
+                                                        if ui.small_button("↺").on_hover_text("Reset to 0").clicked() {
+                                                            self.config.eyebrow_weights.insert(name.to_string(), 0.0);
+                                                            changed = true;
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        FacialMorphTab::Mouth => {
+                                            for &name in facial_override::MOUTH_TYPES {
+                                                if !filter.is_empty() && !name.to_lowercase().contains(&filter) {
+                                                    continue;
+                                                }
+                                                let mut weight = *self.config.mouth_weights.get(name).unwrap_or(&0.0);
+                                                let is_active = weight.abs() > 0.001;
+
+                                                ui.horizontal(|ui| {
+                                                    let label_text = egui::RichText::new(name);
+                                                    let label = if is_active {
+                                                        label_text.color(egui::Color32::from_rgb(100, 200, 255)).strong()
+                                                    } else {
+                                                        label_text
+                                                    };
+                                                    ui.allocate_ui_with_layout(
+                                                        egui::vec2(110.0 * scale, 18.0 * scale),
+                                                        egui::Layout::left_to_right(egui::Align::Center),
+                                                        |ui| {
+                                                            ui.label(label);
+                                                        },
+                                                    );
+
+                                                    let slider = egui::Slider::new(&mut weight, 0.0..=1.0)
+                                                        .step_by(0.01)
+                                                        .fixed_decimals(2);
+                                                    if ui.add(slider).changed() {
+                                                        self.config.mouth_weights.insert(name.to_string(), weight);
+                                                        changed = true;
+                                                    }
+
+                                                    if is_active {
+                                                        if ui.small_button("↺").on_hover_text("Reset to 0").clicked() {
+                                                            self.config.mouth_weights.insert(name.to_string(), 0.0);
+                                                            changed = true;
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }
+                                        FacialMorphTab::Ear => {
+                                            for (idx, &name) in facial_override::EAR_TYPES.iter().enumerate() {
+                                                if !filter.is_empty() && !name.to_lowercase().contains(&filter) {
+                                                    continue;
+                                                }
+                                                let mut weight = *self.config.ear_weights.get(name).unwrap_or(&0.0);
+                                                let is_active = weight.abs() > 0.001;
+
+                                                ui.horizontal(|ui| {
+                                                    let label_text = egui::RichText::new(name);
+                                                    let label = if is_active {
+                                                        label_text.color(egui::Color32::from_rgb(100, 200, 255)).strong()
+                                                    } else {
+                                                        label_text
+                                                    };
+                                                    ui.allocate_ui_with_layout(
+                                                        egui::vec2(110.0 * scale, 18.0 * scale),
+                                                        egui::Layout::left_to_right(egui::Align::Center),
+                                                        |ui| {
+                                                            ui.label(label);
+                                                        },
+                                                    );
+
+                                                    let slider = egui::Slider::new(&mut weight, 0.0..=1.0)
+                                                        .step_by(0.01)
+                                                        .fixed_decimals(2);
+                                                    if ui.add(slider).changed() {
+                                                        self.config.ear_weights.insert(name.to_string(), weight);
+                                                        self.config.override_ear = true;
+                                                        self.config.active_ear = idx as i32;
+                                                        self.config.active_ear_weight = weight;
+                                                        changed = true;
+                                                    }
+
+                                                    if is_active {
+                                                        if ui.small_button("↺").on_hover_text("Reset to 0").clicked() {
+                                                            self.config.ear_weights.insert(name.to_string(), 0.0);
+                                                            if self.config.active_ear == idx as i32 {
+                                                                self.config.active_ear_weight = 0.0;
+                                                            }
+                                                            changed = true;
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    }
+                                });
+                        }
+                    },
+                    |ui| {
+                        if ui.button("Reset All").clicked() {
+                            reset_clicked = true;
+                        }
+                    },
+                );
+            });
+
+        if reset_tab_clicked {
+            match self.current_tab {
+                FacialMorphTab::Emotion => {
+                    self.config.emotion_weights.clear();
+                    self.config.active_emotion = "Base".to_string();
+                    self.config.active_emotion_weight = 1.0;
+                }
+                FacialMorphTab::Eye => {
+                    self.config.eye_weights.clear();
+                }
+                FacialMorphTab::EyeBrow => {
+                    self.config.eyebrow_weights.clear();
+                }
+                FacialMorphTab::Mouth => {
+                    self.config.mouth_weights.clear();
+                }
+                FacialMorphTab::Ear => {
+                    self.config.ear_weights.clear();
+                    self.config.active_ear = 0;
+                    self.config.active_ear_weight = 1.0;
+                }
+            }
+            changed = true;
+        }
+
+        if reset_clicked {
+            self.config = facial_override::FacialOverrideConfig::default();
+            changed = true;
+        }
+
+        if changed {
+            facial_override::update_config(|c| *c = self.config.clone());
+        }
+
         open
     }
 }
