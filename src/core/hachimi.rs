@@ -747,6 +747,34 @@ impl Default for CySpringBustModifierConfig {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct CySpringSkirtModifierConfig {
+    pub enabled: bool,
+    pub stiffness_multiplier: f32,
+    pub drag_multiplier: f32,
+    pub gravity_multiplier: f32,
+    pub wind_multiplier: f32,
+    pub disable_limit_angle: bool,
+    pub dummy_wind: bool,
+    pub dummy_wind_dir: [f32; 3],
+}
+
+impl Default for CySpringSkirtModifierConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            stiffness_multiplier: 0.5,
+            drag_multiplier: 0.6,
+            gravity_multiplier: 0.7,
+            wind_multiplier: 2.5,
+            disable_limit_angle: false,
+            dummy_wind: false,
+            dummy_wind_dir: [0.0, 1.0, 0.0],
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Config {
     #[serde(default = "Config::default_true")]
@@ -892,6 +920,8 @@ pub struct Config {
     pub cyspring_mono_uncap_frame_scale: bool,
     #[serde(default, alias = "bouncy_bust")]
     pub cyspring_bust_modifier: CySpringBustModifierConfig,
+    #[serde(default, alias = "windy_skirt")]
+    pub cyspring_skirt_modifier: CySpringSkirtModifierConfig,
     #[serde(default = "Config::default_ui_animation_scale")]
     pub ui_animation_scale: f32,
     #[serde(default)]
