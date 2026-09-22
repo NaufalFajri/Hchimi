@@ -1,3 +1,4 @@
+use super::RaceDefine::RunningStyle;
 use crate::il2cpp::{symbols::get_method_addr, types::*};
 
 static mut GET_GATE_NO_ADDR: usize = 0;
@@ -9,6 +10,9 @@ impl_addr_wrapper_fn!(get_charaName, GET_CHARA_NAME_ADDR, *mut Il2CppString, thi
 static mut GET_TRAINER_NAME_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_TrainerName, GET_TRAINER_NAME_ADDR, *mut Il2CppString, this: *mut Il2CppObject);
 
+static mut GET_RUNNING_STYLE_ADDR: usize = 0;
+impl_addr_wrapper_fn!(get_RunningStyle, GET_RUNNING_STYLE_ADDR, RunningStyle, this: *mut Il2CppObject);
+
 pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, HorseData);
 
@@ -16,5 +20,7 @@ pub fn init(umamusume: *const Il2CppImage) {
         GET_GATE_NO_ADDR = get_method_addr(HorseData, c"get_GateNo", 0);
         GET_CHARA_NAME_ADDR = get_method_addr(HorseData, c"get_charaName", 0);
         GET_TRAINER_NAME_ADDR = get_method_addr(HorseData, c"get_TrainerName", 0);
+        GET_RUNNING_STYLE_ADDR = get_method_addr(HorseData, c"get_RunningStyle", 0);
     }
 }
+

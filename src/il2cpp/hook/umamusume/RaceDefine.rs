@@ -29,6 +29,17 @@ pub enum HorsePhase {
     Finished = 4,
 }
 
+#[repr(i32)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum RunningStyle {
+    None = 0,
+    Nige = 1,   // Front
+    Senko = 2,  // Pace
+    Sashi = 3,  // Late
+    Oikomi = 4, // End
+}
+
 impl_enum_eq!(Motivation);
 impl_enum_eq!(LaneType);
 impl_enum_eq!(HorsePhase);
+impl_enum_eq!(RunningStyle);

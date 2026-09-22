@@ -38,7 +38,7 @@ use crate::il2cpp::{
             RaceSimulateData,
             RaceSimulateReader,
             RaceSimulateEventData,
-            RaceDefine::{HorsePhase, LaneType},
+            RaceDefine::{HorsePhase, LaneType, RunningStyle},
             SimulateEventType,
             SkillManager,
             TemptationMode,
@@ -407,6 +407,7 @@ struct CharacterStats {
     finish_time_scaled: f32,
     finish_time_diff: f32,
     sim_events: SimEventStates,
+    running_style: RunningStyle,
     used_skill_ids: Vec<i32>,
     all_skill_ids: Vec<i32>
 }
@@ -446,6 +447,7 @@ impl Default for CharacterStats {
             finish_time_scaled: 0.0,
             finish_time_diff: 0.0,
             sim_events: SimEventStates::default(),
+            running_style: RunningStyle::None,
             used_skill_ids: Vec::new(),
             all_skill_ids: Vec::new()
         }
@@ -688,7 +690,7 @@ impl RaceStatHud {
         Self::elements_showing_locked(&RACE_STAT_HUD.lock().unwrap())
     }
 
-    fn elements_showing_locked(hud: &RaceStatHud) -> bool {
+    fn elements_showing_locked(_hud: &RaceStatHud) -> bool {
         if !matches!(Hachimi::instance().game.region, Region::Japan | Region::Global) {
             return false;
         }
@@ -702,7 +704,7 @@ impl RaceStatHud {
             return false;
         }
 
-        hud.visible || !hud.clones.is_empty() || config.race_stat_hud_toggle_button
+        true
     }
 
     fn is_active() -> bool {
@@ -758,12 +760,7 @@ impl RaceStatHud {
         let panel = Self::panel_size(game_view, is_vertical, hud_scale, width_scale, height_scale);
         Self::log_game_view(split, game_view, source, panel, hud_scale);
 
-        let need_stats = hud.visible || !hud.clones.is_empty();
-        let (all_stats, course_info) = if need_stats {
-            hud.collect_stats()
-        } else {
-            (Vec::new(), None)
-        };
+        let (all_stats, course_info) = hud.collect_stats();
 
         if hud.clones.is_empty() && hud.config.race_stat_hud_persist_clones {
             let entries: Vec<hachimi::RaceStatHudCloneConfig> = hud.config.race_stat_hud_clones.iter().copied().collect();
@@ -824,6 +821,10 @@ impl RaceStatHud {
                 }
                 clone.run_hud(ctx, screen, game_view, panel, hud_scale, width_scale, height_scale, toggle_button, can_add_clone, &all_stats, course_info.as_ref());
             }
+
+            // Render bottom-right Uma Musume prototype HUD gauge using chara racer from the first window
+            let first_window_selected = hud.selected_character.min(all_stats.len() - 1);
+            Self::render_bottom_right_prototype_hud(ctx, game_view, hud_scale, &all_stats[first_window_selected]);
         }
         hud.stats_buf = all_stats;
 
@@ -1990,6 +1991,259 @@ impl RaceStatHud {
             })
     }
 
+    fn render_bottom_right_prototype_hud(ctx: &egui::Context, game_view: egui::Rect, scale: f32, stats: &CharacterStats) {
+        let hud_w = 340.0 * scale;
+        let hud_h = 100.0 * scale;
+        let margin_right = 16.0 * scale;
+        let margin_bottom = 24.0 * scale;
+
+        let hud_rect = egui::Rect::from_min_size(
+            egui::pos2(game_view.right() - hud_w - margin_right, game_view.bottom() - hud_h - margin_bottom),
+            egui::vec2(hud_w, hud_h),
+        );
+
+        egui::Area::new(egui::Id::new("uma_hud_gauge_prototype_overlay"))
+            .fixed_pos(hud_rect.min)
+            .order(egui::Order::Foreground)
+            .show(ctx, |ui| {
+                let painter = ui.painter();
+
+                // Outer background frame
+                painter.rect_filled(hud_rect, 14.0 * scale, egui::Color32::from_rgba_premultiplied(25, 28, 38, 225));
+                painter.rect_stroke(
+                    hud_rect,
+                    14.0 * scale,
+                    egui::Stroke::new(2.5 * scale, egui::Color32::from_rgb(255, 255, 255)),
+                    egui::StrokeKind::Outside,
+                );
+
+                // ==========================================
+                // 1. TOP-LEFT: 4 Uma Runner Circles (Front, Pace, Late, End)
+                // ==========================================
+                let circle_radius = 11.5 * scale;
+                let circle_spacing = 30.0 * scale;
+                let circles_start_x = hud_rect.min.x + 22.0 * scale;
+                let circles_y = hud_rect.min.y + 24.0 * scale;
+
+                let styles = [
+                    (RunningStyle::Nige, "逃", "Front", egui::Color32::from_rgb(255, 105, 180)),
+                    (RunningStyle::Senko, "先", "Pace", egui::Color32::from_rgb(255, 170, 0)),
+                    (RunningStyle::Sashi, "差", "Late", egui::Color32::from_rgb(50, 180, 255)),
+                    (RunningStyle::Oikomi, "追", "End", egui::Color32::from_rgb(175, 100, 255)),
+                ];
+
+                for (idx, (style, label_kanji, _label_en, theme_color)) in styles.iter().enumerate() {
+                    let c_center = egui::pos2(circles_start_x + (idx as f32) * circle_spacing, circles_y);
+                    let is_current = stats.running_style == *style;
+
+                    if is_current {
+                        // Highlight ring and active background
+                        painter.circle_filled(c_center, circle_radius + 2.5 * scale, *theme_color);
+                        painter.circle_filled(c_center, circle_radius, egui::Color32::WHITE);
+                        painter.circle_stroke(
+                            c_center,
+                            circle_radius,
+                            egui::Stroke::new(2.0 * scale, *theme_color),
+                        );
+                        painter.text(
+                            c_center,
+                            egui::Align2::CENTER_CENTER,
+                            *label_kanji,
+                            egui::FontId::proportional(12.0 * scale),
+                            *theme_color,
+                        );
+                    } else {
+                        // Inactive/dimmed circle
+                        painter.circle_filled(c_center, circle_radius, egui::Color32::from_rgba_premultiplied(50, 55, 70, 200));
+                        painter.circle_stroke(
+                            c_center,
+                            circle_radius,
+                            egui::Stroke::new(1.2 * scale, egui::Color32::from_gray(100)),
+                        );
+                        painter.text(
+                            c_center,
+                            egui::Align2::CENTER_CENTER,
+                            *label_kanji,
+                            egui::FontId::proportional(11.0 * scale),
+                            egui::Color32::from_gray(160),
+                        );
+                    }
+                }
+
+                // Racer name label next to circles
+                painter.text(
+                    egui::pos2(circles_start_x + 4.0 * circle_spacing + 4.0 * scale, circles_y),
+                    egui::Align2::LEFT_CENTER,
+                    &stats.name,
+                    egui::FontId::proportional(11.5 * scale),
+                    egui::Color32::WHITE,
+                );
+
+                // ==========================================
+                // 2. BOTTOM: Stamina Bar (2 Layers)
+                // - 1st Layer (Bottom): Orange
+                // - 2nd Layer (Top): Green (>50%), Yellow (>20%), Red (<=20%)
+                // ==========================================
+                let bar_x = hud_rect.min.x + 14.0 * scale;
+                let bar_y = hud_rect.min.y + 48.0 * scale;
+                let bar_w = 210.0 * scale;
+                let bar_h = 24.0 * scale;
+                let bar_rect = egui::Rect::from_min_size(egui::pos2(bar_x, bar_y), egui::vec2(bar_w, bar_h));
+                let bar_corner_r = 7.0 * scale;
+
+                // Frame background (empty bar track)
+                painter.rect_filled(bar_rect, bar_corner_r, egui::Color32::from_rgb(35, 38, 48));
+
+                let hp_ratio = if stats.max_hp > 0.0 {
+                    (stats.hp / stats.max_hp).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+
+                // Layer 1 (Bottom layer): Solid Orange representing base stamina
+                let layer1_color = egui::Color32::from_rgb(255, 140, 0); // Orange
+                let layer1_w = bar_w * hp_ratio;
+                if layer1_w > 0.5 {
+                    let layer1_rect = egui::Rect::from_min_size(bar_rect.min, egui::vec2(layer1_w, bar_h));
+                    painter.rect_filled(layer1_rect, bar_corner_r, layer1_color);
+                }
+
+                // Layer 2 (Top layer): Green (100%->50%), Yellow (50%->20%), Red (<=20%)
+                // Top layer covers the bar with current health status color
+                let layer2_color = if hp_ratio > 0.50 {
+                    egui::Color32::from_rgb(72, 218, 72) // Green
+                } else if hp_ratio > 0.20 {
+                    egui::Color32::from_rgb(255, 215, 0) // Yellow
+                } else {
+                    egui::Color32::from_rgb(235, 55, 55) // Red
+                };
+
+                // In Uma Musume's 2-layer gauge, when above 50% the top layer progresses across the bar;
+                // Below 50%, it transitions and shows the reserve layer beneath.
+                if layer1_w > 0.5 {
+                    let layer2_rect = egui::Rect::from_min_size(bar_rect.min, egui::vec2(layer1_w, bar_h));
+                    painter.rect_filled(layer2_rect, bar_corner_r, layer2_color);
+                }
+
+                // Stamina bar border
+                painter.rect_stroke(
+                    bar_rect,
+                    bar_corner_r,
+                    egui::Stroke::new(1.8 * scale, egui::Color32::WHITE),
+                    egui::StrokeKind::Outside,
+                );
+
+                // Stamina text readout
+                let hp_text = format!("{:.0} / {:.0}", stats.hp, stats.max_hp);
+                painter.text(
+                    bar_rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    hp_text,
+                    egui::FontId::proportional(11.0 * scale),
+                    egui::Color32::WHITE,
+                );
+
+                // ==========================================
+                // 3. RIGHT: Half Circle Speedometer Gauge
+                // - Min Speed: 3.0 m/s (Needle far-left, angle = PI)
+                // - Max Speed: 30.0 m/s (Needle far-right, angle = 0)
+                // - Shape: Half circle
+                // ==========================================
+                let gauge_cx = hud_rect.max.x - 52.0 * scale;
+                let gauge_cy = hud_rect.min.y + 68.0 * scale;
+                let gauge_center = egui::pos2(gauge_cx, gauge_cy);
+                let outer_radius = 42.0 * scale;
+                let inner_radius = 26.0 * scale;
+
+                let min_speed = 3.0f32;
+                let max_speed = 30.0f32;
+                let speed_clamped = stats.speed.clamp(min_speed, max_speed);
+                let speed_ratio = (speed_clamped - min_speed) / (max_speed - min_speed);
+
+                // Draw half-circle background arc (top half, from PI to 0) in solid segments
+                let segments = 24;
+                for i in 0..segments {
+                    let frac1 = i as f32 / segments as f32;
+                    let frac2 = (i + 1) as f32 / segments as f32;
+                    // Angles: 0.0 frac is Left (PI), 1.0 frac is Right (0.0 rad)
+                    let a1 = std::f32::consts::PI * (1.0 - frac1);
+                    let a2 = std::f32::consts::PI * (1.0 - frac2);
+
+                    let c_outer1 = gauge_center + egui::vec2(a1.cos() * outer_radius, -a1.sin() * outer_radius);
+                    let c_outer2 = gauge_center + egui::vec2(a2.cos() * outer_radius, -a2.sin() * outer_radius);
+                    let c_inner1 = gauge_center + egui::vec2(a1.cos() * inner_radius, -a1.sin() * inner_radius);
+                    let c_inner2 = gauge_center + egui::vec2(a2.cos() * inner_radius, -a2.sin() * inner_radius);
+
+                    // Solid gradient colors across speedometer
+                    let seg_color = if frac2 <= 0.33 {
+                        egui::Color32::from_rgb(60, 180, 240) // Cyan/Blue for low speed
+                    } else if frac2 <= 0.66 {
+                        egui::Color32::from_rgb(80, 220, 110) // Green for mid speed
+                    } else if frac2 <= 0.85 {
+                        egui::Color32::from_rgb(250, 200, 40) // Yellow for high speed
+                    } else {
+                        egui::Color32::from_rgb(255, 75, 75) // Red/Orange for max speed
+                    };
+
+                    let dim_color = egui::Color32::from_rgba_premultiplied(
+                        seg_color.r() / 3,
+                        seg_color.g() / 3,
+                        seg_color.b() / 3,
+                        180,
+                    );
+
+                    // Fill active speed vs inactive speed
+                    let fill_col = if frac2 <= speed_ratio { seg_color } else { dim_color };
+
+                    painter.add(egui::Shape::convex_polygon(
+                        vec![c_outer1, c_outer2, c_inner2, c_inner1],
+                        fill_col,
+                        egui::Stroke::NONE,
+                    ));
+                }
+
+                // Speedometer base line & hub
+                painter.line_segment(
+                    [
+                        gauge_center - egui::vec2(outer_radius + 2.0 * scale, 0.0),
+                        gauge_center + egui::vec2(outer_radius + 2.0 * scale, 0.0),
+                    ],
+                    egui::Stroke::new(1.8 * scale, egui::Color32::WHITE),
+                );
+                painter.circle_filled(gauge_center, 4.5 * scale, egui::Color32::WHITE);
+
+                // Speedometer Needle
+                // Left is min (angle = PI), Right is max (angle = 0)
+                let needle_angle = std::f32::consts::PI * (1.0 - speed_ratio);
+                let needle_len = outer_radius + 2.0 * scale;
+                let needle_tip = gauge_center + egui::vec2(needle_angle.cos() * needle_len, -needle_angle.sin() * needle_len);
+
+                painter.line_segment(
+                    [gauge_center, needle_tip],
+                    egui::Stroke::new(2.8 * scale, egui::Color32::from_rgb(255, 245, 120)),
+                );
+                // Needle tip star/dot
+                painter.circle_filled(needle_tip, 3.0 * scale, egui::Color32::WHITE);
+
+                // Speed digital text value
+                let speed_text = format!("{:.1}", stats.speed);
+                painter.text(
+                    gauge_center - egui::vec2(0.0, 10.0 * scale),
+                    egui::Align2::CENTER_BOTTOM,
+                    speed_text,
+                    egui::FontId::proportional(12.0 * scale),
+                    egui::Color32::WHITE,
+                );
+                painter.text(
+                    gauge_center + egui::vec2(0.0, 14.0 * scale),
+                    egui::Align2::CENTER_TOP,
+                    "m/s",
+                    egui::FontId::proportional(9.0 * scale),
+                    egui::Color32::from_gray(180),
+                );
+            });
+    }
+
     fn collect_stats(&mut self) -> (Vec<CharacterStats>, Option<RaceCourseInfo>) {
         let mut all_stats = std::mem::take(&mut self.stats_buf);
 
@@ -2318,6 +2572,12 @@ impl RaceStatHud {
             let s = unsafe { (*trainer_name_ptr).as_utf16str() };
             stats.player_name.extend(s.chars());
         }
+
+        stats.running_style = if !horse_data.is_null() {
+            HorseData::get_RunningStyle(horse_data)
+        } else {
+            RunningStyle::None
+        };
 
         stats.speed = HorseRaceInfo::get__lastSpeed(race_info);
         stats.min_speed = HorseRaceInfo::get__minSpeed(race_info);
