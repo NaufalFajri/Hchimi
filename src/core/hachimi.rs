@@ -78,6 +78,9 @@ pub struct Hachimi {
     pub current_view_id: AtomicI32,
 
     #[cfg(target_os = "windows")]
+    pub target_fps_unfocused: AtomicI32,
+
+    #[cfg(target_os = "windows")]
     pub vsync_count: AtomicI32,
 
     #[cfg(target_os = "windows")]
@@ -175,6 +178,9 @@ impl Hachimi {
 
             target_fps: AtomicI32::new(config.target_fps.unwrap_or(-1)),
             current_view_id: AtomicI32::new(0),
+
+            #[cfg(target_os = "windows")]
+            target_fps_unfocused: AtomicI32::new(config.windows.target_fps_unfocused.unwrap_or(-1)),
 
             #[cfg(target_os = "windows")]
             vsync_count: AtomicI32::new(config.windows.vsync_count),

@@ -115,6 +115,8 @@ pub struct Config {
     #[serde(default)]
     pub free_camera: super::free_camera::FreeCameraConfig,
     #[serde(default)]
+    pub target_fps_unfocused: Option<i32>,
+    #[serde(default)]
     pub bouncy_uma: BouncyUmaConfig,
 }
 

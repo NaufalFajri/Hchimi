@@ -7,6 +7,9 @@ use crate::{
 
 type SetTargetFrameRateFn = extern "C" fn(value: i32);
 pub extern "C" fn set_targetFrameRate(mut value: i32) {
+    #[cfg(target_os = "windows")]
+    LAST_GAME_FPS.store(value, atomic::Ordering::Relaxed);
+
     let hachimi = Hachimi::instance();
     let mut target_fps = hachimi
         .target_fps
@@ -24,11 +27,51 @@ pub extern "C" fn set_targetFrameRate(mut value: i32) {
     if target_fps != -1 {
         value = target_fps;
     }
+    #[cfg(target_os = "windows")]
+    {
+        let unfocused_fps = hachimi.target_fps_unfocused.load(atomic::Ordering::Relaxed);
+        if unfocused_fps != -1 && crate::windows::wnd_hook::window_unfocused() {
+            value = unfocused_fps;
+        }
+    }
     // Don't call original if value is 0 (triggered from ChangeView internally without an explicit real value)
     if value == 0 {
         return;
     }
     get_orig_fn!(set_targetFrameRate, SetTargetFrameRateFn)(value);
+}
+
+#[cfg(target_os = "windows")]
+static LAST_GAME_FPS: atomic::AtomicI32 = atomic::AtomicI32::new(-1);
+
+#[cfg(target_os = "windows")]
+pub fn current_effective_frame_rate() -> i32 {
+    let hachimi = Hachimi::instance();
+    let mut target_fps = hachimi.target_fps.load(atomic::Ordering::Relaxed);
+
+    let current_view_id = hachimi.current_view_id.load(atomic::Ordering::Acquire);
+    let config = hachimi.config.load();
+    for &(view_id, _, fps) in &config.view_overrides {
+        if view_id == current_view_id {
+            target_fps = fps;
+            break;
+        }
+    }
+
+    let unfocused_fps = hachimi.target_fps_unfocused.load(atomic::Ordering::Relaxed);
+    if unfocused_fps != -1 && crate::windows::wnd_hook::window_unfocused() {
+        unfocused_fps
+    } else if target_fps != -1 {
+        target_fps
+    } else {
+        LAST_GAME_FPS.load(atomic::Ordering::Relaxed)
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn poke_target_frame_rate() {
+    let value = current_effective_frame_rate();
+    set_targetFrameRate(value);
 }
 
 #[cfg(target_os = "windows")]
