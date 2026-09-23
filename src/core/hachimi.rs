@@ -897,6 +897,8 @@ pub struct Config {
     pub home_walk_spawn_multiplier: f32,
     #[serde(default = "Config::default_true")]
     pub home_walk_playback_button: bool,
+    #[serde(default)]
+    pub home_walk_assert_dominance: bool,
 
     #[serde(default)]
     pub disable_skill_name_translation: bool,

@@ -130,6 +130,14 @@ extern "C" fn UpdateWalker(this: *mut Il2CppObject, delta_time: f32) {
     }
 }
 
+type UpdatePoseFn = extern "C" fn(this: *mut Il2CppObject);
+extern "C" fn UpdatePose(this: *mut Il2CppObject) {
+    if Hachimi::instance().config.load().home_walk_assert_dominance {
+        return;
+    }
+    get_orig_fn!(UpdatePose, UpdatePoseFn)(this);
+}
+
 pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, HomeWalkMotionDirector);
     let AlterUpdate_addr = get_method_addr(HomeWalkMotionDirector, c"AlterUpdate", 0);
@@ -137,4 +145,9 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     let UpdateWalker_addr = get_method_addr(HomeWalkMotionDirector, c"UpdateWalker", 1);
     new_hook!(UpdateWalker_addr, UpdateWalker);
+
+    get_class_or_return!(umamusume, Gallop, HomeWalkModelController);
+    let UpdatePose_addr = get_method_addr(HomeWalkModelController, c"UpdatePose", 0);
+    new_hook!(UpdatePose_addr, UpdatePose);
 }
+

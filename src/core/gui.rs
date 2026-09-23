@@ -6570,6 +6570,12 @@ impl ConfigEditor {
                 ui.end_row();
             }
 
+            if should_show_option(search, &t!("config_editor.home_walk_assert_dominance", default = "Home Walk Assert Dominance (T-Pose)")) {
+                ui.label(t!("config_editor.home_walk_assert_dominance", default = "Home Walk Assert Dominance (T-Pose)"));
+                ui.checkbox(&mut config.home_walk_assert_dominance, "");
+                ui.end_row();
+            }
+
 
             if should_show_option(search, &t!("config_editor.disable_tap_effect")) {
                 ui.label(t!("config_editor.disable_tap_effect"));
