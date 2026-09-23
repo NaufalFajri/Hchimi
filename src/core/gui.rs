@@ -2120,14 +2120,48 @@ impl RaceStatHud {
                     }
                 }
 
-                // Speed label next to circles
-                painter.text(
-                    egui::pos2(circles_start_x + 3.8 * circle_spacing + 6.0 * scale, circles_y),
-                    egui::Align2::LEFT_CENTER,
-                    format!("{:.1} m/s", stats.speed),
-                    egui::FontId::proportional(11.5 * scale),
-                    egui::Color32::from_rgb(45, 55, 75),
+                const SMOOTH_TIME: f32 = 16.0 / 15.0;
+
+                // Smooth speed (applied to both gauge and digital text)
+                let display_speed = ctx.animate_value_with_time(
+                    egui::Id::new("uma_proto_gauge_smooth_speed"),
+                    stats.speed,
+                    SMOOTH_TIME,
                 );
+
+                // Speed label next to circles, with instantaneous accel indicator without ease
+                let mut speed_job = egui::text::LayoutJob::default();
+                speed_job.append(
+                    &format!("{:.1} m/s", display_speed),
+                    0.0,
+                    egui::TextFormat {
+                        font_id: egui::FontId::proportional(11.5 * scale),
+                        color: egui::Color32::from_rgb(45, 55, 75),
+                        ..Default::default()
+                    },
+                );
+
+                if let Some(accel) = stats.accel {
+                    if accel.abs() > 0.05 {
+                        let accel_color = if accel > 0.0 { DELTA_UP_COLOR } else { DELTA_DOWN_COLOR };
+                        speed_job.append(
+                            &format!(" ({:+.1})", accel),
+                            0.0,
+                            egui::TextFormat {
+                                font_id: egui::FontId::proportional(11.0 * scale),
+                                color: accel_color,
+                                ..Default::default()
+                            },
+                        );
+                    }
+                }
+
+                let speed_galley = painter.layout_job(speed_job);
+                let speed_pos = egui::pos2(
+                    circles_start_x + 3.8 * circle_spacing + 6.0 * scale,
+                    circles_y - speed_galley.size().y * 0.5,
+                );
+                painter.galley(speed_pos, speed_galley, egui::Color32::WHITE);
 
                 // ==========================================
                 // 2. TOP-RIGHT: Half Circle Speedometer Gauge
@@ -2140,12 +2174,6 @@ impl RaceStatHud {
 
                 let min_speed = cfg.speed_min;
                 let max_speed = if cfg.speed_max > min_speed { cfg.speed_max } else { min_speed + 1.0 };
-                // Smooth interpolation for visual gauge to eliminate game tick jitter/stepping
-                let display_speed = ctx.animate_value_with_time(
-                    egui::Id::new("uma_proto_gauge_smooth_speed"),
-                    stats.speed,
-                    0.20,
-                );
                 let speed_clamped = display_speed.clamp(min_speed, max_speed);
                 let speed_ratio = (speed_clamped - min_speed) / (max_speed - min_speed);
 
@@ -2276,7 +2304,7 @@ impl RaceStatHud {
                 let display_hp = ctx.animate_value_with_time(
                     egui::Id::new("uma_proto_gauge_smooth_hp"),
                     stats.hp,
-                    0.25,
+                    SMOOTH_TIME,
                 );
                 let hp_ratio = if stats.max_hp > 0.0 {
                     (display_hp / stats.max_hp).clamp(0.0, 1.0)
@@ -2319,15 +2347,48 @@ impl RaceStatHud {
                     egui::StrokeKind::Outside,
                 );
 
-                // Stamina text readout
-                let hp_text = format!("{:.0} / {:.0}", stats.hp, stats.max_hp);
-                painter.text(
-                    bar_rect.center(),
-                    egui::Align2::CENTER_CENTER,
-                    hp_text,
-                    egui::FontId::proportional(11.0 * scale),
-                    egui::Color32::WHITE,
+                // Stamina text readout: e.g. "2420 (-20) / 2440" or "2440 (+20) / 2440"
+                // The current HP is smoothed with SMOOTH_TIME, while the delta (-20 / +20) is raw without ease
+                let mut hp_job = egui::text::LayoutJob::default();
+                hp_job.append(
+                    &format!("{:.0} ", display_hp),
+                    0.0,
+                    egui::TextFormat {
+                        font_id: egui::FontId::proportional(11.0 * scale),
+                        color: egui::Color32::WHITE,
+                        ..Default::default()
+                    },
                 );
+
+                if let Some(drain) = stats.hp_drain {
+                    let delta = -drain;
+                    if delta.abs() > 0.05 {
+                        let delta_color = if delta > 0.0 { DELTA_UP_COLOR } else { DELTA_DOWN_COLOR };
+                        hp_job.append(
+                            &format!("({:+.0}) ", delta),
+                            0.0,
+                            egui::TextFormat {
+                                font_id: egui::FontId::proportional(11.0 * scale),
+                                color: delta_color,
+                                ..Default::default()
+                            },
+                        );
+                    }
+                }
+
+                hp_job.append(
+                    &format!("/ {:.0}", stats.max_hp),
+                    0.0,
+                    egui::TextFormat {
+                        font_id: egui::FontId::proportional(11.0 * scale),
+                        color: egui::Color32::WHITE,
+                        ..Default::default()
+                    },
+                );
+
+                let hp_galley = painter.layout_job(hp_job);
+                let hp_pos = bar_rect.center() - hp_galley.size() * 0.5;
+                painter.galley(hp_pos, hp_galley, egui::Color32::WHITE);
             });
     }
 
