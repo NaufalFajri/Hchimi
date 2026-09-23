@@ -733,6 +733,34 @@ impl RaceStatHudCloneConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
+pub struct RaceGaugeHudConfig {
+    pub enabled: bool,
+    pub show_needle: bool,
+    pub speed_style: String,
+    pub speed_min: f32,
+    pub speed_max: f32,
+    pub scale: f32,
+    pub offset_x: f32,
+    pub offset_y: f32,
+}
+
+impl Default for RaceGaugeHudConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            show_needle: true,
+            speed_style: "bars".to_owned(),
+            speed_min: 0.0,
+            speed_max: 30.0,
+            scale: 1.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct CySpringBustModifierConfig {
     pub enabled: bool,
     pub stiffness_multiplier: f32,
@@ -898,6 +926,8 @@ pub struct Config {
     pub race_stat_hud_main_open: bool,
     #[serde(default)]
     pub race_stat_hud_clones: Vec<RaceStatHudCloneConfig>,
+    #[serde(default)]
+    pub race_gauge_hud: RaceGaugeHudConfig,
     #[serde(default)]
     pub race_stat_hud_selected_character: Option<usize>,
     #[serde(default)]
