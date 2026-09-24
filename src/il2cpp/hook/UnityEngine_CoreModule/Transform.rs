@@ -26,6 +26,17 @@ pub fn set_update_race_camera(value: bool) {
 static mut GET_PARENT_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_parent, GET_PARENT_ADDR, *mut Il2CppObject, this: *mut Il2CppObject);
 
+// public Void SetParent(Transform parent, Boolean worldPositionStays) { }
+static mut SET_PARENT_ADDR: usize = 0;
+impl_addr_wrapper_fn!(
+    SetParent,
+    SET_PARENT_ADDR,
+    (),
+    this: *mut Il2CppObject,
+    parent: *mut Il2CppObject,
+    world_position_stays: bool
+);
+
 // public Int32 get_childCount() { }
 static mut GET_CHILDCOUNT_ADDR: usize = 0;
 impl_addr_wrapper_fn!(get_childCount, GET_CHILDCOUNT_ADDR, i32, this: *mut Il2CppObject);
@@ -177,6 +188,7 @@ pub fn init(UnityEngine_CoreModule: *const Il2CppImage) {
         TYPE_OBJECT = il2cpp_type_get_object(il2cpp_class_get_type(Transform));
 
         GET_PARENT_ADDR = get_method_addr(Transform, c"get_parent", 0);
+        SET_PARENT_ADDR = get_method_addr(Transform, c"SetParent", 2);
         GET_CHILDCOUNT_ADDR = get_method_addr(Transform, c"get_childCount", 0);
         GETCHILD_ADDR = get_method_addr(Transform, c"GetChild", 1);
         GET_POSITION_ADDR = get_method_addr(Transform, c"get_position", 0);
