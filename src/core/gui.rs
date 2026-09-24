@@ -1995,6 +1995,72 @@ impl RaceStatHud {
             })
     }
 
+    fn draw_prototype_hud_runner_icon(
+        painter: &egui::Painter,
+        pos: egui::Pos2,
+        scale: f32,
+        theme_color: egui::Color32,
+        glow_on: bool,
+    ) {
+        if glow_on {
+            // Golden glow bloom around the runner icon (flashing 0.5s ON)
+            painter.circle_filled(pos, 11.5 * scale, egui::Color32::from_rgba_premultiplied(255, 225, 80, 130));
+            painter.circle_filled(pos, 8.0 * scale, egui::Color32::from_rgba_premultiplied(255, 245, 130, 190));
+        }
+
+        let ix = pos.x;
+        let iy = pos.y;
+
+        // 3 Horizontal speed streaks on the left
+        let speed_lines = [
+            (egui::pos2(ix - 7.5 * scale, iy - 3.2 * scale), egui::pos2(ix - 2.5 * scale, iy - 3.2 * scale)),
+            (egui::pos2(ix - 9.5 * scale, iy),               egui::pos2(ix - 3.5 * scale, iy)),
+            (egui::pos2(ix - 7.0 * scale, iy + 3.2 * scale), egui::pos2(ix - 2.5 * scale, iy + 3.2 * scale)),
+        ];
+
+        // Runner figure points (leaning sprinter silhouette)
+        let head_center = egui::pos2(ix + 3.0 * scale, iy - 4.2 * scale);
+        let head_radius = 2.2 * scale;
+        let torso_start = egui::pos2(ix + 2.2 * scale, iy - 2.0 * scale);
+        let hip = egui::pos2(ix + 0.5 * scale, iy + 1.2 * scale);
+        let forward_arm = egui::pos2(ix + 5.2 * scale, iy - 0.5 * scale);
+        let back_arm = egui::pos2(ix - 1.8 * scale, iy - 2.2 * scale);
+
+        let fwd_knee = egui::pos2(ix + 3.5 * scale, iy + 3.8 * scale);
+        let fwd_foot = egui::pos2(ix + 5.0 * scale, iy + 2.0 * scale);
+
+        let back_knee = egui::pos2(ix - 1.6 * scale, iy + 2.4 * scale);
+        let back_foot = egui::pos2(ix - 3.2 * scale, iy + 5.2 * scale);
+
+        // Pass 1: Solid White Outline
+        let outline_stroke = egui::Stroke::new(3.0 * scale, egui::Color32::WHITE);
+        for (p1, p2) in &speed_lines {
+            painter.line_segment([*p1, *p2], outline_stroke);
+        }
+        painter.circle_filled(head_center, head_radius + 1.2 * scale, egui::Color32::WHITE);
+        painter.line_segment([torso_start, hip], outline_stroke);
+        painter.line_segment([torso_start, forward_arm], outline_stroke);
+        painter.line_segment([torso_start, back_arm], outline_stroke);
+        painter.line_segment([hip, fwd_knee], outline_stroke);
+        painter.line_segment([fwd_knee, fwd_foot], outline_stroke);
+        painter.line_segment([hip, back_knee], outline_stroke);
+        painter.line_segment([back_knee, back_foot], outline_stroke);
+
+        // Pass 2: Theme Color Fill (runner color based on runner type)
+        let fill_stroke = egui::Stroke::new(1.5 * scale, theme_color);
+        for (p1, p2) in &speed_lines {
+            painter.line_segment([*p1, *p2], fill_stroke);
+        }
+        painter.circle_filled(head_center, head_radius, theme_color);
+        painter.line_segment([torso_start, hip], fill_stroke);
+        painter.line_segment([torso_start, forward_arm], fill_stroke);
+        painter.line_segment([torso_start, back_arm], fill_stroke);
+        painter.line_segment([hip, fwd_knee], fill_stroke);
+        painter.line_segment([fwd_knee, fwd_foot], fill_stroke);
+        painter.line_segment([hip, back_knee], fill_stroke);
+        painter.line_segment([back_knee, back_foot], fill_stroke);
+    }
+
     fn render_bottom_right_prototype_hud(
         ctx: &egui::Context,
         game_view: egui::Rect,
@@ -2018,6 +2084,11 @@ impl RaceStatHud {
             .order(egui::Order::Foreground)
             .show(ctx, |ui| {
                 let painter = ui.painter();
+
+                // Flashing glow timer: 0.5s ON, 0.5s OFF
+                let time = ctx.input(|i| i.time);
+                let glow_on = (time % 1.0) < 0.5;
+                ctx.request_repaint();
 
                 // Outer background frame matching the prototype HUD
                 painter.rect_filled(hud_rect, 12.0 * scale, egui::Color32::from_rgba_premultiplied(246, 248, 252, 235));
@@ -2070,14 +2141,20 @@ impl RaceStatHud {
                     }
 
                     if is_current {
-                        // Active runner: glowing halo + full vibrant color
-                        painter.circle_filled(c_center, circle_radius + 3.0 * scale, egui::Color32::from_rgba_premultiplied(255, 215, 0, 160));
-                        painter.circle_filled(c_center, circle_radius + 1.5 * scale, egui::Color32::WHITE);
+                        // Flashing golden glow effect around active circle (0.5s ON, 0.5s OFF)
+                        if glow_on {
+                            painter.circle_filled(c_center, circle_radius + 5.5 * scale, egui::Color32::from_rgba_premultiplied(255, 220, 80, 130));
+                            painter.circle_filled(c_center, circle_radius + 3.5 * scale, egui::Color32::from_rgba_premultiplied(255, 240, 120, 190));
+                        }
+
+                        // Active runner: inner ring + full vibrant color
+                        painter.circle_filled(c_center, circle_radius + 1.8 * scale, egui::Color32::from_rgb(255, 235, 120));
+                        painter.circle_filled(c_center, circle_radius + 0.8 * scale, egui::Color32::WHITE);
                         painter.circle_filled(c_center, circle_radius, *theme_color);
                         painter.circle_stroke(
                             c_center,
                             circle_radius,
-                            egui::Stroke::new(1.8 * scale, egui::Color32::WHITE),
+                            egui::Stroke::new(1.6 * scale, egui::Color32::WHITE),
                         );
                         painter.text(
                             c_center,
@@ -2087,14 +2164,9 @@ impl RaceStatHud {
                             egui::Color32::WHITE,
                         );
 
-                        // Mini indicator icon above active runner
-                        painter.text(
-                            c_center - egui::vec2(0.0, 14.0 * scale),
-                            egui::Align2::CENTER_BOTTOM,
-                            "⚡",
-                            egui::FontId::proportional(11.0 * scale),
-                            egui::Color32::from_rgb(255, 215, 0),
-                        );
+                        // Running icon above active runner with speed streaks & white outline
+                        let icon_pos = c_center - egui::vec2(0.0, (circle_radius + 12.0) * scale);
+                        Self::draw_prototype_hud_runner_icon(painter, icon_pos, scale, *theme_color, glow_on);
                     } else {
                         // Inactive runner: 33% transparency (1/3 alpha)
                         let inactive_col = egui::Color32::from_rgba_unmultiplied(
