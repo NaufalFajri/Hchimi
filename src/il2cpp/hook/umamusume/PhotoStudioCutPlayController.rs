@@ -361,7 +361,6 @@ extern "C" fn CutInTimelineMotionCamera_AlterLateUpdate(
     }
 
     if free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay) {
-        apply_photo_studio_free_camera();
         return;
     }
 
@@ -402,20 +401,6 @@ extern "C" fn CutInTimelineController_AlterLateUpdate_MotionCamera(
         CutInTimelineController_AlterLateUpdate_MotionCamera,
         AlterLateUpdateMotionCameraFn
     )(this, active_sheet, update_pos, update_rot);
-
-    if is_free_cam {
-        apply_photo_studio_free_camera();
-    }
-}
-
-extern "C" fn CutInTimelineController_AlterUpdate_CameraCharaHeight(this: *mut Il2CppObject) {
-    if free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay) {
-        return;
-    }
-    get_orig_fn!(
-        CutInTimelineController_AlterUpdate_CameraCharaHeight,
-        NoArgsFn
-    )(this);
 }
 
 extern "C" fn PhotoStudioPlayCutViewController_LateUpdateView(this: *mut Il2CppObject) {
@@ -568,13 +553,6 @@ pub fn init(umamusume: *const Il2CppImage) {
         new_hook!(
             alter_late_update_motion_camera,
             CutInTimelineController_AlterLateUpdate_MotionCamera
-        );
-
-        let alter_update_camera_chara_height =
-            get_method_addr(timeline_ctrl_class, c"AlterUpdate_CameraCharaHeight", 0);
-        new_hook!(
-            alter_update_camera_chara_height,
-            CutInTimelineController_AlterUpdate_CameraCharaHeight
         );
     }
 }
