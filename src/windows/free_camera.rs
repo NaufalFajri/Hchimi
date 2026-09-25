@@ -1133,8 +1133,8 @@ pub fn set_home_active_with_transform(pos: Vector3_t, rot: Quaternion_t) {
         state.camera_pos = Vec3::from(pos);
         let q = Quat::from_quaternion(rot);
         let forward = q.rotate_vec(Vec3::new(0.0, 0.0, 1.0));
-        state.yaw = forward.x.atan2(forward.z).to_degrees();
-        state.pitch = (-forward.y.clamp(-1.0, 1.0)).asin().to_degrees();
+        state.yaw = forward.x.atan2(-forward.z).to_degrees();
+        state.pitch = forward.y.clamp(-1.0, 1.0).asin().to_degrees();
         state.update_look_from_angles();
     }
 }
@@ -1152,8 +1152,25 @@ pub fn set_photo_studio_cut_play_active_with_transform(pos: Vector3_t, rot: Quat
         state.camera_pos = Vec3::from(pos);
         let q = Quat::from_quaternion(rot);
         let forward = q.rotate_vec(Vec3::new(0.0, 0.0, 1.0));
-        state.yaw = forward.x.atan2(forward.z).to_degrees();
-        state.pitch = (-forward.y.clamp(-1.0, 1.0)).asin().to_degrees();
+        state.yaw = forward.x.atan2(-forward.z).to_degrees();
+        state.pitch = forward.y.clamp(-1.0, 1.0).asin().to_degrees();
+        state.update_look_from_angles();
+    }
+}
+
+pub fn reseed_photo_studio_camera_transform(pos: Vector3_t, rot: Quaternion_t) {
+    let config = Hachimi::instance().config.load();
+    if !config.windows.free_camera.enabled {
+        return;
+    }
+
+    let mut state = STATE.lock().unwrap();
+    if state.scene == CameraScene::PhotoStudioCutPlay {
+        state.camera_pos = Vec3::from(pos);
+        let q = Quat::from_quaternion(rot);
+        let forward = q.rotate_vec(Vec3::new(0.0, 0.0, 1.0));
+        state.yaw = forward.x.atan2(-forward.z).to_degrees();
+        state.pitch = forward.y.clamp(-1.0, 1.0).asin().to_degrees();
         state.update_look_from_angles();
     }
 }

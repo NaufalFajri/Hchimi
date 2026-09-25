@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 
 use crate::{
     il2cpp::{
@@ -30,6 +30,10 @@ static CUT_CAMERA_TRANSFORM: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::
 static CUT_BG_CAMERA: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
 static CUT_BG_CAMERA_TRANSFORM: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
 
+static ORIGINAL_CAMERA_PARENT: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+static ORIGINAL_BG_CAMERA_PARENT: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+static WAS_FREE_CAM_ACTIVE: AtomicBool = AtomicBool::new(false);
+
 static mut TIMELINE_CONTROLLER_GET_BACKGROUND_CAMERA_ADDR: usize = 0;
 impl_addr_wrapper_fn!(
     get_BackGroundCamera,
@@ -50,10 +54,56 @@ static mut LAST_CUT_CAMERA_ROT: Quaternion_t = Quaternion_t {
     z: 0.0,
 };
 
+fn detach_cut_cameras() {
+    let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+    if !cut_transform.is_null()
+        && Object::op_Implicit(cut_transform)
+        && ORIGINAL_CAMERA_PARENT.load(Ordering::Relaxed).is_null()
+    {
+        let parent = Transform::get_parent(cut_transform);
+        if !parent.is_null() && Object::op_Implicit(parent) {
+            ORIGINAL_CAMERA_PARENT.store(parent, Ordering::Relaxed);
+            Transform::SetParent(cut_transform, std::ptr::null_mut(), true);
+        }
+    }
+
+    let bg_transform = CUT_BG_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+    if !bg_transform.is_null()
+        && Object::op_Implicit(bg_transform)
+        && ORIGINAL_BG_CAMERA_PARENT.load(Ordering::Relaxed).is_null()
+    {
+        let parent = Transform::get_parent(bg_transform);
+        if !parent.is_null() && Object::op_Implicit(parent) {
+            ORIGINAL_BG_CAMERA_PARENT.store(parent, Ordering::Relaxed);
+            Transform::SetParent(bg_transform, std::ptr::null_mut(), true);
+        }
+    }
+}
+
+fn restore_cut_camera_parents() {
+    let orig_parent = ORIGINAL_CAMERA_PARENT.swap(std::ptr::null_mut(), Ordering::Relaxed);
+    if !orig_parent.is_null() && Object::op_Implicit(orig_parent) {
+        let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+        if !cut_transform.is_null() && Object::op_Implicit(cut_transform) {
+            Transform::SetParent(cut_transform, orig_parent, true);
+        }
+    }
+
+    let orig_bg_parent = ORIGINAL_BG_CAMERA_PARENT.swap(std::ptr::null_mut(), Ordering::Relaxed);
+    if !orig_bg_parent.is_null() && Object::op_Implicit(orig_bg_parent) {
+        let bg_transform = CUT_BG_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+        if !bg_transform.is_null() && Object::op_Implicit(bg_transform) {
+            Transform::SetParent(bg_transform, orig_bg_parent, true);
+        }
+    }
+}
+
 pub fn apply_photo_studio_free_camera() {
     if !free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay) {
         return;
     }
+
+    detach_cut_cameras();
 
     let mut position = free_camera::camera_pos();
     let rotation_opt = free_camera::camera_rotation();
@@ -173,6 +223,11 @@ extern "C" fn CutInTimelineMotionCamera_SetTargetCamera(
     this: *mut Il2CppObject,
     target_camera: *mut Il2CppObject,
 ) {
+    let current_cam = CUT_CAMERA.load(Ordering::Relaxed);
+    if !current_cam.is_null() && current_cam != target_camera {
+        restore_cut_camera_parents();
+    }
+
     CUT_MOTION_CAMERA.store(this, Ordering::Relaxed);
     if !target_camera.is_null() {
         CUT_CAMERA.store(target_camera, Ordering::Relaxed);
@@ -189,6 +244,7 @@ extern "C" fn CutInTimelineMotionCamera_SetTargetCamera(
 
 extern "C" fn CutInTimelineMotionCamera_OnDestroy(this: *mut Il2CppObject) {
     if CUT_MOTION_CAMERA.load(Ordering::Relaxed) == this {
+        restore_cut_camera_parents();
         CUT_MOTION_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
         CUT_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
         CUT_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
@@ -264,14 +320,34 @@ extern "C" fn PhotoStudioPlayCutViewController_LateUpdateView(this: *mut Il2CppO
 
     get_orig_fn!(PhotoStudioPlayCutViewController_LateUpdateView, NoArgsFn)(this);
 
-    if free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay) {
+    let is_free_cam = free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay);
+    let was_free_cam = WAS_FREE_CAM_ACTIVE.swap(is_free_cam, Ordering::Relaxed);
+
+    if is_free_cam {
+        if !was_free_cam {
+            detach_cut_cameras();
+            unsafe {
+                free_camera::reseed_photo_studio_camera_transform(
+                    LAST_CUT_CAMERA_POS,
+                    LAST_CUT_CAMERA_ROT,
+                );
+            }
+        } else {
+            detach_cut_cameras();
+        }
         apply_photo_studio_free_camera();
+    } else {
+        if was_free_cam {
+            restore_cut_camera_parents();
+        }
     }
 }
 
 extern "C" fn PhotoStudioPlayCutViewController_EndView(
     this: *mut Il2CppObject,
 ) -> *mut Il2CppObject {
+    restore_cut_camera_parents();
+    WAS_FREE_CAM_ACTIVE.store(false, Ordering::Relaxed);
     VIEW_CONTROLLER.store(std::ptr::null_mut(), Ordering::Relaxed);
     CUT_TIMELINE_CONTROLLER.store(std::ptr::null_mut(), Ordering::Relaxed);
     CUT_MOTION_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
