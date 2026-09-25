@@ -38,6 +38,14 @@ type CheckFollowCharacterFn = extern "C" fn(
     cur_key: *mut Il2CppObject,
     next_key: *mut Il2CppObject,
 );
+type CleanUpCuttFn = extern "C" fn(this: *mut Il2CppObject);
+type PlayCutInFn = extern "C" fn(
+    this: *mut Il2CppObject,
+    model: *mut Il2CppObject,
+    on_end_cut_in: *mut Il2CppObject,
+    on_end_clean_up: *mut Il2CppObject,
+);
+type PlayCuttFn = extern "C" fn(this: *mut Il2CppObject, play_resume_animation: bool);
 
 static VIEW_CONTROLLER: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
 static CUT_TIMELINE_CONTROLLER: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
@@ -72,27 +80,84 @@ static mut LAST_CUT_CAMERA_ROT: Quaternion_t = Quaternion_t {
 };
 static mut HAS_INITIAL_CUT_CAMERA: bool = false;
 
+fn is_alive(obj: *mut Il2CppObject) -> bool {
+    if obj.is_null() {
+        return false;
+    }
+    unsafe {
+        let cached_ptr = *(obj.cast::<u8>().add(0x10) as *const usize);
+        if cached_ptr == 0 {
+            return false;
+        }
+        Object::IsNativeObjectAlive(obj)
+    }
+}
+
+fn find_active_main_camera() -> (*mut Il2CppObject, *mut Il2CppObject) {
+    let all_cams = Camera::get_allCameras();
+    if all_cams.is_null() {
+        return (std::ptr::null_mut(), std::ptr::null_mut());
+    }
+
+    let arr = Array::<*mut Il2CppObject>::from(all_cams);
+    for cam in unsafe { arr.as_slice() }.iter().copied() {
+        if !is_alive(cam) {
+            continue;
+        }
+        let name = Object::get_name(cam);
+        let name_str = if !name.is_null() {
+            unsafe { (*name).as_utf16str().to_string() }
+        } else {
+            String::new()
+        };
+        if name_str.contains("UI")
+            || name_str.contains("Canvas")
+            || name_str.contains("Shadow")
+            || name_str.contains("Face")
+            || name_str.contains("Eye")
+            || name_str.contains("Tex")
+            || name_str.contains("Depth")
+            || name_str.contains("Aura")
+            || name_str.contains("BackGround")
+            || name_str.contains("Background")
+        {
+            continue;
+        }
+        let trans = Component::get_transform(cam);
+        if is_alive(trans) {
+            return (cam, trans);
+        }
+    }
+    (std::ptr::null_mut(), std::ptr::null_mut())
+}
+
 fn detach_cut_cameras() {
     let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
-    if !cut_transform.is_null() && ORIGINAL_CAMERA_PARENT.load(Ordering::Relaxed).is_null() {
+    if is_alive(cut_transform) {
         let parent = Transform::get_parent(cut_transform);
-        if !parent.is_null() {
-            ORIGINAL_CAMERA_PARENT.store(parent, Ordering::Relaxed);
+        if is_alive(parent) {
+            let orig_parent = ORIGINAL_CAMERA_PARENT.load(Ordering::Relaxed);
+            if orig_parent.is_null() || !is_alive(orig_parent) {
+                ORIGINAL_CAMERA_PARENT.store(parent, Ordering::Relaxed);
+            }
             Transform::SetParent(cut_transform, std::ptr::null_mut(), true);
         }
     }
 
     let bg_transform = CUT_BG_CAMERA_TRANSFORM.load(Ordering::Relaxed);
-    if !bg_transform.is_null() && ORIGINAL_BG_CAMERA_PARENT.load(Ordering::Relaxed).is_null() {
+    if is_alive(bg_transform) {
         let parent = Transform::get_parent(bg_transform);
-        if !parent.is_null() {
-            ORIGINAL_BG_CAMERA_PARENT.store(parent, Ordering::Relaxed);
+        if is_alive(parent) {
+            let orig_bg_parent = ORIGINAL_BG_CAMERA_PARENT.load(Ordering::Relaxed);
+            if orig_bg_parent.is_null() || !is_alive(orig_bg_parent) {
+                ORIGINAL_BG_CAMERA_PARENT.store(parent, Ordering::Relaxed);
+            }
             Transform::SetParent(bg_transform, std::ptr::null_mut(), true);
         }
     }
 
     let timeline_ctrl = CUT_TIMELINE_CONTROLLER.load(Ordering::Relaxed);
-    if !timeline_ctrl.is_null() {
+    if is_alive(timeline_ctrl) {
         unsafe {
             *(timeline_ctrl.cast::<u8>().add(0x720) as *mut bool) = false; // IsCameraUpdateEnable = false
             *(timeline_ctrl.cast::<u8>().add(0x710) as *mut bool) = true;  // _isDisableLookAt = true
@@ -100,34 +165,32 @@ fn detach_cut_cameras() {
     }
 
     let motion_cam = CUT_MOTION_CAMERA.load(Ordering::Relaxed);
-    if !motion_cam.is_null() {
+    if is_alive(motion_cam) {
         unsafe {
             *(motion_cam.cast::<u8>().add(0x28) as *mut bool) = false; // IsUseMotionCamera = false
-            *(motion_cam.cast::<u8>().add(0x98) as *mut *mut Il2CppObject) = std::ptr::null_mut(); // _targetTransform = null
-            *(motion_cam.cast::<u8>().add(0xd8) as *mut *mut Il2CppObject) = std::ptr::null_mut(); // _target = null
         }
     }
 }
 
 fn restore_cut_camera_parents_and_flags() {
     let orig_parent = ORIGINAL_CAMERA_PARENT.swap(std::ptr::null_mut(), Ordering::Relaxed);
-    if !orig_parent.is_null() {
-        let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
-        if !cut_transform.is_null() {
+    let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+    if !orig_parent.is_null() && !cut_transform.is_null() {
+        if is_alive(orig_parent) && is_alive(cut_transform) {
             Transform::SetParent(cut_transform, orig_parent, true);
         }
     }
 
     let orig_bg_parent = ORIGINAL_BG_CAMERA_PARENT.swap(std::ptr::null_mut(), Ordering::Relaxed);
-    if !orig_bg_parent.is_null() {
-        let bg_transform = CUT_BG_CAMERA_TRANSFORM.load(Ordering::Relaxed);
-        if !bg_transform.is_null() {
+    let bg_transform = CUT_BG_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+    if !orig_bg_parent.is_null() && !bg_transform.is_null() {
+        if is_alive(orig_bg_parent) && is_alive(bg_transform) {
             Transform::SetParent(bg_transform, orig_bg_parent, true);
         }
     }
 
     let timeline_ctrl = CUT_TIMELINE_CONTROLLER.load(Ordering::Relaxed);
-    if !timeline_ctrl.is_null() {
+    if is_alive(timeline_ctrl) {
         unsafe {
             *(timeline_ctrl.cast::<u8>().add(0x720) as *mut bool) = true; // IsCameraUpdateEnable = true
             *(timeline_ctrl.cast::<u8>().add(0x710) as *mut bool) = false; // _isDisableLookAt = false
@@ -135,16 +198,41 @@ fn restore_cut_camera_parents_and_flags() {
     }
 
     let motion_cam = CUT_MOTION_CAMERA.load(Ordering::Relaxed);
-    if !motion_cam.is_null() {
+    if is_alive(motion_cam) {
         unsafe {
             *(motion_cam.cast::<u8>().add(0x28) as *mut bool) = true; // IsUseMotionCamera = true
         }
     }
 }
 
+fn reset_camera_state() {
+    restore_cut_camera_parents_and_flags();
+    unsafe {
+        HAS_INITIAL_CUT_CAMERA = false;
+    }
+    CUT_TIMELINE_CONTROLLER.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_MOTION_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_BG_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
+    CUT_BG_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
+    ORIGINAL_CAMERA_PARENT.store(std::ptr::null_mut(), Ordering::Relaxed);
+    ORIGINAL_BG_CAMERA_PARENT.store(std::ptr::null_mut(), Ordering::Relaxed);
+}
+
 pub fn apply_photo_studio_free_camera() {
     if !free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay) {
         return;
+    }
+
+    let mut cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+    if !is_alive(cut_transform) {
+        let (cam, trans) = find_active_main_camera();
+        if !cam.is_null() && !trans.is_null() {
+            CUT_CAMERA.store(cam, Ordering::Relaxed);
+            CUT_CAMERA_TRANSFORM.store(trans, Ordering::Relaxed);
+            cut_transform = trans;
+        }
     }
 
     detach_cut_cameras();
@@ -159,7 +247,7 @@ pub fn apply_photo_studio_free_camera() {
     };
 
     let mut apply_transform = |transform: *mut Il2CppObject| {
-        if transform.is_null() {
+        if !is_alive(transform) {
             return;
         }
         Transform::set_position_Injected(transform, &mut position);
@@ -171,13 +259,12 @@ pub fn apply_photo_studio_free_camera() {
         }
     };
 
-    let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
     let bg_transform = CUT_BG_CAMERA_TRANSFORM.load(Ordering::Relaxed);
 
-    if !cut_transform.is_null() {
+    if is_alive(cut_transform) {
         apply_transform(cut_transform);
     }
-    if !bg_transform.is_null() {
+    if is_alive(bg_transform) {
         apply_transform(bg_transform);
     }
 
@@ -186,7 +273,7 @@ pub fn apply_photo_studio_free_camera() {
     if !all_cams.is_null() {
         let arr = Array::<*mut Il2CppObject>::from(all_cams);
         for cam in unsafe { arr.as_slice() }.iter().copied() {
-            if cam.is_null() {
+            if !is_alive(cam) {
                 continue;
             }
             let name = Object::get_name(cam);
@@ -207,7 +294,7 @@ pub fn apply_photo_studio_free_camera() {
                 continue;
             }
             let t = Component::get_transform(cam);
-            if !t.is_null() && t != cut_transform && t != bg_transform {
+            if is_alive(t) && t != cut_transform && t != bg_transform {
                 apply_transform(t);
             }
         }
@@ -216,17 +303,17 @@ pub fn apply_photo_studio_free_camera() {
     // Keep camera FoV in sync
     if let Some(fov) = free_camera::fov_for_scene(CameraScene::PhotoStudioCutPlay) {
         let cut_cam = CUT_CAMERA.load(Ordering::Relaxed);
-        if !cut_cam.is_null() {
+        if is_alive(cut_cam) {
             Camera::set_fieldOfView(cut_cam, fov);
         }
         let bg_cam = CUT_BG_CAMERA.load(Ordering::Relaxed);
-        if !bg_cam.is_null() {
+        if is_alive(bg_cam) {
             Camera::set_fieldOfView(bg_cam, fov);
         }
         if !all_cams.is_null() {
             let arr = Array::<*mut Il2CppObject>::from(all_cams);
             for cam in unsafe { arr.as_slice() }.iter().copied() {
-                if cam.is_null() {
+                if !is_alive(cam) {
                     continue;
                 }
                 let name = Object::get_name(cam);
@@ -253,22 +340,22 @@ pub fn apply_photo_studio_free_camera() {
 }
 
 fn cache_cameras_from_controller(controller: *mut Il2CppObject) {
-    if controller.is_null() {
+    if !is_alive(controller) {
         return;
     }
 
     // Extract _motionCamera (offset 0xf8)
     let motion_cam = unsafe { *(controller.cast::<u8>().add(0xf8) as *const *mut Il2CppObject) };
-    if !motion_cam.is_null() {
+    if is_alive(motion_cam) {
         CUT_MOTION_CAMERA.store(motion_cam, Ordering::Relaxed);
 
         // _targetCamera (offset 0x88)
         let target_cam =
             unsafe { *(motion_cam.cast::<u8>().add(0x88) as *const *mut Il2CppObject) };
-        if !target_cam.is_null() {
+        if is_alive(target_cam) {
             CUT_CAMERA.store(target_cam, Ordering::Relaxed);
             let cam_trans = Component::get_transform(target_cam);
-            if !cam_trans.is_null() {
+            if is_alive(cam_trans) {
                 CUT_CAMERA_TRANSFORM.store(cam_trans, Ordering::Relaxed);
             }
         }
@@ -277,10 +364,12 @@ fn cache_cameras_from_controller(controller: *mut Il2CppObject) {
     // Extract BackgroundCamera
     if unsafe { TIMELINE_CONTROLLER_GET_BACKGROUND_CAMERA_ADDR != 0 } {
         let bg_cam = get_BackGroundCamera(controller);
-        if !bg_cam.is_null() {
+        if is_alive(bg_cam) {
             CUT_BG_CAMERA.store(bg_cam, Ordering::Relaxed);
-            CUT_BG_CAMERA_TRANSFORM
-                .store(Component::get_transform(bg_cam), Ordering::Relaxed);
+            let bg_trans = Component::get_transform(bg_cam);
+            if is_alive(bg_trans) {
+                CUT_BG_CAMERA_TRANSFORM.store(bg_trans, Ordering::Relaxed);
+            }
         }
     }
 }
@@ -372,13 +461,53 @@ extern "C" fn CutInTimelineMotionCamera_AlterLateUpdate(
 
 extern "C" fn CutInTimelineMotionCamera_OnDestroy(this: *mut Il2CppObject) {
     if CUT_MOTION_CAMERA.load(Ordering::Relaxed) == this {
-        CUT_MOTION_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
-        CUT_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
-        CUT_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
-        CUT_BG_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
-        CUT_BG_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
+        reset_camera_state();
     }
     get_orig_fn!(CutInTimelineMotionCamera_OnDestroy, NoArgsFn)(this);
+}
+
+extern "C" fn PhotoStudioCuttController_CleanUpCutt(this: *mut Il2CppObject) {
+    reset_camera_state();
+    get_orig_fn!(PhotoStudioCuttController_CleanUpCutt, CleanUpCuttFn)(this);
+}
+
+extern "C" fn PhotoStudioCuttController_CleanUpCuttAndAssetUnload(this: *mut Il2CppObject) {
+    reset_camera_state();
+    get_orig_fn!(
+        PhotoStudioCuttController_CleanUpCuttAndAssetUnload,
+        CleanUpCuttFn
+    )(this);
+}
+
+extern "C" fn PhotoStudioCuttController_PlayCutIn(
+    this: *mut Il2CppObject,
+    model: *mut Il2CppObject,
+    on_end_cut_in: *mut Il2CppObject,
+    on_end_clean_up: *mut Il2CppObject,
+) {
+    reset_camera_state();
+    get_orig_fn!(PhotoStudioCuttController_PlayCutIn, PlayCutInFn)(
+        this,
+        model,
+        on_end_cut_in,
+        on_end_clean_up,
+    );
+}
+
+extern "C" fn PhotoStudioCuttController_OnDestroy(this: *mut Il2CppObject) {
+    reset_camera_state();
+    get_orig_fn!(PhotoStudioCuttController_OnDestroy, NoArgsFn)(this);
+}
+
+extern "C" fn PhotoStudioPlayCutViewController_PlayCutt(
+    this: *mut Il2CppObject,
+    play_resume_animation: bool,
+) {
+    reset_camera_state();
+    get_orig_fn!(PhotoStudioPlayCutViewController_PlayCutt, PlayCuttFn)(
+        this,
+        play_resume_animation,
+    );
 }
 
 extern "C" fn CutInTimelineController_AlterLateUpdate_MotionCamera(
@@ -406,6 +535,15 @@ extern "C" fn CutInTimelineController_AlterLateUpdate_MotionCamera(
 extern "C" fn PhotoStudioPlayCutViewController_LateUpdateView(this: *mut Il2CppObject) {
     VIEW_CONTROLLER.store(this, Ordering::Relaxed);
 
+    // If camera transform is missing or destroyed, dynamically locate active 3D camera
+    if !is_alive(CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed)) {
+        let (cam, trans) = find_active_main_camera();
+        if !cam.is_null() && !trans.is_null() {
+            CUT_CAMERA.store(cam, Ordering::Relaxed);
+            CUT_CAMERA_TRANSFORM.store(trans, Ordering::Relaxed);
+        }
+    }
+
     unsafe {
         free_camera::set_photo_studio_cut_play_active_with_transform(
             LAST_CUT_CAMERA_POS,
@@ -418,12 +556,22 @@ extern "C" fn PhotoStudioPlayCutViewController_LateUpdateView(this: *mut Il2CppO
 
     let is_free_cam = free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay);
     let was_free_cam = WAS_FREE_CAM_ACTIVE.swap(is_free_cam, Ordering::Relaxed);
-    let cam_trans = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+
+    // Re-check cam_trans in case LateUpdateView or other scripts updated it
+    let mut cam_trans = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
+    if !is_alive(cam_trans) {
+        let (cam, trans) = find_active_main_camera();
+        if !cam.is_null() && !trans.is_null() {
+            CUT_CAMERA.store(cam, Ordering::Relaxed);
+            CUT_CAMERA_TRANSFORM.store(trans, Ordering::Relaxed);
+            cam_trans = trans;
+        }
+    }
 
     if is_free_cam {
         if !was_free_cam {
             detach_cut_cameras();
-            if !cam_trans.is_null() {
+            if is_alive(cam_trans) {
                 let mut pos = Vector3_t::default();
                 let mut rot = Quaternion_t::default();
                 Transform::get_position_Injected(cam_trans, &mut pos);
@@ -435,7 +583,7 @@ extern "C" fn PhotoStudioPlayCutViewController_LateUpdateView(this: *mut Il2CppO
                 }
                 free_camera::reseed_photo_studio_camera_transform(pos, rot);
             }
-        } else if unsafe { !HAS_INITIAL_CUT_CAMERA } && !cam_trans.is_null() {
+        } else if unsafe { !HAS_INITIAL_CUT_CAMERA } && is_alive(cam_trans) {
             detach_cut_cameras();
             let mut pos = Vector3_t::default();
             let mut rot = Quaternion_t::default();
@@ -447,13 +595,15 @@ extern "C" fn PhotoStudioPlayCutViewController_LateUpdateView(this: *mut Il2CppO
                 HAS_INITIAL_CUT_CAMERA = true;
             }
             free_camera::reseed_photo_studio_camera_transform(pos, rot);
+        } else {
+            detach_cut_cameras();
         }
         apply_photo_studio_free_camera();
     } else {
         if was_free_cam {
             restore_cut_camera_parents_and_flags();
         }
-        if !cam_trans.is_null() {
+        if is_alive(cam_trans) {
             let mut pos = Vector3_t::default();
             let mut rot = Quaternion_t::default();
             Transform::get_position_Injected(cam_trans, &mut pos);
@@ -470,18 +620,9 @@ extern "C" fn PhotoStudioPlayCutViewController_LateUpdateView(this: *mut Il2CppO
 extern "C" fn PhotoStudioPlayCutViewController_EndView(
     this: *mut Il2CppObject,
 ) -> *mut Il2CppObject {
-    restore_cut_camera_parents_and_flags();
-    unsafe {
-        HAS_INITIAL_CUT_CAMERA = false;
-    }
+    reset_camera_state();
     WAS_FREE_CAM_ACTIVE.store(false, Ordering::Relaxed);
     VIEW_CONTROLLER.store(std::ptr::null_mut(), Ordering::Relaxed);
-    CUT_TIMELINE_CONTROLLER.store(std::ptr::null_mut(), Ordering::Relaxed);
-    CUT_MOTION_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
-    CUT_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
-    CUT_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
-    CUT_BG_CAMERA.store(std::ptr::null_mut(), Ordering::Relaxed);
-    CUT_BG_CAMERA_TRANSFORM.store(std::ptr::null_mut(), Ordering::Relaxed);
     free_camera::end_scene(CameraScene::PhotoStudioCutPlay);
     get_orig_fn!(PhotoStudioPlayCutViewController_EndView, EndViewFn)(this)
 }
@@ -499,6 +640,9 @@ pub fn init(umamusume: *const Il2CppImage) {
 
     let end_view = get_method_addr(PhotoStudioPlayCutViewController, c"EndView", 0);
     new_hook!(end_view, PhotoStudioPlayCutViewController_EndView);
+
+    let play_cutt = get_method_addr(PhotoStudioPlayCutViewController, c"PlayCutt", 1);
+    new_hook!(play_cutt, PhotoStudioPlayCutViewController_PlayCutt);
 
     // Hook CutInHelper
     if let Ok(cutin_helper_class) =
@@ -554,5 +698,26 @@ pub fn init(umamusume: *const Il2CppImage) {
             alter_late_update_motion_camera,
             CutInTimelineController_AlterLateUpdate_MotionCamera
         );
+    }
+
+    // Hook PhotoStudioCuttController
+    if let Ok(cutt_ctrl_class) =
+        crate::il2cpp::symbols::get_class(umamusume, c"Gallop", c"PhotoStudioCuttController")
+    {
+        let cleanup_cutt = get_method_addr(cutt_ctrl_class, c"CleanUpCutt", 0);
+        new_hook!(cleanup_cutt, PhotoStudioCuttController_CleanUpCutt);
+
+        let cleanup_cutt_and_unload =
+            get_method_addr(cutt_ctrl_class, c"CleanUpCuttAndAssetUnload", 0);
+        new_hook!(
+            cleanup_cutt_and_unload,
+            PhotoStudioCuttController_CleanUpCuttAndAssetUnload
+        );
+
+        let play_cut_in = get_method_addr(cutt_ctrl_class, c"PlayCutIn", 3);
+        new_hook!(play_cut_in, PhotoStudioCuttController_PlayCutIn);
+
+        let on_destroy = get_method_addr(cutt_ctrl_class, c"OnDestroy", 0);
+        new_hook!(on_destroy, PhotoStudioCuttController_OnDestroy);
     }
 }
