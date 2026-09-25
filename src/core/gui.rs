@@ -2000,12 +2000,24 @@ impl RaceStatHud {
         pos: egui::Pos2,
         scale: f32,
         theme_color: egui::Color32,
-        glow_on: bool,
+        glow_factor: f32,
     ) {
-        if glow_on {
-            // Golden glow bloom around the runner icon (flashing 0.5s ON)
-            painter.circle_filled(pos, 11.5 * scale, egui::Color32::from_rgba_premultiplied(255, 225, 80, 130));
-            painter.circle_filled(pos, 8.0 * scale, egui::Color32::from_rgba_premultiplied(255, 245, 130, 190));
+        if glow_factor > 0.02 {
+            // Golden glow bloom around the runner icon (smooth fade in & fade out)
+            let a1 = (glow_factor * 140.0) as u8;
+            let a2 = (glow_factor * 195.0) as u8;
+            painter.circle_filled(pos, 11.5 * scale, egui::Color32::from_rgba_premultiplied(
+                (255.0 * glow_factor) as u8,
+                (225.0 * glow_factor) as u8,
+                (80.0 * glow_factor) as u8,
+                a1,
+            ));
+            painter.circle_filled(pos, 8.0 * scale, egui::Color32::from_rgba_premultiplied(
+                (255.0 * glow_factor) as u8,
+                (245.0 * glow_factor) as u8,
+                (130.0 * glow_factor) as u8,
+                a2,
+            ));
         }
 
         let ix = pos.x;
@@ -2085,25 +2097,87 @@ impl RaceStatHud {
             .show(ctx, |ui| {
                 let painter = ui.painter();
 
-                // Flashing glow timer: 0.5s ON, 0.5s OFF
+                const SMOOTH_TIME: f32 = 16.0 / 15.0;
+
+                // Pulsating glow timer with smooth fade in & fade out (1.0s cycle: 0.5s in, 0.5s out)
                 let time = ctx.input(|i| i.time);
-                let glow_on = (time % 1.0) < 0.5;
+                let glow_factor = ((time * std::f64::consts::PI * 2.0).sin() * 0.5 + 0.5) as f32;
                 ctx.request_repaint();
 
-                // Outer background frame matching the prototype HUD
-                painter.rect_filled(hud_rect, 12.0 * scale, egui::Color32::from_rgba_premultiplied(246, 248, 252, 235));
-                painter.rect_stroke(
-                    hud_rect,
-                    12.0 * scale,
-                    egui::Stroke::new(2.4 * scale, egui::Color32::from_rgb(108, 229, 255)), // Cyan border
-                    egui::StrokeKind::Outside,
+                // Smooth HP and 1-bar state check (when stamina is only 1 bar / 50% or below)
+                let display_hp = ctx.animate_value_with_time(
+                    egui::Id::new("uma_proto_gauge_smooth_hp"),
+                    stats.hp,
+                    SMOOTH_TIME,
                 );
-                painter.rect_stroke(
-                    hud_rect,
-                    12.0 * scale + 1.2 * scale,
-                    egui::Stroke::new(1.0 * scale, egui::Color32::from_rgba_premultiplied(255, 180, 210, 140)), // Soft pink outer glow
-                    egui::StrokeKind::Outside,
-                );
+                let hp_ratio = if stats.max_hp > 0.0 {
+                    (display_hp / stats.max_hp).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                let is_one_bar = hp_ratio <= 0.50 && stats.max_hp > 0.0;
+
+                // Outer background frame matching prototype HUD:
+                // Base resolution: 1600x900
+                // Order from Photoshop measurement:
+                // Normal state: Base color (white) > extend 4px as cyan > extend 4px as black outline (33% opacity)
+                // Base glow state (1 bar / hp_ratio <= 0.50): Base color (white) > extend 4px as glow1 > extend 4px as glow2 (fade in & fade out)
+                let ext1 = 4.0 * scale;
+                let ext2 = 8.0 * scale;
+                let corner_r = 12.0 * scale;
+
+                if is_one_bar {
+                    // When stamina is only 1 bar: Base glows orange (fade in & fade out effect)
+                    let glow2_alpha = (glow_factor * 160.0) as u8;
+                    let glow1_alpha = (50.0 + glow_factor * 205.0) as u8;
+                    let bloom_alpha = (glow_factor * 60.0) as u8;
+
+                    // Soft outer glow bloom
+                    if bloom_alpha > 0 {
+                        painter.rect_filled(
+                            hud_rect.expand(ext2 + 2.5 * scale),
+                            corner_r + ext2 + 2.5 * scale,
+                            egui::Color32::from_rgba_unmultiplied(240, 90, 10, bloom_alpha),
+                        );
+                    }
+
+                    // glow2: extends 4px from glow1 (outer orange glow)
+                    if glow2_alpha > 0 {
+                        painter.rect_filled(
+                            hud_rect.expand(ext2),
+                            corner_r + ext2,
+                            egui::Color32::from_rgba_unmultiplied(255, 115, 15, glow2_alpha),
+                        );
+                    }
+
+                    // glow1: extends 4px from basecolor (inner bright orange outline)
+                    painter.rect_filled(
+                        hud_rect.expand(ext1),
+                        corner_r + ext1,
+                        egui::Color32::from_rgba_unmultiplied(255, 130, 20, glow1_alpha),
+                    );
+
+                    // Base color: Solid white
+                    painter.rect_filled(hud_rect, corner_r, egui::Color32::WHITE);
+                } else {
+                    // Normal state:
+                    // 1. Outermost: extend 4px from cyan as black outline 33% opacity (ext2 = 8px from base)
+                    painter.rect_filled(
+                        hud_rect.expand(ext2),
+                        corner_r + ext2,
+                        egui::Color32::from_rgba_unmultiplied(0, 0, 0, 84), // 33% of 255 = 84
+                    );
+
+                    // 2. Middle: extend 4px from basecolor as cyan outline (ext1 = 4px from base)
+                    painter.rect_filled(
+                        hud_rect.expand(ext1),
+                        corner_r + ext1,
+                        egui::Color32::from_rgb(100, 225, 255),
+                    );
+
+                    // 3. Innermost: Base solid white color
+                    painter.rect_filled(hud_rect, corner_r, egui::Color32::WHITE);
+                }
 
                 // ==========================================
                 // 1. TOP-LEFT: 4 Uma Runner Circles
@@ -2141,10 +2215,22 @@ impl RaceStatHud {
                     }
 
                     if is_current {
-                        // Flashing golden glow effect around active circle (0.5s ON, 0.5s OFF)
-                        if glow_on {
-                            painter.circle_filled(c_center, circle_radius + 5.5 * scale, egui::Color32::from_rgba_premultiplied(255, 220, 80, 130));
-                            painter.circle_filled(c_center, circle_radius + 3.5 * scale, egui::Color32::from_rgba_premultiplied(255, 240, 120, 190));
+                        // Golden glow effect around active circle (smooth fade in & fade out)
+                        if glow_factor > 0.02 {
+                            let a1 = (glow_factor * 130.0) as u8;
+                            let a2 = (glow_factor * 190.0) as u8;
+                            painter.circle_filled(c_center, circle_radius + 5.5 * scale, egui::Color32::from_rgba_premultiplied(
+                                (255.0 * glow_factor) as u8,
+                                (220.0 * glow_factor) as u8,
+                                (80.0 * glow_factor) as u8,
+                                a1,
+                            ));
+                            painter.circle_filled(c_center, circle_radius + 3.5 * scale, egui::Color32::from_rgba_premultiplied(
+                                (255.0 * glow_factor) as u8,
+                                (240.0 * glow_factor) as u8,
+                                (120.0 * glow_factor) as u8,
+                                a2,
+                            ));
                         }
 
                         // Active runner: inner ring + full vibrant color
@@ -2166,7 +2252,7 @@ impl RaceStatHud {
 
                         // Running icon above active runner with speed streaks & white outline
                         let icon_pos = c_center - egui::vec2(0.0, (circle_radius + 12.0) * scale);
-                        Self::draw_prototype_hud_runner_icon(painter, icon_pos, scale, *theme_color, glow_on);
+                        Self::draw_prototype_hud_runner_icon(painter, icon_pos, scale, *theme_color, glow_factor);
                     } else {
                         // Inactive runner: 33% transparency (1/3 alpha)
                         let inactive_col = egui::Color32::from_rgba_unmultiplied(
@@ -2191,8 +2277,6 @@ impl RaceStatHud {
                         );
                     }
                 }
-
-                const SMOOTH_TIME: f32 = 16.0 / 15.0;
 
                 // Smooth speed (applied to both gauge and digital text)
                 let display_speed = ctx.animate_value_with_time(
@@ -2372,18 +2456,6 @@ impl RaceStatHud {
                 // Empty bar track
                 painter.rect_filled(bar_rect, bar_corner_r, egui::Color32::from_rgb(32, 34, 42));
 
-                // Smooth interpolation for visual stamina bar (ignoring digital text)
-                let display_hp = ctx.animate_value_with_time(
-                    egui::Id::new("uma_proto_gauge_smooth_hp"),
-                    stats.hp,
-                    SMOOTH_TIME,
-                );
-                let hp_ratio = if stats.max_hp > 0.0 {
-                    (display_hp / stats.max_hp).clamp(0.0, 1.0)
-                } else {
-                    0.0
-                };
-
                 let (layer1_ratio, layer2_ratio) = if hp_ratio > 0.50 {
                     (1.0, (hp_ratio - 0.50) / 0.50)
                 } else {
@@ -2411,11 +2483,17 @@ impl RaceStatHud {
                     painter.rect_filled(l2_rect, bar_corner_r, layer2_color);
                 }
 
-                // Stamina bar border
+                // Stamina bar border: white inner stroke + delicate pink accent seen in proto
                 painter.rect_stroke(
                     bar_rect,
                     bar_corner_r,
                     egui::Stroke::new(1.8 * scale, egui::Color32::WHITE),
+                    egui::StrokeKind::Outside,
+                );
+                painter.rect_stroke(
+                    bar_rect,
+                    bar_corner_r + 1.2 * scale,
+                    egui::Stroke::new(1.0 * scale, egui::Color32::from_rgba_premultiplied(255, 175, 195, 180)),
                     egui::StrokeKind::Outside,
                 );
 
