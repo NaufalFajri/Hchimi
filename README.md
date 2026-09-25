@@ -1,15 +1,14 @@
 <img align="left" width="80" height="80" src="assets/icon.png">
 
-# Hachimi Edge
+# Hchimi
 
-English | [简体中文](README-zh_cn.md) | [繁體中文](README-zh_tw.md)
-
-[![Discord server](https://dcbadge.limes.pink/api/server/https://discord.gg/YjBgmuqqYr)](https://discord.gg/YjBgmuqqYr)
+English
 
 Game enhancement and translation mod for UM:PD.
 
 <img width="100%" height="100%" src="assets/screenshot-1.png">
 <img width="100%" height="100%" src="assets/screenshot-2.png">
+<img width="100%" height="100%" src="assets/screenshot-3.png">
 
 # ⚠️ Please don't link to this repo or Hachimi's website
 We understand that you want to help people install Hachimi and have a better experience playing the game. However, this project is inherently against the game's TOS and The Game Developer most definitely wants it gone if they were ever to learn about it.
@@ -35,11 +34,9 @@ Do what you must, but we would respectfully request that you try to label the ga
 
     Additionally, Hachimi does not provide translation features for only a single language; it has been designed to be fully configurable for any language.
 
-- **Easy setup:** Just plug and play. All setup is done within the game itself, no external application needed.
 - **Translation auto update:** Built-in translation updater lets you play the game as normal while it updates, and reloads it in-game when it's done, no restart needed!
 - **Built-in GUI:** Comes with a config editor so you can modify settings without even exiting the game!
 - **Graphics settings:** You can adjust the game's graphics settings to make full use of your device's specs, such as FPS unlocking and resolution scaling.
-- **Cross-platform:** Designed from the ground up to be portable, with Windows and Android support.
 
 # Installation
 Please see the [Getting started](https://hachimi.noccu.art/docs/hachimi/getting-started.html) page.
