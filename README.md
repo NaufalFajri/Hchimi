@@ -9,19 +9,20 @@ Game enhancement and translation mod for UM:PD.
 <img width="100%" height="100%" src="assets/screenshot-1.png">
 <img width="100%" height="100%" src="assets/screenshot-2.png">
 <img width="100%" height="100%" src="assets/screenshot-3.png">
+<img width="100%" height="100%" src="assets/screenshot-4.png">
 
-# ⚠️ Please don't link to this repo or Hachimi's website
-We understand that you want to help people install Hachimi and have a better experience playing the game. However, this project is inherently against the game's TOS and The Game Developer most definitely wants it gone if they were ever to learn about it.
+# ⚠️ Please don't link to this repo or Hchimi's website
+We understand that you want to help people install Hchimi and have a better experience playing the game. However, this project is inherently against the game's TOS and The Game Developer most definitely wants it gone if they were ever to learn about it.
 
 While sharing in your self-managed chat services and through private messaging is fine, we humbly ask that you refrain from sharing links to this project on public facing sites, or to any of the tools involved.
 
-Or share them and ruin it for the dozens of Hachimi users. It's up to you.
+Or share them and ruin it for the dozens of Hchiiimi users. It's up to you.
 
 ### If you're going to share it anyways
 Do what you must, but we would respectfully request that you try to label the game as "UM:PD" or "The Honse Game" instead of the actual name of the game, to avoid search engine parsing.
 
 # Features
-- **High quality translations:** Hachimi comes with advanced translation features that help translations feel more natural (plural forms, ordinal numbers, etc.) and prevent introducing jank to the UI. It also supports translating most in-game components; no manual assets patching needed!
+- **High quality translations:** Hchimi comes with advanced translation features that help translations feel more natural (plural forms, ordinal numbers, etc.) and prevent introducing jank to the UI. It also supports translating most in-game components; no manual assets patching needed!
 
     Supported components:
     - UI text
@@ -32,7 +33,7 @@ Do what you must, but we would respectfully request that you try to label the ga
     - Texture replacement
     - Sprite atlas replacement
 
-    Additionally, Hachimi does not provide translation features for only a single language; it has been designed to be fully configurable for any language.
+    Additionally, Hchimi does not provide translation features for only a single language; it has been designed to be fully configurable for any language.
 
 - **Translation auto update:** Built-in translation updater lets you play the game as normal while it updates, and reloads it in-game when it's done, no restart needed!
 - **Built-in GUI:** Comes with a config editor so you can modify settings without even exiting the game!
@@ -42,7 +43,7 @@ Do what you must, but we would respectfully request that you try to label the ga
 Please see the [Getting started](https://hachimi.noccu.art/docs/hachimi/getting-started.html) page.
 
 # Special thanks
-These projects have been the basis for Hachimi's development; without them, Hachimi would never have existed in its current form:
+These projects have been the basis for Hchimi's development; without them, Hchimi would never have existed in its current form:
 
 - [Trainers' Legend G](https://github.com/MinamiChiwa/Trainers-Legend-G)
 - [umamusume-localify-android](https://github.com/Kimjio/umamusume-localify-android)
