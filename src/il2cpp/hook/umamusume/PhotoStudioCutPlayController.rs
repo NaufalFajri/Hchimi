@@ -97,34 +97,35 @@ pub fn apply_photo_studio_free_camera() {
     let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
     if !cut_transform.is_null() {
         apply_transform(cut_transform);
-    } else {
-        // Fallback: search allCameras for active 3D cut cameras
-        let all_cams = Camera::get_allCameras();
-        if !all_cams.is_null() {
-            let arr = Array::<*mut Il2CppObject>::from(all_cams);
-            for cam in unsafe { arr.as_slice() }.iter().copied() {
-                if cam.is_null() {
-                    continue;
-                }
-                let name = Object::get_name(cam);
-                let name_str = if !name.is_null() {
-                    unsafe { (*name).as_utf16str().to_string() }
-                } else {
-                    String::new()
-                };
-                // Skip UI / Canvas cameras
-                if name_str.contains("UI") || name_str.contains("Canvas") {
-                    continue;
-                }
+    }
+
+    // Apply free camera to all active cameras named "CutInCamera" (multi-camera passes)
+    let all_cams = Camera::get_allCameras();
+    if !all_cams.is_null() {
+        let arr = Array::<*mut Il2CppObject>::from(all_cams);
+        for cam in unsafe { arr.as_slice() }.iter().copied() {
+            if cam.is_null() {
+                continue;
+            }
+            let name = Object::get_name(cam);
+            let name_str = if !name.is_null() {
+                unsafe { (*name).as_utf16str().to_string() }
+            } else {
+                String::new()
+            };
+            if name_str.contains("CutInCamera") {
                 let t = Component::get_transform(cam);
-                if !t.is_null() {
+                if !t.is_null() && t != cut_transform {
                     apply_transform(t);
+                }
+                if let Some(fov) = free_camera::fov_for_scene(CameraScene::PhotoStudioCutPlay) {
+                    Camera::set_fieldOfView(cam, fov);
                 }
             }
         }
     }
 
-    // Keep camera FoV in sync
+    // Keep camera FoV in sync on the primary cut camera
     if let Some(fov) = free_camera::fov_for_scene(CameraScene::PhotoStudioCutPlay) {
         let cut_cam = CUT_CAMERA.load(Ordering::Relaxed);
         if !cut_cam.is_null() {

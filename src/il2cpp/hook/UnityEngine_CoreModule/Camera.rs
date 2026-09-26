@@ -25,12 +25,15 @@ fn should_override_near_clip() -> bool {
     free_camera::is_scene_enabled(CameraScene::Home)
         || free_camera::is_scene_enabled(CameraScene::Live)
         || free_camera::is_scene_enabled(CameraScene::Race)
-        || free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay)
 }
 
 #[cfg(target_os = "windows")]
 extern "C" fn Camera_get_fieldOfView(this: *mut Il2CppObject) -> f32 {
     let scene = free_camera::scene();
+    if scene == CameraScene::PhotoStudioCutPlay {
+        // Let cut cameras return their real FOV so DoF and post-processing shaders are not distorted
+        return get_orig_fn!(Camera_get_fieldOfView, CameraGetFloatFn)(this);
+    }
     if let Some(fov) = free_camera::fov_for_scene(scene) {
         return fov;
     }
@@ -58,7 +61,6 @@ extern "C" fn Camera_set_farClipPlane(this: *mut Il2CppObject, mut value: f32) {
     if free_camera::is_scene_enabled(CameraScene::Home)
         || free_camera::is_scene_enabled(CameraScene::Live)
         || free_camera::is_scene_enabled(CameraScene::Race)
-        || free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay)
     {
         value = 2500.0;
     }
@@ -70,7 +72,6 @@ extern "C" fn Camera_get_farClipPlane(this: *mut Il2CppObject) -> f32 {
     if free_camera::is_scene_enabled(CameraScene::Home)
         || free_camera::is_scene_enabled(CameraScene::Live)
         || free_camera::is_scene_enabled(CameraScene::Race)
-        || free_camera::is_scene_enabled(CameraScene::PhotoStudioCutPlay)
     {
         return 2500.0;
     }
