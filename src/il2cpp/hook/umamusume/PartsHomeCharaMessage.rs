@@ -3,26 +3,16 @@ use crate::{
     il2cpp::{symbols::get_method_addr, types::*},
 };
 
-type PlayIdleFn = extern "C" fn(this: *mut Il2CppObject, useSmoothFaceBlend: bool);
-extern "C" fn PlayIdle(this: *mut Il2CppObject, useSmoothFaceBlend: bool) {
-    if Hachimi::instance().config.load().chara_speak_home_idle {
-        get_orig_fn!(PlayIdle, PlayIdleFn)(this, useSmoothFaceBlend);
-    }
-}
-
-type PlaySetFn = extern "C" fn(this: *mut Il2CppObject, useSmoothFaceBlend: bool);
-extern "C" fn PlaySet(this: *mut Il2CppObject, useSmoothFaceBlend: bool) {
-    if Hachimi::instance().config.load().chara_speak_home_idle {
-        get_orig_fn!(PlaySet, PlaySetFn)(this, useSmoothFaceBlend);
-    }
+type SetModelFn = extern "C" fn(this: *mut Il2CppObject, modelController: *mut Il2CppObject, isPlayVoice: bool);
+extern "C" fn SetModel(this: *mut Il2CppObject, modelController: *mut Il2CppObject, isPlayVoice: bool) {
+    let play_voice = isPlayVoice && Hachimi::instance().config.load().chara_speak_home_idle;
+    get_orig_fn!(SetModel, SetModelFn)(this, modelController, play_voice);
 }
 
 pub fn init(umamusume: *const Il2CppImage) {
     get_class_or_return!(umamusume, Gallop, PartsHomeCharaMessage);
 
-    let PlayIdle_addr = get_method_addr(PartsHomeCharaMessage, c"PlayIdle", 1);
-    let PlaySet_addr = get_method_addr(PartsHomeCharaMessage, c"PlaySet", 1);
+    let SetModel_addr = get_method_addr(PartsHomeCharaMessage, c"SetModel", 2);
 
-    new_hook!(PlayIdle_addr, PlayIdle);
-    new_hook!(PlaySet_addr, PlaySet);
+    new_hook!(SetModel_addr, SetModel);
 }
