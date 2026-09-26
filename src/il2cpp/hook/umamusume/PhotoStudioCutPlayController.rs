@@ -1,4 +1,12 @@
-use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicBool, AtomicPtr, Ordering},
+        Mutex,
+    },
+};
+
+use once_cell::sync::Lazy;
 
 use crate::{
     il2cpp::{
@@ -26,7 +34,8 @@ static CUT_MOTION_CAMERA: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::nul
 static CUT_CAMERA: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
 static CUT_CAMERA_TRANSFORM: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
 
-static ORIGINAL_CAMERA_PARENT: AtomicPtr<Il2CppObject> = AtomicPtr::new(std::ptr::null_mut());
+static DETACHED_CAMERA_PARENTS: Lazy<Mutex<HashMap<usize, usize>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 static WAS_FREE_CAM_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 static mut LAST_CUT_CAMERA_POS: Vector3_t = Vector3_t {
@@ -41,26 +50,57 @@ static mut LAST_CUT_CAMERA_ROT: Quaternion_t = Quaternion_t {
     z: 0.0,
 };
 
+fn detach_camera_transform(transform: *mut Il2CppObject) {
+    if transform.is_null() || !Object::op_Implicit(transform) {
+        return;
+    }
+    let key = transform as usize;
+    let mut map = DETACHED_CAMERA_PARENTS.lock().unwrap();
+    if !map.contains_key(&key) {
+        let parent = Transform::get_parent(transform);
+        if !parent.is_null() && Object::op_Implicit(parent) {
+            map.insert(key, parent as usize);
+            Transform::SetParent(transform, std::ptr::null_mut(), true);
+        }
+    }
+}
+
 fn detach_cut_cameras() {
     let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
-    if !cut_transform.is_null()
-        && Object::op_Implicit(cut_transform)
-        && ORIGINAL_CAMERA_PARENT.load(Ordering::Relaxed).is_null()
-    {
-        let parent = Transform::get_parent(cut_transform);
-        if !parent.is_null() && Object::op_Implicit(parent) {
-            ORIGINAL_CAMERA_PARENT.store(parent, Ordering::Relaxed);
-            Transform::SetParent(cut_transform, std::ptr::null_mut(), true);
+    if !cut_transform.is_null() {
+        detach_camera_transform(cut_transform);
+    }
+
+    let all_cams = Camera::get_allCameras();
+    if !all_cams.is_null() {
+        let arr = Array::<*mut Il2CppObject>::from(all_cams);
+        for cam in unsafe { arr.as_slice() }.iter().copied() {
+            if cam.is_null() {
+                continue;
+            }
+            let name = Object::get_name(cam);
+            let name_str = if !name.is_null() {
+                unsafe { (*name).as_utf16str().to_string() }
+            } else {
+                String::new()
+            };
+            if name_str.contains("CutInCamera") {
+                let t = Component::get_transform(cam);
+                if !t.is_null() {
+                    detach_camera_transform(t);
+                }
+            }
         }
     }
 }
 
 fn restore_cut_camera_parents() {
-    let orig_parent = ORIGINAL_CAMERA_PARENT.swap(std::ptr::null_mut(), Ordering::Relaxed);
-    if !orig_parent.is_null() && Object::op_Implicit(orig_parent) {
-        let cut_transform = CUT_CAMERA_TRANSFORM.load(Ordering::Relaxed);
-        if !cut_transform.is_null() && Object::op_Implicit(cut_transform) {
-            Transform::SetParent(cut_transform, orig_parent, true);
+    let mut map = DETACHED_CAMERA_PARENTS.lock().unwrap();
+    for (trans_ptr, parent_ptr) in map.drain() {
+        let transform = trans_ptr as *mut Il2CppObject;
+        let parent = parent_ptr as *mut Il2CppObject;
+        if Object::IsNativeObjectAlive(transform) && Object::IsNativeObjectAlive(parent) {
+            Transform::SetParent(transform, parent, true);
         }
     }
 }
@@ -115,8 +155,11 @@ pub fn apply_photo_studio_free_camera() {
             };
             if name_str.contains("CutInCamera") {
                 let t = Component::get_transform(cam);
-                if !t.is_null() && t != cut_transform {
-                    apply_transform(t);
+                if !t.is_null() {
+                    detach_camera_transform(t);
+                    if t != cut_transform {
+                        apply_transform(t);
+                    }
                 }
                 if let Some(fov) = free_camera::fov_for_scene(CameraScene::PhotoStudioCutPlay) {
                     Camera::set_fieldOfView(cam, fov);
